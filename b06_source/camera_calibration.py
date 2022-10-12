@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import math
 import pickle
 import itertools as it
 import imageio as iio
@@ -841,3 +842,115 @@ class CalibrationForAnipose3DTracking:
                                  'however, all cam_ids must be unique! Please check for duplicates '
                                  'in the "single_cams_to_calibrate" list, or rename the respective '
                                  'cam_id attribute of the corresponding SingleCamDataForAnipose object.')
+
+
+    def _get_length_in_3d_space(self, PointA: np.array, PointB: np.array) -> float:
+            length = math.sqrt((PointA[0]-PointB[0])**2 + (PointA[1]-PointB[1])**2 + (PointA[2]-PointB[2])**2)
+            return length
+
+    def _get_angle_from_law_of_cosines(self, length_a: float, length_b: float, length_c: float)->float:
+        cos_angle = (length_a**2 + length_b**2 - length_c**2) / (2 * length_b * length_c)
+        return math.degrees(math.acos(cos_angle))
+
+    def _get_angle_between_three_points_at_PointC(self, PointA: np.array, PointB: np.array, PointC: np.array) -> float:
+        length_c = self._get_length_in_3d_space(PointA, PointB)
+        length_b = self._get_length_in_3d_space(PointA, PointC)
+        length_a = self._get_length_in_3d_space(PointB, PointC)
+        return self._get_angle_from_law_of_cosines(length_a, length_b, length_c)
+
+    def _get_coordinates_plane_equation_from_three_points(self, PointA: np.array, PointB: np.array, PointC: np.array) -> np.array:
+        R1 = self._get_Richtungsvektor_from_two_points(PointA, PointB)
+        R2 = self._get_Richtungsvektor_from_two_points(PointA, PointC)
+        #check for linear independency
+        #np.solve: R2 * x != R1
+        plane_equation_coordinates = np.asarray([PointA, R1, R2])
+        return plane_equation_coordinates
+     
+        
+    def _get_vector_product(self, A: np.array, B: np.array) -> np.array:
+        #Kreuzprodukt
+        N = np.asarray([A[1]*B[2] - A[2]*B[1], A[2]*B[0]-A[0]*B[2], A[0]*B[1]-A[1]*B[0]])
+        return N
+
+    def _get_Richtungsvektor_from_two_points(self, PointA: np.array, PointB: np.array) -> np.array:
+        R = np.asarray([PointA[0] - PointB[0], PointA[1] - PointB[1], PointA[2] - PointB[2]])
+        return R
+
+    def _get_vector_length(self, vector: np.array) -> float:
+        length = math.sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2)
+        return length
+
+    def _get_angle_between_plane_and_line(self, N: np.array, R: np.array) -> float:
+        cosphi = self._get_vector_length(vector = self._get_vector_product(A = N, B = R)) / (self._get_vector_length(N) * self._get_vector_length(R))
+        phi = math.degrees(math.acos(cosphi))
+        angle = 90 - phi
+        return angle
+
+    def _get_angle_between_two_points_and_plane(self, PointA: np.array, PointB: np.array, N: np.array)->float:
+        R = self._get_Richtungsvektor_from_two_points(PointA, PointB)
+        return self._get_angle_between_plane_and_line(N = N, R = R)
+
+
+    def _get_distance_between_plane_and_point(self, N: np.array, PointOnPlane: np.array, DistantPoint: np.array)->float:
+        a = N[0] * PointOnPlane [0] + N[1] * PointOnPlane [1] + N[2]* PointOnPlane [2]
+        distance = abs(N[0] * DistantPoint[0] + N[1] * DistantPoint[1] + N[2] * DistantPoint[2] - a)/math.sqrt(N[0]**2 + N[1]**2 + N[2]**2)
+        return distance
+
+    def _get_vector_from_label(self, label: str)->np.array:
+        return np.asarray([self.anipose_io['df_xyz'][label + '_x'], self.anipose_io['df_xyz'][label + '_y'], self.anipose_io['df_xyz'][label + '_z']])
+    
+    
+    def run_calibration_control(self, show_full_output = False)->None:
+        #check for tilt in maze_plane
+        #mazecorners have 90 degrees
+        maze_corner_closed_left = self._get_vector_from_label(label = 'maze_corner_closed_left')
+        maze_corner_open_left = self._get_vector_from_label(label = 'maze_corner_open_left')
+        maze_corner_closed_right = self._get_vector_from_label(label = 'maze_corner_closed_right')
+        maze_corner_open_right = self._get_vector_from_label(label = 'maze_corner_open_right')
+        
+        angle_at_open_right = self._get_angle_between_three_points_at_PointC(PointA = maze_corner_open_left, PointB = maze_corner_closed_right, PointC = maze_corner_open_right)
+        angle_at_open_left = self._get_angle_between_three_points_at_PointC(PointA = maze_corner_open_right, PointB = maze_corner_closed_left, PointC = maze_corner_open_left)
+        angle_at_closed_right = self._get_angle_between_three_points_at_PointC(PointA = maze_corner_closed_left, PointB = maze_corner_open_right, PointC = maze_corner_closed_right)
+        angle_at_closed_left = self._get_angle_between_three_points_at_PointC(PointA = maze_corner_open_left, PointB = maze_corner_closed_right, PointC = maze_corner_closed_left)
+        
+        print(f'Maze tilted?:\n\n'
+            f'Angle at open right: {angle_at_open_right}\n'
+            f'Angle at open left: {angle_at_open_left}\n'
+            f'Angle at closed right: {angle_at_closed_right}\n'
+            f'Angle at closed left: {angle_at_closed_left}\n\n')
+
+        #check for angle of objects on the plane
+        plane_coord = self._get_coordinates_plane_equation_from_three_points(PointA = maze_corner_open_left, PointB = maze_corner_closed_right, PointC = maze_corner_closed_left)
+        N = self._get_vector_product(A = plane_coord[0], B = plane_coord[2])
+        
+        screw1_bottom = self._get_vector_from_label(label = 'screw1_bottom')
+        screw1_top = self._get_vector_from_label(label = 'screw1_top')
+        angle_screw_1 = self._get_angle_between_two_points_and_plane(PointA = screw1_bottom, PointB = screw1_top, N = N)
+        screw2_bottom = self._get_vector_from_label(label = 'screw2_bottom')
+        screw2_top = self._get_vector_from_label(label = 'screw2_top')
+        angle_screw_2 = self._get_angle_between_two_points_and_plane(PointA = screw2_bottom, PointB = screw2_top, N = N)
+        screw3_bottom = self._get_vector_from_label(label = 'screw3_bottom')
+        screw3_top = self._get_vector_from_label(label = 'screw3_top')
+        angle_screw_3 = self._get_angle_between_two_points_and_plane(PointA = screw3_bottom, PointB = screw3_top, N = N)
+        screw4_bottom = self._get_vector_from_label(label = 'screw4_bottom')
+        screw4_top = self._get_vector_from_label(label = 'screw4_top')
+        angle_screw_4 = self._get_angle_between_two_points_and_plane(PointA = screw4_bottom, PointB = screw4_top, N = N)
+        
+        print(f'Angle of objects on the maze:\n'
+            f'Angle screw1: {angle_screw_1}\n'
+            f'Angle screw2: {angle_screw_2}\n'
+            f'Angle screw3: {angle_screw_3}\n'
+            f'Angle screw4: {angle_screw_4}\n')
+            
+        #X1/X2 are close to the plane
+        x1 = self._get_vector_from_label(label = 'x1')
+        x2 = self._get_vector_from_label(label = 'x2')
+        
+        distance_X1_to_maze_plane = self._get_distance_between_plane_and_point(N = N, PointOnPlane = plane_coord[0], DistantPoint = x1)[0]
+        distance_X2_to_maze_plane = self._get_distance_between_plane_and_point(N = N, PointOnPlane = plane_coord[0], DistantPoint = x2)[0]
+        #in cm?
+
+           
+        print(f'Distance of X1 and X2:\n'
+        f'Distance X1 to maze: {distance_X1_to_maze_plane}\n'
+        f'Distance X2 to maze: {distance_X2_to_maze_plane}\n')
