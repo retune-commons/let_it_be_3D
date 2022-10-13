@@ -47,7 +47,7 @@ distances:
         MazeCornerClosedRight: 5
         MazeCornerOpenRight: 50.24
 
-    maze_corner_closed_right:
+    MazeCornerClosedRight:
         MazeCornerClosedLeft: 5
         MazeCornerOpenRight: 50
         MazeCornerOpenLeft: 50.24
