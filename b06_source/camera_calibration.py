@@ -728,7 +728,7 @@ class CalibrationForAnipose3DTracking:
                 if (marker_id_a in gt_distances.keys()) & (marker_id_b in gt_distances[marker_id_a].keys()):
                     gt_distance = gt_distances[marker_id_a][marker_id_b]
                     triangulated_distance = triangulated_distances[marker_id_a][marker_id_b]
-                    distance_error = gt_distance - triangulated_distance
+                    distance_error = abs(gt_distance - abs(triangulated_distance))
                     marker_ids_with_distance_error.append((marker_id_a, marker_id_b, distance_error))
         return marker_ids_with_distance_error
     
