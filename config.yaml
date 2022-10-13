@@ -42,11 +42,11 @@ angles:
 
     MazeCornerOpenRight: 
         value: 90
-        marker: [MazeCornerOpenRight, maze_corner_open_left, maze_corner_closed_right]
+        marker: [MazeCornerOpenRight, MazeCornerOpenLeft, MazeCornerClosedRight]
 
     MazeCornerClosedLeft: 
         value: 90
-        marker: [MazeCornerClosedLeft, maze_corner_closed_right, maze_corner_open_left]
+        marker: [MazeCornerClosedLeft, MazeCornerClosedRight, MazeCornerOpenLeft]
     
     MazeCornerClosedRight: 
         value: 90
