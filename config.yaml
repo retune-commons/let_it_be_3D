@@ -36,66 +36,34 @@ distances:
 
 #calculates angle at the first given marker
 angles:
-- 
-    maze_corner_open_left: 90
-    marker: 
-    - maze_corner_open_left
-    - maze_corner_open_right
-    - maze_corner_closed_left
-- 
-    maze_corner_open_right : 90
-    marker: 
-    - maze_corner_open_right 
-    - maze_corner_open_left
-    - maze_corner_closed_right
+    maze_corner_open_left: 
+        value: 90
+        marker: [maze_corner_open_left, maze_corner_open_right, maze_corner_closed_left]
 
--
-    maze_corner_closed_left: 90
-    marker:
-    - maze_corner_closed_left
-    - maze_corner_closed_right
-    - maze_corner_open_left
+    maze_corner_open_right: 
+        value: 90
+        marker: [maze_corner_open_right, maze_corner_open_left, maze_corner_closed_right]
+
+    maze_corner_closed_left: 
+        value: 90
+        marker: [maze_corner_closed_left, maze_corner_closed_right, maze_corner_open_left]
     
--
-    maze_corner_closed_right: 90
-    marker:
-    - maze_corner_closed_right
-    - maze_corner_closed_left
-    - maze_corner_open_right
+    maze_corner_closed_right: 
+        value: 90
+        marker: [maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
         
--
-    screw_1: 90
-    marker:
-    - screw1_bottom
-    - screw1_top
-    - maze_corner_closed_right
-    - maze_corner_closed_left
-    - maze_corner_open_right  
+    screw_1: 
+        value: 90
+        marker: [screw1_bottom, screw1_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]  
 
+    screw_2: 
+        value: 90
+        marker: [screw2_bottom, screw2_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
 
--
-    screw_2: 90
-    marker:
-    - screw2_bottom
-    - screw2_top
-    - maze_corner_closed_right
-    - maze_corner_closed_left
-    - maze_corner_open_right
+    screw_3: 
+        value: 90
+        marker: [screw3_bottom, screw3_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
 
--
-    screw_3: 90
-    marker:
-    - screw3_bottom
-    - screw3_top
-    - maze_corner_closed_right
-    - maze_corner_closed_left
-    - maze_corner_open_right
-
--
-    screw_4: 90
-    marker:
-    - screw4_bottom
-    - screw4_top
-    - maze_corner_closed_right
-    - maze_corner_closed_left
-    - maze_corner_open_right
+    screw_4: 
+        value: 90
+        marker: [screw4_bottom, screw4_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
