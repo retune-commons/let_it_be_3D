@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import imageio as iio
 import ffmpeg
 
+from b06_source.video_metadata import VideoMetadata
+from b06_source.utils import Coordinates
 
 
 class TimeseriesTemplate(ABC):
@@ -342,7 +344,7 @@ class Synchronizer(ABC):
         return sampling_frame_idxs
         
         
-    def _adjust_frame_idxs_for_synchronization_shift(self, unadjusted_frame_idxs: List[int], start_idx: int) -> List[int]
+    def _adjust_frame_idxs_for_synchronization_shift(self, unadjusted_frame_idxs: List[int], start_idx: int) -> List[int]:
         adjusted_frame_idxs = np.asarray(unadjusted_frame_idxs) + start_idx
         return list(adjusted_frame_idxs)
 

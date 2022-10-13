@@ -1,15 +1,16 @@
 from typing import List, Tuple, Dict, Union, Optional
+import datetime
+from abc import ABC, abstractmethod
+
 from pathlib import Path
 import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
-from gait3d.video_module import VideoMetadata, VideoInterface
-#from gait3d.whatever import Synchronizer
-import datetime
-from abc import ABC, abstractmethod
 
-
+from b06_source.video_metadata import VideoMetadata
+from b06_source.video_module import VideoInterface
+from b06_source.video_synchronization import Synchronizer, RecordingVideoDownSynchronizer, RecordingVideoSynchronizer, CharucoVideoSynchronizer
 
 """
 import pickle
@@ -133,7 +134,7 @@ class Calibration():
         charuco_interfaces = [VideoInterface(metadata = video_metadata) for video_metadata in charuco_metadata]
         #bool to inspect and validate intrinsic calibration?
         for video_interface in charuco_interfaces:
-            video_interface.run_synchronizer(synchronizer = 'Charuco', use_gpu = use_gpu)#missing subclass for synchronizer
+            video_interface.run_synchronizer(synchronizer = CharucoVideoSynchronizer, use_gpu = use_gpu)#missing subclass for synchronizer
         self.synchronized_charuco_videofiles = [video_interface.synchronized_object_filepath for video_interface in charuco_interfaces]
         self.camera_objects = [video_interface.export_for_aniposelib() for video_interface in charuco_interfaces]
         self.metadata_from_videos = [video_interface.metadata for video_interface in charuco_interfaces]
