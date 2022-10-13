@@ -34,6 +34,28 @@ distances:
     x2:
         maze_corner_closed_left: 17.4
 
+    maze_corner_open_left:
+        maze_corner_closed_left: 50
+        maze_corner_open_right: 5
+
+    maze_corner_open_right:
+        maze_corner_closed_right: 50
+        maze_corner_open_left: 5
+
+    maze_corner_closed_left:
+        maze_corner_open_left: 50
+        maze_corner_closed_right: 5
+        maze_corner_open_right: 50.24
+
+    maze_corner_closed_right:
+        maze_corner_closed_left: 5
+        maze_corner_open_right: 50
+        maze_corner_open_left: 50.24
+
+
+
+
+
 #calculates angle at the first given marker
 angles:
     maze_corner_open_left: 
@@ -67,3 +89,15 @@ angles:
     screw_4: 
         value: 90
         marker: [screw4_bottom, screw4_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
+
+marker_ids_to_connect_in_3D_plot:
+    -
+      - screw1_bottom
+      - screw4_bottom
+      - screw4_top
+      - screw1_nut
+    -
+      - maze_corner_closed_left
+      - maze_corner_open_left
+      - maze_corner_open_right
+      - maze_corner_closed_right

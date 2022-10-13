@@ -582,22 +582,23 @@ class CalibrationForAnipose3DTracking:
         self.anipose_io = self._add_dataframe_of_triangulated_points(anipose_io=self.anipose_io)
         self.anipose_io = self._add_reprojection_errors_of_all_test_position_markers(anipose_io=self.anipose_io)
         self._set_distances_and_angles_for_evaluation(test_positions_gt)
+        gt_distances = self._fill_in_distaces(test_positions_gt["distances"])
         self.anipose_io = self._add_all_real_distances_errors(anipose_io=self.anipose_io,
-                                                              test_positions_gt=test_positions_gt)
+                                                              test_positions_gt=gt_distances)
 
         self._set_angles_error_between_screws_and_plane(test_positions_gt["angles"])
         if verbose:
-           print(f'Mean reprojection error: {self.anipose_io["reproj_nonan"].mean()}')
-           for reference_distance_id, distance_errors in self.anipose_io['distance_errors_in_cm'].items():
-               print(
-                   f'Using {reference_distance_id} as reference distance, the mean distance error is: {distance_errors["mean_error"]} cm.')
-           for angle, angle_error in self.anipose_io["angles_error_screws_plan"].items():
-               print(
-                   f'Considering {angle}, the mean angle error is: {angle_error}'
-               )
+            print(f'Mean reprojection error: {self.anipose_io["reproj_nonan"].mean()}')
+            for reference_distance_id, distance_errors in self.anipose_io['distance_errors_in_cm'].items():
+                print(
+                    f'Using {reference_distance_id} as reference distance, the mean distance error is: {distance_errors["mean_error"]} cm.')
+            for angle, angle_error in self.anipose_io["angles_error_screws_plan"].items():
+                print(
+                    f'Considering {angle}, the angle error is: {angle_error}'
+                )
         if show_3D_plot:
-           self._show_3D_plot(frame_idx=0, anipose_io=self.anipose_io,
-                              marker_ids_to_connect=test_positions_gt.marker_ids_to_connect_in_3D_plot)
+            self._show_3D_plot(frame_idx=0, anipose_io=self.anipose_io,
+                               marker_ids_to_connect=test_positions_gt["marker_ids_to_connect_in_3D_plot"])
 
     def load_calibration(self, filepath: Path) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup.load(filepath)
@@ -621,6 +622,18 @@ class CalibrationForAnipose3DTracking:
         # validate filepath and extension (.toml)
         # and add default alternative
         self.camera_group.dump(filepath)
+
+    def _fill_in_distaces(self, distances_dict):
+        filled_d = {}
+        for key, value in distances_dict.items():
+            filled_d[key] = value
+            for k, v in value.items():
+                if k in filled_d.keys():
+                    filled_d[k][key] = v
+                else:
+                    filled_d[k] = {}
+                    filled_d[k][key] = v
+        return filled_d
 
     def _set_distances_and_angles_for_evaluation(self, parameters_dict):
         if "distances" in parameters_dict:
@@ -650,13 +663,13 @@ class CalibrationForAnipose3DTracking:
         anipose_io['scores_flat'] = anipose_io['scores'].reshape(n_cams, -1)
         return anipose_io
 
-    def _add_all_real_distances_errors(self, anipose_io: Dict, test_positions_gt: TestPositionsGroundTruth) -> Dict:
+    def _add_all_real_distances_errors(self, anipose_io: Dict, test_positions_gt: Dict) -> Dict:
         all_distance_to_cm_conversion_factors = self._get_conversion_factors_from_different_references(
             anipose_io=anipose_io, test_positions_gt=test_positions_gt)
         anipose_io = self._add_distances_in_cm_for_each_conversion_factor(anipose_io=anipose_io,
                                                                           conversion_factors=all_distance_to_cm_conversion_factors)
         anipose_io = self._add_distance_errors(anipose_io=anipose_io,
-                                               gt_distances=test_positions_gt.marker_ids_with_distances)
+                                               gt_distances=test_positions_gt)
         return anipose_io
 
     def _add_dataframe_of_triangulated_points(self, anipose_io: Dict) -> Dict:
@@ -739,13 +752,14 @@ class CalibrationForAnipose3DTracking:
         for marker_id_a in triangulated_distances.keys():
             for marker_id_b in triangulated_distances[marker_id_a].keys():
                 if (marker_id_a in gt_distances.keys()) & (marker_id_b in gt_distances[marker_id_a].keys()):
-                    gt_distance = gt_distances[marker_id_a][marker_id_b]
+                    ground_truth = gt_distances[marker_id_a][marker_id_b]
                     triangulated_distance = triangulated_distances[marker_id_a][marker_id_b]
-                    distance_error = abs(gt_distance - abs(triangulated_distance))
+                    distance_error = abs(ground_truth - abs(triangulated_distance))
                     marker_ids_with_distance_error.append((marker_id_a, marker_id_b, distance_error))
+
         return marker_ids_with_distance_error
 
-    def _wrap_angles_360(angle):
+    def _wrap_angles_360(self, angle):
         """
         Wraps negative angle on 360 space
         :param angle: input angle
@@ -759,19 +773,19 @@ class CalibrationForAnipose3DTracking:
         :param gt_angles: ground truth angles
         :return: list with angle errors
         """
-        triangulates_angles: Dict = self.anipose_io["angles_screws_plan"]
+        triangulates_angles: Dict = self.anipose_io["angles_to_plane"]
         marker_ids_with_angles_error = {}
         if triangulates_angles.keys() == gt_angles.keys():
             for key in triangulates_angles:
                 wrapped_tri_angle = self._wrap_angles_360(triangulates_angles[key])
-                angle_error = abs(gt_angles[key] - wrapped_tri_angle)
+                angle_error = abs(gt_angles[key]["value"] - wrapped_tri_angle)
                 half_pi_corrected_angle = angle_error if angle_error < 180 else angle_error - 180
                 marker_ids_with_angles_error[key] = half_pi_corrected_angle
         else:
-            raise ("Please check the ground truth angles passed. The screws angles needed are:",
-                   ', '.join(str(key) for key in triangulates_angles),
-                   "\n But the angles in the passed ground truth are:",
-                   ', '.join(str(key) for key in gt_angles))
+            raise ValueError("Please check the ground truth angles passed. The screws angles needed are:",
+                             ', '.join(str(key) for key in triangulates_angles),
+                             "\n But the angles in the passed ground truth are:",
+                             ', '.join(str(key) for key in gt_angles))
         return marker_ids_with_angles_error
 
     def _computes_angles(self, angles_to_compute) -> Dict[str, float]:
@@ -780,27 +794,29 @@ class CalibrationForAnipose3DTracking:
         :return: dictionary of the angles computed
         """
         triangulated_angles = {}
-        for angle, markers in angles_to_compute.items():
-            if len(markers) == 3:
-                pt_a = self._get_vector_from_label(label=markers[0])
-                pt_b = self._get_vector_from_label(label=markers[1])
-                pt_c = self._get_vector_from_label(label=markers[2])
-                triangulated_angles[angle] = self._get_coordinates_plane_equation_from_three_points(PointA=pt_a,
-                                                                                                    PointB=pt_b,
-                                                                                                    PointC=pt_c)
-            elif len(markers) == 5:
-                pt_a = self._get_vector_from_label(label=markers[2])
-                pt_b = self._get_vector_from_label(label=markers[3])
-                pt_c = self._get_vector_from_label(label=markers[4])
+        for angle, markers_dictionary in angles_to_compute.items():
+            if len(markers_dictionary["marker"]) == 3:
+                pt_a = self._get_vector_from_label(label=markers_dictionary["marker"][0])
+                pt_b = self._get_vector_from_label(label=markers_dictionary["marker"][1])
+                pt_c = self._get_vector_from_label(label=markers_dictionary["marker"][2])
+                triangulated_angles[angle] = self._get_angle_between_three_points_at_PointA(PointA=pt_a,
+                                                                                            PointB=pt_b,
+                                                                                            PointC=pt_c)
+            elif len(markers_dictionary["marker"]) == 5:
+                pt_a = self._get_vector_from_label(label=markers_dictionary["marker"][2])
+                pt_b = self._get_vector_from_label(label=markers_dictionary["marker"][3])
+                pt_c = self._get_vector_from_label(label=markers_dictionary["marker"][4])
                 plane_coord = self._get_coordinates_plane_equation_from_three_points(PointA=pt_a,
                                                                                      PointB=pt_b,
                                                                                      PointC=pt_c)
                 N = self._get_vector_product(A=plane_coord[0], B=plane_coord[2])
-                pt_d = self._get_vector_from_label(label=markers[0])
-                pt_e = self._get_vector_from_label(label=markers[1])
+
+                pt_d = self._get_vector_from_label(label=markers_dictionary["marker"][0])
+                pt_e = self._get_vector_from_label(label=markers_dictionary["marker"][1])
                 triangulated_angles[angle] = self._get_angle_between_two_points_and_plane(PointA=pt_d, PointB=pt_e, N=N)
             else:
-                raise ("Invalid number of markers to compute the angle", angle)
+                raise ValueError("Invalid number (%d) of markers to compute the angle " + angle,
+                                 (len(markers_dictionary["marker"])))
         return triangulated_angles
 
     def _set_angles_to_plane(self, angles_to_compute):
@@ -811,7 +827,6 @@ class CalibrationForAnipose3DTracking:
         :return:
         """
         self.anipose_io["angles_to_plane"] = self._computes_angles(angles_to_compute)
-
 
     def _set_angles_error_between_screws_and_plane(self, gt_angles):
         """
@@ -857,18 +872,6 @@ class CalibrationForAnipose3DTracking:
                            self.single_cam_objects]
         setattr(self, 'calibration_video_filepaths', video_filepaths)
 
-    # def _get_conversion_factors_from_different_references(self, anipose_io: Dict,
-    #                                                      test_positions_gt: TestPositionsGroundTruth) -> Dict:  # Tuple? List?
-    #    all_conversion_factors = {}
-    #    for reference_distance_id, reference_marker_ids in test_positions_gt.reference_distance_ids_with_corresponding_marker_ids:
-    #        distance_in_cm = test_positions_gt.marker_ids_with_distances[reference_marker_ids[0]][
-    #            reference_marker_ids[1]]
-    #        distance_to_cm_conversion_factor = self._get_xyz_to_cm_conversion_factor(
-    #            reference_marker_ids=reference_marker_ids,
-    #            distance_in_cm=distance_in_cm,
-    #            df_xyz=anipose_io['df_xyz'])
-    #        all_conversion_factors[reference_distance_id] = distance_to_cm_conversion_factor
-    #    return all_conversion_factors
 
     def _get_conversion_factors_from_different_references(self, anipose_io: Dict,
                                                           test_positions_gt: Dict) -> Dict:  # Tuple? List?
@@ -883,7 +886,7 @@ class CalibrationForAnipose3DTracking:
                     distance_in_cm=distance_in_cm,
                     df_xyz=anipose_io['df_xyz'])
                 all_conversion_factors[reference_distance_id] = distance_to_cm_conversion_factor
-        print(anipose_io['df_xyz'])
+
         return all_conversion_factors
 
     def _get_xyz_distance_in_triangulation_space(self, marker_ids: Tuple[str, str], df_xyz: pd.DataFrame) -> float:

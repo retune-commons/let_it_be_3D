@@ -5,7 +5,6 @@ def read_config(path):
     """
     Reads structured config file defining a project.
     """
-
     if os.path.exists(path):
         try:
             with open(path, "r") as ymlfile:
