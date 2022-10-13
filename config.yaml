@@ -1,69 +1,69 @@
 distances: 
-    screw1_bottom: 
+    Screw1Bottom: 
         screw2_bottom: 5
         screw1_top: 8.1
         screw1_nut: 6.1
         screw3_bottom: 7
         screw4_bottom: 10
     
-    screw1_nut:
+    Screw1Nut:
         screw4_top: 10
         screw1_top: 2
     
-    screw2_bottom:
+    Screw2Bottom:
         screw3_bottom: 2
         screw4_bottom: 5
     
-    screw2_top:
+    Screw2Top:
         screw1_top: 7.7
         screw3_top: 1.9
     
-    screw3_bottom:
+    Screw3Bottom:
         screw4_bottom: 3
     
-    screw3_top:
+    Screw3Top:
         screw4_top: 4.6
     
-    screw4_bottom:
+    Screw4Bottom:
         screw4_top: 6.1
     
-    x1:
+    X1:
         maze_corner_open_left: 9.4
         x2: 16.8
     
-    x2:
+    X2:
         maze_corner_closed_left: 17.4
 
 #calculates angle at the first given marker
 angles:
-    maze_corner_open_left: 
+    MazeCornerOpenLeft: 
         value: 90
         marker: [maze_corner_open_left, maze_corner_open_right, maze_corner_closed_left]
 
-    maze_corner_open_right: 
+    MazeCornerOpenRight: 
         value: 90
         marker: [maze_corner_open_right, maze_corner_open_left, maze_corner_closed_right]
 
-    maze_corner_closed_left: 
+    MazeCornerClosedLeft: 
         value: 90
         marker: [maze_corner_closed_left, maze_corner_closed_right, maze_corner_open_left]
     
-    maze_corner_closed_right: 
+    MazeCornerClosedRight: 
         value: 90
         marker: [maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
         
-    screw_1: 
+    Screw1: 
         value: 90
         marker: [screw1_bottom, screw1_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]  
 
-    screw_2: 
+    Screw2: 
         value: 90
         marker: [screw2_bottom, screw2_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
 
-    screw_3: 
+    Screw3: 
         value: 90
         marker: [screw3_bottom, screw3_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
 
-    screw_4: 
+    Screw4: 
         value: 90
         marker: [screw4_bottom, screw4_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
