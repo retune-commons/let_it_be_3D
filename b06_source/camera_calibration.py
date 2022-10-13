@@ -222,10 +222,11 @@ class TestPositionsGroundTruth:
         self.reference_distance_ids_with_corresponding_marker_ids = []
         self.marker_ids_to_connect_in_3D_plot = []
         self._add_maze_corners()
-        self.add_marker_ids_to_be_connected_in_3d_plots(marker_ids=('maze_corner_open_left',
-                                                                    'maze_corner_open_right',
-                                                                    'maze_corner_closed_right',
-                                                                    'maze_corner_closed_left'))
+        self.add_marker_ids_to_be_connected_in_3d_plots(
+            marker_ids=('maze_corner_open_left',
+                        'maze_corner_open_right',
+                        'maze_corner_closed_right',
+                        'maze_corner_closed_left'))
         self.add_marker_ids_and_distance_id_as_reference_distance(
             marker_ids=('maze_corner_open_left', 'maze_corner_closed_left'),
             distance_id='maze_length_left')
@@ -871,7 +872,6 @@ class CalibrationForAnipose3DTracking:
         video_filepaths = [[single_cam.filepath_synchronized_calibration_video.as_posix()] for single_cam in
                            self.single_cam_objects]
         setattr(self, 'calibration_video_filepaths', video_filepaths)
-
 
     def _get_conversion_factors_from_different_references(self, anipose_io: Dict,
                                                           test_positions_gt: Dict) -> Dict:  # Tuple? List?

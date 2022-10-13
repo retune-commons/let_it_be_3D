@@ -34,23 +34,23 @@ distances:
     X2:
         MazeCornerClosedLeft: 17.4
 
-    maze_corner_open_left:
-        maze_corner_closed_left: 50
-        maze_corner_open_right: 5
+    MazeCornerOpenLeft:
+        MazeCornerClosedLeft: 50
+        MazeCornerOpenRight: 5
 
-    maze_corner_open_right:
-        maze_corner_closed_right: 50
-        maze_corner_open_left: 5
+    MazeCornerOpenRight:
+        MazeCornerClosedRight: 50
+        MazeCornerOpenLeft: 5
 
-    maze_corner_closed_left:
-        maze_corner_open_left: 50
-        maze_corner_closed_right: 5
-        maze_corner_open_right: 50.24
+    MazeCornerClosedLeft:
+        MazeCornerOpenLeft: 50
+        MazeCornerClosedRight: 5
+        MazeCornerOpenRight: 50.24
 
     maze_corner_closed_right:
-        maze_corner_closed_left: 5
-        maze_corner_open_right: 50
-        maze_corner_open_left: 50.24
+        MazeCornerClosedLeft: 5
+        MazeCornerOpenRight: 50
+        MazeCornerOpenLeft: 50.24
 
 
 
@@ -86,19 +86,19 @@ angles:
         value: 90
         marker: [Screw3Bottom, Screw3Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
 
-    Screw4: w
+    Screw4:
         value: 90
         marker: [Screw4Bottom, Screw4Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
-        marker: [screw4_bottom, screw4_top, maze_corner_closed_right, maze_corner_closed_left, maze_corner_open_right]
+
 
 marker_ids_to_connect_in_3D_plot:
     -
-      - screw1_bottom
-      - screw4_bottom
-      - screw4_top
-      - screw1_nut
+      - Screw1Bottom
+      - Screw4Bottom
+      - Screw4Top
+      - Screw1Nut
     -
-      - maze_corner_closed_left
-      - maze_corner_open_left
-      - maze_corner_open_right
-      - maze_corner_closed_right
+      - MazeCornerClosedLeft
+      - MazeCornerOpenLeft
+      - MazeCornerOpenRight
+      - MazeCornerClosedRight
