@@ -1021,15 +1021,11 @@ class CalibrationForAnipose3DTracking:
     def run_calibration_control(self, show_full_output=False) -> None:
         # check for tilt in maze_plane
         # mazecorners have 90 degrees
-        maze_corner_closed_left = self._get_vector_from_label(label='maze_corner_closed_left')
-        maze_corner_open_left = self._get_vector_from_label(label='maze_corner_open_left')
-        maze_corner_closed_right = self._get_vector_from_label(label='maze_corner_closed_right')
-        maze_corner_open_right = self._get_vector_from_label(label='maze_corner_open_right')
+        maze_corner_closed_left = self._get_vector_from_label(label='MazeCornerClosedLeft')
+        maze_corner_open_left = self._get_vector_from_label(label='MazeCornerOpenLeft')
+        maze_corner_closed_right = self._get_vector_from_label(label='MazeCornerClosedRight')
+        maze_corner_open_right = self._get_vector_from_label(label='MazeCornerOpenRight')
 
-        plane_coord = self._get_coordinates_plane_equation_from_three_points(PointA=maze_corner_open_left,
-                                                                             PointB=maze_corner_closed_right,
-                                                                             PointC=maze_corner_closed_left)
-        N = self._get_vector_product(A=plane_coord[0], B=plane_coord[2])
 
         angle_at_open_right = self._get_angle_between_three_points_at_PointA(PointA=maze_corner_open_left,
                                                                              PointB=maze_corner_closed_right,
@@ -1043,29 +1039,45 @@ class CalibrationForAnipose3DTracking:
         angle_at_closed_left = self._get_angle_between_three_points_at_PointA(PointA=maze_corner_open_left,
                                                                               PointB=maze_corner_closed_right,
                                                                               PointC=maze_corner_closed_left)
-
         print(f'Maze tilted?:\n\n'
               f'Angle at open right: {angle_at_open_right}\n'
               f'Angle at open left: {angle_at_open_left}\n'
               f'Angle at closed right: {angle_at_closed_right}\n'
               f'Angle at closed left: {angle_at_closed_left}\n\n')
 
-        angles_dict = self._computes_angles_between_screws_and_plane()
+        # check for angle of objects on the plane
+        plane_coord = self._get_coordinates_plane_equation_from_three_points(PointA=maze_corner_open_left,
+                                                                             PointB=maze_corner_closed_right,
+                                                                             PointC=maze_corner_closed_left)
+        N = self._get_vector_product(A=plane_coord[0], B=plane_coord[2])
+
+        screw1_bottom = self._get_vector_from_label(label='Screw1Bottom')
+        screw1_top = self._get_vector_from_label(label='Screw1Top')
+        angle_screw_1 = self._get_angle_between_two_points_and_plane(PointA=screw1_bottom, PointB=screw1_top, N=N)
+        screw2_bottom = self._get_vector_from_label(label='Screw2Bottom')
+        screw2_top = self._get_vector_from_label(label='Screw2Top')
+        angle_screw_2 = self._get_angle_between_two_points_and_plane(PointA=screw2_bottom, PointB=screw2_top, N=N)
+        screw3_bottom = self._get_vector_from_label(label='Screw3Bottom')
+        screw3_top = self._get_vector_from_label(label='Screw3Top')
+        angle_screw_3 = self._get_angle_between_two_points_and_plane(PointA=screw3_bottom, PointB=screw3_top, N=N)
+        screw4_bottom = self._get_vector_from_label(label='Screw4Bottom')
+        screw4_top = self._get_vector_from_label(label='Screw4Top')
+        angle_screw_4 = self._get_angle_between_two_points_and_plane(PointA=screw4_bottom, PointB=screw4_top, N=N)
 
         print(f'Angle of objects on the maze:\n'
-              f'Angle screw1: {angles_dict["angle_screw_1"]}\n'
-              f'Angle screw2: {angles_dict["angle_screw_2"]}\n'
-              f'Angle screw3: {angles_dict["angle_screw_3"]}\n'
-              f'Angle screw4: {angles_dict["angle_screw_4"]}\n')
+              f'Angle screw1: {angle_screw_1}\n'
+              f'Angle screw2: {angle_screw_2}\n'
+              f'Angle screw3: {angle_screw_3}\n'
+              f'Angle screw4: {angle_screw_4}\n')
 
         # X1/X2 are close to the plane
-        x1 = self._get_vector_from_label(label='x1')
-        x2 = self._get_vector_from_label(label='x2')
+        x1 = self._get_vector_from_label(label='X1')
+        x2 = self._get_vector_from_label(label='X2')
 
         distance_X1_to_maze_plane = \
-            self._get_distance_between_plane_and_point(N=N, PointOnPlane=plane_coord[0], DistantPoint=x1)[0]
+        self._get_distance_between_plane_and_point(N=N, PointOnPlane=plane_coord[0], DistantPoint=x1)[0]
         distance_X2_to_maze_plane = \
-            self._get_distance_between_plane_and_point(N=N, PointOnPlane=plane_coord[0], DistantPoint=x2)[0]
+        self._get_distance_between_plane_and_point(N=N, PointOnPlane=plane_coord[0], DistantPoint=x2)[0]
         # in cm?
 
         print(f'Distance of X1 and X2:\n'
