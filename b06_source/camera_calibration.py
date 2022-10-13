@@ -713,12 +713,17 @@ class CalibrationForAnipose3DTracking:
             marker_ids_with_distance_error = self._compute_differences_between_triangulated_and_gt_distances(
                 triangulated_distances=triangulated_distances,
                 gt_distances=gt_distances)
-            all_distance_errors = [distance_error for marker_id_a, marker_id_b, distance_error in
+            all_distance_errors = [distance_error for marker_id_a, marker_id_b, distance_error, percentage_error in
                                    marker_ids_with_distance_error]
             mean_distance_error = np.asarray(all_distance_errors).mean()
+            all_percentage_errors = [percentage_error for marker_id_a, marker_id_b, distance_error, percentage_error in
+                                   marker_ids_with_distance_error]
+            mean_percentage_error = np.asarray(all_percentage_errors).mean()
             anipose_io['distance_errors_in_cm'][reference_distance_id] = {
                 'individual_errors': marker_ids_with_distance_error,
-                'mean_error': mean_distance_error}
+                'mean_error': mean_distance_error,
+                'mean_percentage_error': mean_percentage_error}
+
         return anipose_io
 
     def _add_distances_in_cm_for_each_conversion_factor(self, anipose_io: Dict, conversion_factors: Dict) -> Dict:
@@ -755,7 +760,8 @@ class CalibrationForAnipose3DTracking:
                     ground_truth = gt_distances[marker_id_a][marker_id_b]
                     triangulated_distance = triangulated_distances[marker_id_a][marker_id_b]
                     distance_error = abs(ground_truth - abs(triangulated_distance))
-                    marker_ids_with_distance_error.append((marker_id_a, marker_id_b, distance_error))
+                    percentage_error = distance_error / ground_truth
+                    marker_ids_with_distance_error.append((marker_id_a, marker_id_b, distance_error, percentage_error))
 
         return marker_ids_with_distance_error
 
