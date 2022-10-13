@@ -1,7 +1,7 @@
 import os
 import yaml
 
-def load_config(path):
+def read_config(path):
     """
     Reads structured config file defining a project.
     """
