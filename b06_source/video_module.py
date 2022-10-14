@@ -34,9 +34,9 @@ class VideoInterface:
                                                      self.metadata.intrinsic_calibration['D'])
         self._plot_distorted_and_undistorted_image(distorted_image = distorted_input_image, undistorted_image = undistorted_output_image)           
     
-    def run_synchronizer(self, synchronizer: Synchronizer, use_gpu: bool) -> None:
-        synchronizer_object = synchronizer(video_metadata = self.metadata, use_gpu = use_gpu)
-        self.synchronized_object_filepath = synchronizer_object.run_synchronization()
+    def run_synchronizer(self, synchronizer: Synchronizer, use_gpu: bool, output_directory: Path, overwrite: bool=False) -> None:
+        synchronizer_object = synchronizer(video_metadata = self.metadata, use_gpu = use_gpu, output_directory = output_directory)
+        self.synchronized_object_filepath = synchronizer_object.run_synchronization(overwrite = overwrite)
     
     def export_for_aniposelib(self) -> Union[ap_lib.cameras.Camera, Path]:
         if self.synchronized_object_filepath.name.endswith('.h5'):

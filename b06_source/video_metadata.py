@@ -17,7 +17,7 @@ from b06_source.utils import load_single_frame_of_video
 
 class VideoMetadata:
     
-    def __init__(self, video_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int = 300, load_calibration = False) -> None:
+    def __init__(self, video_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_calibration_frames: int = 300, load_calibration = False) -> None:
         if video_filepath.suffix == '.mp4' or video_filepath.suffix == '.AVI' or video_filepath.suffix == '.jpg':
             self.filepath = video_filepath
         else:
@@ -28,7 +28,7 @@ class VideoMetadata:
             raise (f'Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!')
         
         self._read_metadata(recording_config_filepath=recording_config_filepath, project_config_filepath=project_config_filepath, video_filepath = video_filepath)
-        self._get_intrinsic_parameters(recording_config_filepath = recording_config_filepath, max_frame_count = max_frame_count, load_calibration = load_calibration)
+        self._get_intrinsic_parameters(recording_config_filepath = recording_config_filepath, max_calibration_frames = max_calibration_frames, load_calibration = load_calibration)
 
             
     def _read_metadata(self, project_config_filepath: Path, recording_config_filepath: Path, video_filepath: Path)->None:
@@ -197,7 +197,7 @@ class VideoMetadata:
             print(messages[attribute_to_check])
             
         
-    def _get_intrinsic_parameters(self, recording_config_filepath: Path, load_calibration: bool, max_frame_count: int) -> None:
+    def _get_intrinsic_parameters(self, recording_config_filepath: Path, load_calibration: bool, max_calibration_frames: int) -> None:
         if self.charuco_video:
             if self.fisheye:
                 try:
@@ -207,7 +207,7 @@ class VideoMetadata:
                 except FileNotFoundError:
                     try:
                         intrinsic_calibration_checkerboard_video_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.suffix == '.mp4' and 'checkerboard' in file.stem and self.cam_id in file.stem][0]
-                        calibrator = IntrinsicCalibratorFisheyeCamera(filepath_calibration_video = intrinsic_calibration_checkerboard_video_filepath, max_frame_count = max_frame_count)
+                        calibrator = IntrinsicCalibratorFisheyeCamera(filepath_calibration_video = intrinsic_calibration_checkerboard_video_filepath, max_frame_count = max_calibration_frames)
                         intrinsic_calibration = calibrator.run()
                     except IndexError:
                         raise FileNotFoundError (f'Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\nIt is required having a intrinsic_calibration .p file or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibrations_directory}) for a fisheye-camera!')
@@ -220,7 +220,7 @@ class VideoMetadata:
                     except IndexError:
                         raise FileNotFoundError (f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" to calibrate now!')
                 else:
-                    calibrator = IntrinsicCalibratorRegularCameraCharuco(filepath_calibration_video = self.filepath, max_frame_count = max_frame_count)
+                    calibrator = IntrinsicCalibratorRegularCameraCharuco(filepath_calibration_video = self.filepath, max_frame_count = max_calibration_frames)
                     intrinsic_calibration = calibrator.run()
             self._save_calibration(intrinsic_calibration = intrinsic_calibration)
         else:

@@ -10,7 +10,7 @@ import pandas as pd
 
 from b06_source.video_metadata import VideoMetadata
 from b06_source.video_module import VideoInterface
-from b06_source.video_synchronization import Synchronizer, RecordingVideoDownSynchronizer, RecordingVideoSynchronizer, CharucoVideoSynchronizer
+from b06_source.video_synchronization import RecordingVideoDownSynchronizer, RecordingVideoUpSynchronizer, CharucoVideoSynchronizer
 
 """
 import pickle
@@ -93,20 +93,12 @@ class TestPositionsGroundTruth:
 
 
 class Calibration():
-    def __init__(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, output_directory: Optional[Path] = None, load_calibration: bool = False, max_frame_count: int = 300, use_gpu: bool = True) -> None:
-        self._create_video_objects(calibration_directory = calibration_directory, load_calibration = load_calibration, project_config_filepath = project_config_filepath, recording_config_filepath=recording_config_filepath, max_frame_count = max_frame_count, use_gpu = use_gpu)
+    def __init__(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, output_directory: Optional[Path] = None, overwrite: bool=False, load_calibration: bool = False, max_frame_count: int = 300, use_gpu: bool = True) -> None:
+        self.output_directory = output_directory
+        self._create_video_objects(calibration_directory = calibration_directory, load_calibration = load_calibration, project_config_filepath = project_config_filepath, recording_config_filepath=recording_config_filepath, overwrite = overwrite, max_frame_count = max_frame_count, use_gpu = use_gpu)
         self._validate_unique_cam_ids()
         # user input to choose the correct file, if there are multiple for one cam_id?
-        self._validate_and_save_metadata_for_recording()
         self._initialize_camera_group()
-        if output_directory != None:
-            if output_directory.isdir():
-                self.output_directory = output_directory
-            else:
-                self.output_directory = calibration_directory
-                print('The given output_directory does not exist. File will be saved in calibration_directory instead!')
-        else:
-            self.output_directory = calibration_directory
     
     
     def run_calibration(self, use_own_intrinsic_calibration: bool = True, verbose: bool = False, charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard]=None) -> None:
@@ -124,20 +116,32 @@ class Calibration():
         self._save_calibration()
         
             
-    def _create_video_objects(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, max_frame_count: int, load_calibration: bool, use_gpu: bool = True) -> None:
+    def _create_video_objects(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, max_frame_count: int, load_calibration: bool, use_gpu: bool = True, overwrite: bool=False) -> None:
         avi_files = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
         charuco_videofiles = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.mp4') and 'synchronized' not in file.name]
         charuco_videofiles.append(top_cam_file)
-        charuco_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count) for filepath in charuco_videofiles]
+        charuco_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration) for filepath in charuco_videofiles]
         charuco_interfaces = [VideoInterface(metadata = video_metadata) for video_metadata in charuco_metadata]
+        self.metadata_from_videos = [video_interface.metadata for video_interface in charuco_interfaces]
+        self._validate_and_save_metadata_for_recording()
+
+        if self.output_directory != None:
+            try:
+                if not self.output_directory.exists():
+                    self._make_output_dir(project_config_filepath = project_config_filepath)
+            except AttributeError:
+                self._make_output_dir(project_config_filepath = project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath = project_config_filepath)
+        print(f'Started analysis. Saving files at {self.output_directory}.')
+        
         #bool to inspect and validate intrinsic calibration?
         for video_interface in charuco_interfaces:
-            video_interface.run_synchronizer(synchronizer = CharucoVideoSynchronizer, use_gpu = use_gpu)#missing subclass for synchronizer
+            video_interface.run_synchronizer(synchronizer = CharucoVideoSynchronizer, use_gpu = use_gpu, output_directory=self.output_directory)
         self.synchronized_charuco_videofiles = [str(video_interface.synchronized_object_filepath) for video_interface in charuco_interfaces]
         self.camera_objects = [video_interface.export_for_aniposelib() for video_interface in charuco_interfaces]
-        self.metadata_from_videos = [video_interface.metadata for video_interface in charuco_interfaces]
         # better solution for the 3 lines above?
     
     def _validate_unique_cam_ids(self) -> None:
@@ -156,6 +160,11 @@ class Calibration():
         else:
             raise ValueError (f'The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n'
                              'Please check the files and rename them properly!')
+            
+    def _make_output_dir(self, project_config_filepath: Path) -> None:
+        self.output_directory = project_config_filepath.parent.joinpath(f'{self.recording_date}_Analysis')
+        if not self.output_directory.exists():
+            Path.mkdir(self.output_directory)
     
     def _initialize_camera_group(self) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
@@ -182,7 +191,11 @@ class Triangulation(ABC):
     @abstractmethod
     def _create_video_objects(self) -> None:
         pass
-            
+    
+    def _make_output_dir(self, project_config_filepath: Path) -> None:
+        self.output_directory = project_config_filepath.parent.joinpath(f'{self.recording_date}_Analysis')
+        if not self.output_directory.exists():
+            Path.mkdir(self.output_directory)
         
     def run_triangulation(self):
         self._preprocess_dlc_predictions_for_anipose()
@@ -263,37 +276,43 @@ class Triangulation(ABC):
         
 class Triangulation_Recordings(Triangulation):
     
-    def __init__(self, recording_directory: Path, calibration_toml_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int = 300, load_calibration: bool = False, output_directory: Optional[Path] = None, use_gpu: bool=True) -> None:
+    def __init__(self, recording_directory: Path, calibration_toml_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, overwrite: bool=False, max_frame_count: int = 300, load_calibration: bool = False, output_directory: Optional[Path] = None, use_gpu: bool=True) -> None:
         self.recording_directory = recording_directory
+        self.output_directory = output_directory
         self._load_calibration(filepath = calibration_toml_filepath)
-        self._create_video_objects(recording_directory = recording_directory, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count, use_gpu = use_gpu)
-
-        if output_directory != None:
-            if output_directory.isdir():
-                self.output_directory = output_directory
-            else:
-                self.output_directory = recording_directory
-                print('The given output_directory does not exist. File will be saved in recording_directory instead!')
-        else:
-            self.output_directory = recording_directory
-            
+        self._create_video_objects(recording_directory = recording_directory, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count, overwrite=overwrite, use_gpu = use_gpu)
         self._validate_unique_cam_ids()
         # user input to choose the correct file, if there are multiple files for one cam_id?
-        self._validate_and_save_metadata_for_recording()
             
-    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, load_calibration: bool = False, use_gpu: bool = True) -> None:
+    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, overwrite: bool=False, load_calibration: bool = False, use_gpu: bool = True) -> None:
         avi_files = [file for file in recording_directory.iterdir() if file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
         recording_videofiles = [file for file in recording_directory.iterdir() if file.name.endswith('.mp4') and 'synchronized' not in file.name]
         recording_videofiles.append(top_cam_file)
-        recording_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count) for filepath in recording_videofiles]
+        recording_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration) for filepath in recording_videofiles]
         recording_interfaces = [VideoInterface(metadata = video_metadata) for video_metadata in recording_metadata]
-        for video_interface in recording_interfaces:
-            video_interface.run_synchronizer(synchronizer = RecordingVideoDownSynchronizer, use_gpu = use_gpu)
-            # missing possibility to change from Downsampling to Upsampling
-        self.triangulation_dlc_cams_filepaths = {video_interface.metadata.cam_id: video_interface.export_for_aniposelib() for video_interface in recording_interfaces}
         self.metadata_from_videos = [video_interface.metadata for video_interface in recording_interfaces]
+        self._validate_and_save_metadata_for_recording()
+    
+        if self.output_directory != None:
+            try:
+                if not self.output_directory.exists():
+                    self._make_output_dir(project_config_filepath = project_config_filepath)
+            except AttributeError:
+                self._make_output_dir(project_config_filepath = project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath = project_config_filepath)
+        print(f'Started analysis. Saving files at {self.output_directory}.')
+        
+        for video_interface in recording_interfaces:
+            if video_interface.metadata.fps >= video_interface.metadata.target_fps:
+                video_interface.run_synchronizer(synchronizer = RecordingVideoDownSynchronizer, use_gpu = use_gpu, overwrite=overwrite, output_directory=self.output_directory)
+            else:
+                video_interface.run_synchronizer(synchronizer = RecordingVideoUpSynchronizer, use_gpu = use_gpu, overwrite=overwrite, output_directory=self.output_directory)
+                
+        self.csv_output_filepath = self.output_directory.joinpath(f'{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv')
+        self.triangulation_dlc_cams_filepaths = {video_interface.metadata.cam_id: video_interface.export_for_aniposelib() for video_interface in recording_interfaces}
     
     def _validate_unique_cam_ids(self) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
@@ -311,7 +330,6 @@ class Triangulation_Recordings(Triangulation):
             self.recording_date = self.metadata_from_videos[0].recording_date
             self.paradigm = self.metadata_from_videos[0].paradigm
             self.mouse_id = self.metadata_from_videos[0].mouse_id
-            self.csv_output_filepath = self.output_directory.joinpath(f'{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv')
         else:
             raise ValueError (f'The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n'
                              'Please check the files and rename them properly!')
@@ -320,13 +338,13 @@ class Triangulation_Recordings(Triangulation):
     
 class Triangulation_Positions(Triangulation):
     
-    def __init__(self, positions_directory: Path, calibration_toml_filepath: Path, config_filepath: Path, load_calibration: bool = False) -> None:
+    def __init__(self, positions_directory: Path, calibration_toml_filepath: Path, config_filepath: Path, output_directory: Optional[Path]=None, overwrite: bool=False, load_calibration: bool = False) -> None:
         self.positions_directory = positions_directory
         self._load_calibration(filepath = calibration_toml_filepath)
-        self._create_video_objects(positions_directory = positions_directory, config_filepath = config_filepath, load_calibration = load_calibration)
+        self.output_directory = output_directory
+        self._create_video_objects(positions_directory = positions_directory, config_filepath = config_filepath, load_calibration = load_calibration, overwrite=overwrite)
         self._validate_unique_cam_ids()
         # user input to choose the correct file, if there are multiple files for one cam_id?
-        self._validate_and_save_metadata_for_recording()
 
         
     def evaluate_calibration(self, test_positions_gt: TestPositionsGroundTruth, verbose: bool=True):
@@ -345,8 +363,21 @@ class Triangulation_Positions(Triangulation):
         position_files = [file for file in positions_directory.iterdir() if file.name.endswith('.mp4')]
         position_files.append(top_cam_file)
         positions_metadata = [VideoMetadata(filepath = filepath, config_filepath = config_filepath, load_calibration = load_calibration) for filepath in position_files]
-        self.triangulation_dlc_cams_filepaths = {metadata.cam_id: metadata.filepath for metadata in positions_metadata}
         self.metadata_from_videos = positions_metadata
+        self._validate_and_save_metadata_for_recording()
+        
+        if self.output_directory != None:
+            try:
+                if not self.output_directory.exists():
+                    self._make_output_dir(project_config_filepath = project_config_filepath)
+            except AttributeError:
+                self._make_output_dir(project_config_filepath = project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath = project_config_filepath)
+        print(f'Started analysis. Saving files at {self.output_directory}.')
+        
+        self.csv_output_filepath = self.positions_directory.joinpath(f'Positions_{self.recording_date}.csv')
+        self.triangulation_dlc_cams_filepaths = {metadata.cam_id: metadata.filepath for metadata in positions_metadata}
         
     def _validate_unique_cam_ids():
         self.cameras = [camera.name for camera in self.camera_group.cameras]
@@ -358,7 +389,6 @@ class Triangulation_Positions(Triangulation):
     def _validate_and_save_metadata_for_recording():
         if all([metadata.recording_date for metadata in self.metadata_from_videos]):
             self.recording_date = self.metadata_from_videos[0].recording_date
-            self.csv_output_filepath = self.positions_directory.joinpath(f'Positions_{self.recording_date}.csv')
         else:
             raise ValueError (f'The metadata, that was read from the positions.jpgs in {self.positions_directory}, is not identical.\n'
                              'Please check the files and rename them properly!')
