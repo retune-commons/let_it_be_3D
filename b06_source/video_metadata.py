@@ -215,8 +215,6 @@ class VideoMetadata:
                 if load_calibration:
                     try:
                         intrinsic_calibration_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.suffix == '.p' and self.cam_id in file.stem][0]
-                        print('here i am')
-                        print(intrinsic_calibration_filepath)
                         with open(intrinsic_calibration_filepath, 'rb') as io:
                             intrinsic_calibration = pickle.load(io)
                     except IndexError:
@@ -227,7 +225,7 @@ class VideoMetadata:
             self._save_calibration(intrinsic_calibration = intrinsic_calibration)
         else:
             try:
-                intrinsic_calibration_filepath = [file for file in recording_config_filepath.parent.iterdir() if file.stem == '.p' and self.cam_id in file.stem][0]
+                intrinsic_calibration_filepath = [file for file in recording_config_filepath.parent.iterdir() if file.suffix == '.p' and self.cam_id in file.stem][0]
                 with open(intrinsic_calibration_filepath, 'rb') as io:
                             intrinsic_calibration = pickle.load(io)
             except IndexError:

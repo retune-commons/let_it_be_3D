@@ -125,10 +125,10 @@ class Calibration():
         
             
     def _create_video_objects(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, max_frame_count: int, load_calibration: bool, use_gpu: bool = True) -> None:
-        avi_files = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.AVI')]
+        avi_files = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
-        charuco_videofiles = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.mp4')]
+        charuco_videofiles = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.mp4') and 'synchronized' not in file.name]
         charuco_videofiles.append(top_cam_file)
         charuco_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count) for filepath in charuco_videofiles]
         charuco_interfaces = [VideoInterface(metadata = video_metadata) for video_metadata in charuco_metadata]
@@ -216,10 +216,10 @@ class Triangulation(ABC):
     
     def _postprocess_triangulations_and_calculate_reprojection_error(self, p3ds_flat: np.array) -> None:
         #proove type hints
-        reprojerr_flat = self.camera_group.reprojection_error(p3ds_flat, self.anipose_io['points_flat'], mean=True)
+        self.reprojerr_flat = self.camera_group.reprojection_error(p3ds_flat, self.anipose_io['points_flat'], mean=True)
         self.p3ds = p3ds_flat.reshape(self.anipose_io['n_points'], self.anipose_io['n_joints'], 3)
-        self.reprojerr = reprojerr_flat.reshape(self.anipose_io['n_points'], self.anipose_io['n_joints'])
-        self.reprojerr_nonan = reprojerr[np.logical_not(np.isnan(reprojerr))]
+        self.reprojerr = self.reprojerr_flat.reshape(self.anipose_io['n_points'], self.anipose_io['n_joints'])
+        self.reprojerr_nonan = self.reprojerr[np.logical_not(np.isnan(self.reprojerr))]
         
     def _get_dataframe_of_triangulated_points(self) -> None:
         all_points_raw = self.anipose_io['points']
@@ -256,20 +256,17 @@ class Triangulation(ABC):
 
     
     def _save_dataframe_as_h5(self) -> None:
-        df.to_csv(self.csv_output_filepath)    
+        self.df.to_csv(self.csv_output_filepath)    
     
     
             
         
 class Triangulation_Recordings(Triangulation):
     
-    def __init__(self, recording_directory: Path, calibration_toml_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int = 300, load_calibration: bool = False, output_directory: Optional[Path] = None) -> None:
+    def __init__(self, recording_directory: Path, calibration_toml_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int = 300, load_calibration: bool = False, output_directory: Optional[Path] = None, use_gpu: bool=True) -> None:
         self.recording_directory = recording_directory
         self._load_calibration(filepath = calibration_toml_filepath)
-        self._create_video_objects(recording_directory = recording_directory, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count)
-        self._validate_unique_cam_ids()
-        # user input to choose the correct file, if there are multiple files for one cam_id?
-        self._validate_and_save_metadata_for_recording()
+        self._create_video_objects(recording_directory = recording_directory, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count, use_gpu = use_gpu)
 
         if output_directory != None:
             if output_directory.isdir():
@@ -280,24 +277,31 @@ class Triangulation_Recordings(Triangulation):
         else:
             self.output_directory = recording_directory
             
+        self._validate_unique_cam_ids()
+        # user input to choose the correct file, if there are multiple files for one cam_id?
+        self._validate_and_save_metadata_for_recording()
             
-    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, load_calibration: bool = False) -> None:
-        avi_files = [file for file in recording_directory.iterdir() if file.name.endswith('.AVI')]
+    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, load_calibration: bool = False, use_gpu: bool = True) -> None:
+        avi_files = [file for file in recording_directory.iterdir() if file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
-        recording_videofiles = [file for file in recording_directory.iterdir() if file.name.endswith('.mp4')]
+        recording_videofiles = [file for file in recording_directory.iterdir() if file.name.endswith('.mp4') and 'synchronized' not in file.name]
         recording_videofiles.append(top_cam_file)
         recording_metadata = [VideoMetadata(video_filepath = filepath, recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath, load_calibration = load_calibration, max_frame_count = max_frame_count) for filepath in recording_videofiles]
         recording_interfaces = [VideoInterface(metadata = video_metadata) for video_metadata in recording_metadata]
         for video_interface in recording_interfaces:
-            video_interface.run_synchronizer(synchronizer = 'downsample', use_gpu = use_gpu) # missing subclass for synchronizer
+            video_interface.run_synchronizer(synchronizer = RecordingVideoDownSynchronizer, use_gpu = use_gpu)
+            # missing possibility to change from Downsampling to Upsampling
         self.triangulation_dlc_cams_filepaths = {video_interface.metadata.cam_id: video_interface.export_for_aniposelib() for video_interface in recording_interfaces}
         self.metadata_from_videos = [video_interface.metadata for video_interface in recording_interfaces]
     
     def _validate_unique_cam_ids(self) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
         # possibility to create empty .h5 for missing recordings?
-        if self.triangulation_dlc_cams_filepaths.keys().sort() != self.cameras.sort():
+        filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
+        filepath_keys.sort()
+        self.cameras.sort()
+        if filepath_keys != self.cameras:
             raise ValueError (f'The cam_ids of the recordings in {self.recording_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n'
                               'Are there missing or additional files in the calibration or the recording folder?')
         

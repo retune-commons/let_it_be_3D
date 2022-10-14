@@ -113,9 +113,14 @@ class Synchronizer(ABC):
 
     
     def run_synchronization(self) -> Path:
-        if self._construct_video_filepath().exists():
-            self.synchronized_object_filepath = self._construct_video_filepath()
-            return self.synchronized_object_filepath
+        if self.video_metadata.charuco_video:
+            if self._construct_video_filepath().exists():
+                self.synchronized_object_filepath = self._construct_video_filepath()
+                return self.synchronized_object_filepath
+        else:
+            if self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5').exists():
+                self.synchronized_object_filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+                return self.synchronized_object_filepath
         led_center_coordinates = self._get_LED_center_coordinates()
         self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
         plt.figure()
@@ -161,7 +166,11 @@ class Synchronizer(ABC):
         if self.video_metadata.led_extraction_type == 'DLC':
             video_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4')
             config_filepath = self.video_metadata.led_extraction_path
-            dlc_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5')
+            if self.video_metadata.charuco_video:
+                dlc_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5')
+            else:
+                dlc_filepath_out = Path(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+
             
             if not video_filepath_out.exists():
                 sample_frame_idxs = random.sample(range(iio.v2.get_reader(self.video_metadata.filepath).count_frames()), 100)
@@ -459,10 +468,17 @@ class Synchronizer(ABC):
     def _construct_video_filepath(self, part_id: Optional[int] = None) -> Path:
         # ToDo: proper file & directory structure
         # ToDo: include mouse id & session id - OR - charuco
-        if part_id == None:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4')
-        else:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
+        if self.video_metadata.charuco_video:
+            if part_id == None:
+                filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4')
+            else:
+                filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
+                
+        else: 
+            if part_id == None:
+                filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized.mp4')
+            else:
+                filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
         return filepath
     
     
