@@ -118,11 +118,14 @@ class Synchronizer(ABC):
             return self.synchronized_object_filepath
         led_center_coordinates = self._get_LED_center_coordinates()
         self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
+        plt.figure()
+        plt.plot(self.led_timeseries)
+        plt.show()
         template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.led_pattern)
         offset_adjusted_start_idx, remaining_offset= self._find_best_match_of_template(template = template_blinking_motif,
                                                                                                     start_time = 0,
                                                                                                     end_time = 60_000) # ToDo - make start & end time adaptable?
-        self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
+        #self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
         return self._adjust_video_to_target_fps_and_run_marker_detection(target_fps = self.target_fps, start_idx = offset_adjusted_start_idx, offset = remaining_offset)
 
     
@@ -343,8 +346,13 @@ class Synchronizer(ABC):
 
     def _downsample_led_timeseries(self, timeseries: np.ndarray, offset: float) -> np.ndarray:
         n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(original_n_frames = timeseries.shape[0], original_fps = self.video_metadata.fps, target_fps = self.video_metadata.target_fps)
-        original_timestamps = self._compute_timestamps(n_frames = timeseries.[start_idx:].shape[0], fps = self.video_metadata.fps, offset = offset)
+        original_timestamps = self._compute_timestamps(n_frames = timeseries.shape[0], fps = self.video_metadata.fps, offset = offset)
         target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = self.video_metadata.target_fps)
+        print('led downsampling')
+        plt.figure()
+        plt.plot(original_timestamps)
+        plt.plot(target_timestamps)
+        plt.show()
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
         try:
             return timeseries[frame_idxs_with_best_matching_timestamps]
@@ -365,6 +373,7 @@ class Synchronizer(ABC):
 
     
     def _find_closest_timestamp_index(self, original_timestamps: np.ndarray, timestamp: float) -> int:
+        print(original_timestamps, timestamp)
         return np.abs(original_timestamps - timestamp).argmin()        
         
         
@@ -396,10 +405,16 @@ class Synchronizer(ABC):
         original_n_frames = self.led_timeseries[start_idx:].shape[0]
         n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(original_n_frames = original_n_frames,
                                                                              original_fps = self.video_metadata.fps,
-                                                                             target_fps = self.video_metadata.target_fps)
+                                                                             target_fps = target_fps)
         original_timestamps = self._compute_timestamps(n_frames = original_n_frames, fps = self.video_metadata.fps, offset = offset)
-        target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = self.video_metadata.target_fps)
+        target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = target_fps)
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
+        print('video downsampling')
+        plt.close()
+        plt.figure()
+        plt.plot(original_timestamps)
+        plt.plot(target_timestamps)
+        plt.show()
         sampling_frame_idxs = self._adjust_frame_idxs_for_synchronization_shift(unadjusted_frame_idxs = frame_idxs_best_matching_timestamps, start_idx = start_idx)
         return sampling_frame_idxs
         
