@@ -1,0 +1,52 @@
+Bottom:
+  fisheye: True
+  flip_h: True
+  flip_v: True
+  fps: 30
+  offset_col_idx: 452
+  offset_row_idx: 136
+Ground1:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 32
+  offset_row_idx: 44
+Ground2:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 52
+  offset_row_idx: 0
+Side1:
+  fisheye: False
+  flip_h: True
+  flip_v: True
+  fps: 125
+  offset_col_idx: 132
+  offset_row_idx: 84
+Side2:
+  fisheye: False
+  flip_h: True
+  flip_v: True
+  fps: 125
+  offset_col_idx: 156
+  offset_row_idx: 104
+Top:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 80
+  offset_col_idx: 0
+  offset_row_idx: 0
+led_pattern:
+  0:
+    'led_on_time_in_ms': 50
+    'on_off_period_length_in_ms': 1_000
+    'motif_duration_in_ms': 4_000
+  1:
+    'led_on_time_in_ms': 50
+    'on_off_period_length_in_ms': 100
+    'motif_duration_in_ms': 3_000
+recording_date: '220826'

@@ -6,6 +6,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+class Coordinates:
+    
+    def __init__(self, y_or_row: int, x_or_column: int, z: Optional[int] = None) -> None:
+        self.y = y_or_row
+        self.row = y_or_row
+        self.x = x_or_column
+        self.column = x_or_column
+        self.z = z
 
     
 def load_image(filepath: Path, idx: int=0) -> np.ndarray:
