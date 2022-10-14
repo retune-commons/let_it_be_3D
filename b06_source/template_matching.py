@@ -36,11 +36,7 @@ class CreateNewTemplates:
             self._crop_image_arround_marker_and_save_template_image(output_filepath = full_output_filename, image_corner_coords = image_corner_coords)
         for i in range(template_level_depth - 1):
             depth_level += 1
-            offsets_to_upper_left_corner, template_shape = self._update_for_next_depth_level(offsets_to_upper_left_corner = offsets_to_upper_left_corner,
-                                                                                             template_shape = template_shape,
-                                                                                             zoom_factor_per_level = zoom_factor_per_level)
-            upper_left_corner_coor = self._get_upper_left_from_marker_coords(marker_coords = marker_id_coords, 
-                                                                             offsets_to_upper_left_corner = offsets_to_upper_left_corner)
+            template_shape = self._update_for_next_depth_level(template_shape = template_shape, zoom_factor_per_level = zoom_factor_per_level)
             image_corner_coords = self._get_image_corner_coords(upper_left_corner_coords = upper_left_corner_coords, template_shape = template_shape)
             full_output_filename = self._extend_base_output_filename(base_filepath = base_output_filename,
                                                                      offsets_to_upper_left_corner = offsets_to_upper_left_corner,
@@ -77,7 +73,7 @@ class CreateNewTemplates:
         marker_id = base_filepath.name[base_filepath.name.find('template_') + 9:]
         templates_already_present = []
         for file in base_filepath.parent.iterdir():
-            if (self.cam_id in file.name) and ('template' in file.name) and (marker_id in file.name) and (f'lvl-{depth_level}' in file.name):
+            if (self.cam_id in file.name) and ('template' in file.name) and (marker_id in file.name) in file.name):
                 templates_already_present.append(file.name)
         template_idx = str(len(templates_already_present)).zfill(2)
         return self.image_filepath.parent.joinpath(f'{base_filepath.name}_offset-{offsets_to_upper_left_corner[0]}-{offsets_to_upper_left_corner[1]}_lvl-{depth_level}_{template_idx}.png')
@@ -91,12 +87,9 @@ class CreateNewTemplates:
         imsave(output_filepath, template)
 
 
-    def _update_for_next_depth_level(self, offsets_to_upper_left_corner: Tuple[int, int], 
-                                     template_shape: Tuple[int, int], 
-                                     zoom_factor_per_level: float) -> Tuple[Tuple[int, int], Tuple[int, int]]:   
-        new_offsets_to_upper_left_corner = tuple([int(coordinate * zoom_factor_per_level) for coordinate in offsets_to_upper_left_corner])
+    def _update_for_next_depth_level(self, template_shape: Tuple[int, int], zoom_factor_per_level: float) -> Tuple[int, int]:   
         new_template_shape = tuple([int(n_pixels * zoom_factor_per_level) for n_pixels in template_shape])
-        return new_offsets_to_upper_left_corner, new_template_shape
+        return new_template_shape
 
 
     def _plot_all_template_levels_on_positions_image(self, image_corner_coords_per_level: List[Dict]) -> None:
