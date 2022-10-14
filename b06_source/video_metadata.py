@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 
 from pathlib import Path
 import datetime
-import json
 import pickle
 import itertools as it
 import imageio.v3 as iio
@@ -11,45 +10,81 @@ import numpy as np
 import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
+import yaml
 
 from b06_source.camera_intrinsics import IntrinsicCalibratorFisheyeCamera, IntrinsicCalibratorRegularCameraCharuco
 from b06_source.utils import load_single_frame_of_video
 
 class VideoMetadata:
     
-    def __init__(self, filepath: Path, config_filepath: Path, max_frame_count: int = 300, load_calibration = False) -> None:
-        if filepath.name.endswith('.mp4') or filepath.name.endswith('.AVI') or filepath.name.endswith('.jpg'):
-            self.filepath = filepath
+    def __init__(self, video_filepath: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int = 300, load_calibration = False) -> None:
+        if video_filepath.suffix == '.mp4' or video_filepath.suffix == '.AVI' or video_filepath.suffix == '.jpg':
+            self.filepath = video_filepath
         else:
             raise ValueError ('The filepath is not linked to a video or image.')
-        self._extract_filepath_metadata(filepath_name = filepath.name)
-        if config_filepath.name.endswith('.json'):
-            self._read_config_file(config_filepath=config_filepath)
-        else:
-            raise ValueError ('The config_filepath is not linked to a .json-file')
-        self._get_intrinsic_parameters(config_filepath = config_filepath, max_frame_count = max_frame_count, load_calibration = load_calibration)
+        if not recording_config_filepath.exists() and recording_config_filepath.suffix == '.yaml':
+            raise ValueError ('The recording_config_filepath is not linked to a .yaml-file')
+        if not project_config_filepath.exists() and project_config_filepath.suffix == '.yaml':
+            raise (f'Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!')
+        
+        self._read_metadata(recording_config_filepath=recording_config_filepath, project_config_filepath=project_config_filepath, video_filepath = video_filepath)
+        self._get_intrinsic_parameters(recording_config_filepath = recording_config_filepath, max_frame_count = max_frame_count, load_calibration = load_calibration)
+
             
+    def _read_metadata(self, project_config_filepath: Path, recording_config_filepath: Path, video_filepath: Path)->None:
+        with open(project_config_filepath, "r") as ymlfile:
+            project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+        
+        with open(recording_config_filepath,'r') as ymlfile2:
+            recording_config = yaml.load(ymlfile2, Loader=yaml.SafeLoader)
+
+        for key in ['target_fps', 'valid_cam_IDs', 'paradigms', 'animal_lines', 'intrinsic_calibration_dir', 'led_extraction_type', 'led_extraction_path']:
+            try:
+                project_config[key]
+            except KeyError:
+                raise KeyError(f'Missing metadata information in the project_config_file {project_config_filepath} for {key}.')
             
+                
+        self.target_fps = project_config['target_fps']
+        self.valid_cam_ids = project_config['valid_cam_IDs']
+        self.valid_paradigms = project_config['paradigms']
+        self.valid_mouse_lines = project_config['animal_lines']
+        self.intrinsic_calibrations_directory = Path(project_config['intrinsic_calibration_dir'])
+        
+        self._extract_filepath_metadata(filepath_name = video_filepath.name)
             
-    @property
-    def valid_cam_ids(self) -> List:
-        return ['Ground1', 'Ground2', 'Side1', 'Side2', 'Side3', 'Top', 'Bottom']
+        for key in ['led_pattern', self.cam_id]:
+            try:
+                recording_config[key]
+            except KeyError:
+                raise KeyError(f'Missing information for {key} in the config_file {recording_config_filepath}!')
+        
+        self.led_pattern = recording_config['led_pattern']
+        if self.recording_date != recording_config['recording_date']:
+            raise ValueError (f'The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?')
+        metadata_dict = recording_config[self.cam_id]
     
-    
-    @property
-    def valid_paradigms(self) -> List:
-        return ['OTE', 'OTR', 'OTT']
-    
-    
-    @property
-    def valid_mouse_lines(self) -> List:
-        return ['194', '195', '196', '206', '209', '210', '211']
-    
-    
-    @property
-    def intrinsic_calibrations_directory(self) -> Path:
-        return Path('test_data/intrinsic_calibrations/')
-    
+        for key in ['fps', 'offset_row_idx', 'offset_col_idx', 'flip_h', 'flip_v', 'fisheye']:
+            try:
+                metadata_dict[key]
+            except KeyError:
+                raise KeyError(f'Missing metadata information in the recording_config_file {recording_config_filepath} for {self.cam_id} for {key}.')  
+                
+        self.fps = metadata_dict['fps']
+        self.offset_row_idx = metadata_dict['offset_row_idx']
+        self.offset_col_idx = metadata_dict['offset_col_idx']
+        self.flip_h = metadata_dict['flip_h']
+        self.flip_v = metadata_dict['flip_v']
+        self.fisheye = metadata_dict['fisheye']
+
+        self.processing_type = project_config['processing_type'][self.cam_id]
+        self.calibration_evaluation_type = project_config['calibration_evaluation_type'][self.cam_id]
+        self.processing_path = Path(project_config['processing_path'][self.cam_id])
+        self.calibration_evaluation_path = Path(project_config['calibration_evaluation_path'][self.cam_id])
+        self.led_extraction_type = project_config['led_extraction_type'][self.cam_id]
+        self.led_extraction_path = project_config['led_extraction_path'][self.cam_id]
+        
+        
         
     def _extract_filepath_metadata(self, filepath_name: str) -> None: 
         if filepath_name[-4:] == '.AVI':
@@ -112,6 +147,7 @@ class VideoMetadata:
                 if not hasattr(self, attribute):
                     self._check_attribute(attribute_to_check = attribute)
             self.mouse_id = self.mouse_line + '_' + self.mouse_number
+        self.recording_date = self.recording_date.strftime("%y%m%d")
         
         
     def _check_attribute(self, attribute_to_check: str)->None:
@@ -160,32 +196,8 @@ class VideoMetadata:
                     messages['mouse_number'] = f'Entered mouse_number does not match the required structure for a mouse_number. \n Please enter the mouse number as Generation-Number, e.g., F12-45'
             print(messages[attribute_to_check])
             
-
-    def _read_config_file(self, config_filepath: Path)->None:
-        with open(config_filepath,'r') as jsonfile:
-            config = json.load(jsonfile)
-        for key in ['led_pattern', self.cam_id]:
-            try:
-                config[key]
-            except KeyError:
-                raise KeyError(f'Missing information for {key} in the config_file {config_filepath}!')
-        self.led_pattern = config['led_pattern']
-        metadata_dict = config[self.cam_id]
         
-        for key in ['fps', 'offset_row_idx', 'offset_col_idx', 'flip_h', 'flip_v', 'fisheye']:
-            try:
-                metadata_dict[key]
-            except KeyError:
-                raise KeyError(f'Missing metadata information in the config_file {config_filepath} for {self.cam_id} for {key}.')      
-        self.fps = metadata_dict['fps']
-        self.offset_row_idx = metadata_dict['offset_row_idx']
-        self.offset_col_idx = metadata_dict['offset_col_idx']
-        self.flip_h = metadata_dict['flip_h']
-        self.flip_v = metadata_dict['flip_v']
-        self.fisheye = metadata_dict['fisheye']
-
-        
-    def _get_intrinsic_parameters(self, config_filepath: Path, load_calibration: bool, max_frame_count: int) -> None:
+    def _get_intrinsic_parameters(self, recording_config_filepath: Path, load_calibration: bool, max_frame_count: int) -> None:
         if self.charuco_video:
             if self.fisheye:
                 try:
@@ -194,7 +206,7 @@ class VideoMetadata:
                         intrinsic_calibration = pickle.load(io)
                 except FileNotFoundError:
                     try:
-                        intrinsic_calibration_checkerboard_video_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.name.endswith('.mp4') and 'checkerboard' in file.name and self.cam_id in file.name][0]
+                        intrinsic_calibration_checkerboard_video_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.suffix == '.mp4' and 'checkerboard' in file.stem and self.cam_id in file.stem][0]
                         calibrator = IntrinsicCalibratorFisheyeCamera(filepath_calibration_video = intrinsic_calibration_checkerboard_video_filepath, max_frame_count = max_frame_count)
                         intrinsic_calibration = calibrator.run()
                     except IndexError:
@@ -202,7 +214,9 @@ class VideoMetadata:
             else:
                 if load_calibration:
                     try:
-                        intrinsic_calibration_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.name.endswith('.p') and self.cam_id in file.name][0]
+                        intrinsic_calibration_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.suffix == '.p' and self.cam_id in file.stem][0]
+                        print('here i am')
+                        print(intrinsic_calibration_filepath)
                         with open(intrinsic_calibration_filepath, 'rb') as io:
                             intrinsic_calibration = pickle.load(io)
                     except IndexError:
@@ -213,11 +227,11 @@ class VideoMetadata:
             self._save_calibration(intrinsic_calibration = intrinsic_calibration)
         else:
             try:
-                intrinsic_calibration_filepath = [file for file in config_filepath.parent.iterdir() if file.endswith('.p') and self.cam_id in file][0]
+                intrinsic_calibration_filepath = [file for file in recording_config_filepath.parent.iterdir() if file.stem == '.p' and self.cam_id in file.stem][0]
                 with open(intrinsic_calibration_filepath, 'rb') as io:
                             intrinsic_calibration = pickle.load(io)
             except IndexError:
-                raise FileNotFoundError (f'Could not find an intrinsic calibration for {self.cam_id} in {config_filepath.parent}! \nRunning the 3D Calibration should also create an intrinsic calibration. \nMake sure, you run the 3D Calibration before Triangulation.')
+                raise FileNotFoundError (f'Could not find an intrinsic calibration for {self.cam_id} in {recording_config_filepath.parent}! \nRunning the 3D Calibration should also create an intrinsic calibration. \nMake sure, you run the 3D Calibration before Triangulation.')
                 
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(unadjusted_intrinsic_calibration = intrinsic_calibration)
         self._set_intrinsic_calibration(intrinsic_calibration = intrinsic_calibration, adjusting_required = adjusting_required)
@@ -286,6 +300,4 @@ class VideoMetadata:
         intrinsic_calibration['size'] = new_size
         intrinsic_calibration['K'] = adjusted_K
         return intrinsic_calibration
-    
-    
     

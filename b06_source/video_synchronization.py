@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, Dict
+import random
 
 from pathlib import Path
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import imageio as iio
 import ffmpeg
+import pandas as pd
 
 from b06_source.video_metadata import VideoMetadata
 from b06_source.utils import Coordinates
+from b06_source.marker_detection import DeeplabcutInterface
 
 
 class TimeseriesTemplate(ABC):
@@ -111,19 +113,77 @@ class Synchronizer(ABC):
 
     
     def run_synchronization(self) -> Path:
+        if self._construct_video_filepath().exists():
+            self.synchronized_object_filepath = self._construct_video_filepath()
+            return self.synchronized_object_filepath
         led_center_coordinates = self._get_LED_center_coordinates()
-        self.led_timeseries = self._extract_led_pixel_intensities_timeseries(led_center_coords = led_center_coordinates)
-        template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.configs['blinking_patterns'])
+        self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
+        plt.figure()
+        plt.plot(self.led_timeseries)
+        plt.show()
+        template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.led_pattern)
         offset_adjusted_start_idx, remaining_offset= self._find_best_match_of_template(template = template_blinking_motif,
                                                                                                     start_time = 0,
                                                                                                     end_time = 60_000) # ToDo - make start & end time adaptable?
-        self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
+        #self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
         return self._adjust_video_to_target_fps_and_run_marker_detection(target_fps = self.target_fps, start_idx = offset_adjusted_start_idx, offset = remaining_offset)
 
+    
+    
+    def _construct_template_motif(self, blinking_patterns_metadata: Dict) -> Union[MotifTemplate, MultiMotifTemplate]:
+        motif_templates = []
+        for pattern_idx, parameters in blinking_patterns_metadata.items():
+            motif_templates.append(MotifTemplate(led_on_time_in_ms = parameters['led_on_time_in_ms'],
+                                                  on_off_period_length_in_ms = parameters['on_off_period_length_in_ms'],
+                                                  motif_duration_in_ms = parameters['motif_duration_in_ms']))
+        if len(motif_templates) < 1:
+            raise ValueError('Could not construct a blinking pattern template. Please validate your config files!')
+        elif len(motif_templates) == 1:
+            template_motif = motif_templates[0]
+        else:
+            template_motif = MultiMotifTemplate()
+            for template in motif_templates:
+                template_motif.add_motif_template(motif_template = template)
+        return template_motif
+                
+                
+                        
+                          
+            
+            
+    
+    
 
     def _get_LED_center_coordinates(self) -> Coordinates:
-        # call marker detector to detect the LED on some 100 frames
-        return led_center_coords
+        
+        print(f'Now extracting LED position data from {self.video_metadata.filepath}.')
+        
+        if self.video_metadata.led_extraction_type == 'DLC':
+            video_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4')
+            config_filepath = self.video_metadata.led_extraction_path
+            dlc_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5')
+            
+            if not video_filepath_out.exists():
+                sample_frame_idxs = random.sample(range(iio.v2.get_reader(self.video_metadata.filepath).count_frames()), 100)
+
+                selected_frames = []
+                for idx in sample_frame_idxs:
+                    selected_frames.append(iio.v3.imread(self.video_metadata.filepath, index = idx))
+                video_array = np.asarray(selected_frames)
+                iio.v3.imwrite(str(video_filepath_out), video_array, fps=1)
+            
+            if not dlc_filepath_out.exists():
+                
+                dlc_interface = DeeplabcutInterface(object_to_analyse = str(video_filepath_out), output_directory = Path.cwd(), marker_detection_directory = config_filepath, dynamic = False)
+                #how to delete automatically created .h5 file?
+                # save it to a temp folder and delete it after analysis?
+                dlc_ending = dlc_interface.analyze_objects()
+                Path(video_filepath_out.stem + dlc_ending + '.h5').rename(dlc_filepath_out)
+            df = pd.read_hdf(dlc_filepath_out)
+            x_key, y_key = [key for key in df.keys() if 'LED5' in key and 'x' in key], [key for key in df.keys() if 'LED5' in key and 'y' in key]
+            x = int(df[x_key].mean().values)
+            y = int(df[y_key].mean().values)
+        return Coordinates(y_or_row = y, x_or_column = x)
 
 
     def _extract_led_pixel_intensities(self, led_center_coords: Coordinates, box_rows: int=5, box_cols: int=5) ->np.ndarray:
@@ -143,7 +203,7 @@ class Synchronizer(ABC):
 
     def _calculate_mean_pixel_intensities(self, box_row_indices: Tuple[int, int], box_col_indices: Tuple[int, int]) -> List[float]:
         mean_pixel_intensities = []
-        for frame in iio.v3.imiter(self.filepath):
+        for frame in iio.v3.imiter(self.video_metadata.filepath):
             box_mean_intensity = frame[box_row_indices[0]:box_row_indices[1], 
                                        box_col_indices[0]:box_col_indices[1]].mean()
             mean_pixel_intensities.append(box_mean_intensity)
@@ -157,9 +217,9 @@ class Synchronizer(ABC):
         best_match_start_frame_idx, best_match_offset = self._get_start_index_and_offset_of_best_match(adjusted_templates = adjusted_motif_timeseries,
                                                                                                        start_frame_idx = start_frame_idx, 
                                                                                                        end_frame_idx = end_frame_idx)
-        offset_adjusted_start_idx, remaining_offset = self._adjust_start_index_and_offset(start_frame_idx = best_match_start_frame_idx,
+        offset_adjusted_start_idx, remaining_offset = self._adjust_start_idx_and_offset(start_frame_idx = best_match_start_frame_idx,
                                                                                                            offset = best_match_offset,
-                                                                                                           fps = self.video_metatdata.fps)
+                                                                                                           fps = self.video_metadata.fps)
         return offset_adjusted_start_idx, remaining_offset
 
 
@@ -174,7 +234,7 @@ class Synchronizer(ABC):
         else:
             if time < 0:
                 raise ValueError(time_error_message)
-            framerate = 1000 / self.fps # adapt
+            framerate = 1000 / self.video_metadata.fps # adapt
             closest_frame_idx = round(time / framerate)
             if closest_frame_idx >= self.led_timeseries.shape[0]:
                 raise ValueError(time_error_message)
@@ -279,18 +339,26 @@ class Synchronizer(ABC):
 
     def _adjust_led_timeseries_for_cross_validation(self, start_idx: int, offset: float) -> np.ndarray:
         adjusted_led_timeseries = self.led_timeseries[start_idx:].copy()
-        if self.video_metadata.fps != 30:
+        if self.video_metadata.fps != self.video_metadata.target_fps:
             adjusted_led_timeseries = self._downsample_led_timeseries(timeseries = adjusted_led_timeseries, offset = offset)
         return adjusted_led_timeseries
         
 
     def _downsample_led_timeseries(self, timeseries: np.ndarray, offset: float) -> np.ndarray:
-        n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(original_n_frames = timeseries.shape[0], original_fps = self.video_metadata.fps, target_fps = 30)
+        n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(original_n_frames = timeseries.shape[0], original_fps = self.video_metadata.fps, target_fps = self.video_metadata.target_fps)
         original_timestamps = self._compute_timestamps(n_frames = timeseries.shape[0], fps = self.video_metadata.fps, offset = offset)
-        target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = 30)
+        target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = self.video_metadata.target_fps)
+        print('led downsampling')
+        plt.figure()
+        plt.plot(original_timestamps)
+        plt.plot(target_timestamps)
+        plt.show()
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
-        return timeseries[frame_idxs_with_best_matching_timestamps]
-        
+        try:
+            return timeseries[frame_idxs_with_best_matching_timestamps]
+        except NameError:
+            raise ValueError ('LED not properly detected. No function to set it manually for now.')
+            
     
     def _compute_fps_adjusted_frame_count(self, original_n_frames: int, original_fps: int, target_fps: int) -> int:
         target_ms_per_frame = self._get_ms_interval_per_frame(fps = target_fps)
@@ -305,6 +373,7 @@ class Synchronizer(ABC):
 
     
     def _find_closest_timestamp_index(self, original_timestamps: np.ndarray, timestamp: float) -> int:
+        print(original_timestamps, timestamp)
         return np.abs(original_timestamps - timestamp).argmin()        
         
         
@@ -323,12 +392,12 @@ class Synchronizer(ABC):
     def _downsample_video(self, start_idx: int, offset: float, target_fps: int=30) -> Path:
         frame_idxs_to_sample = self._get_sampling_frame_idxs(start_idx = start_idx, offset = offset, target_fps = target_fps)
         sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(idxs_of_frames_to_sample = frame_idxs_to_sample, max_frame_count = 3_000)
-        if len(frame_idxs_per_part) > 1:
-            filepaths_all_video_parts = self._initiate_iterative_writing_of_individual_video_parts(frame_idxs_per_part = sampling_frame_idxs_per_part, target_fps = target_fps)
+        if len(frame_idxs_to_sample) > 1:
+            filepaths_all_video_parts = self._initiate_iterative_writing_of_individual_video_parts(frame_idxs_to_sample = sampling_frame_idxs_per_part, target_fps = target_fps)
             filepath_downsampled_video = self._concatenate_individual_video_parts_on_disk(filepaths_of_video_parts = filepaths_all_video_parts)
             self._delete_individual_video_parts(filepaths_of_video_parts = filepaths_all_video_parts)
         else:
-            filepath_downsampled_video = self._write_video_to_disk(idxs_of_frames_to_sample = frame_idxs_per_part[0], target_fps = target_fps)
+            filepath_downsampled_video = self._write_video_to_disk(idxs_of_frames_to_sample = frame_idxs_to_sample[0], target_fps = target_fps)
         return filepath_downsampled_video
         
         
@@ -340,6 +409,12 @@ class Synchronizer(ABC):
         original_timestamps = self._compute_timestamps(n_frames = original_n_frames, fps = self.video_metadata.fps, offset = offset)
         target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = target_fps)
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
+        print('video downsampling')
+        plt.close()
+        plt.figure()
+        plt.plot(original_timestamps)
+        plt.plot(target_timestamps)
+        plt.show()
         sampling_frame_idxs = self._adjust_frame_idxs_for_synchronization_shift(unadjusted_frame_idxs = frame_idxs_best_matching_timestamps, start_idx = start_idx)
         return sampling_frame_idxs
         
@@ -350,17 +425,18 @@ class Synchronizer(ABC):
 
 
     def _split_into_ram_digestable_parts(self, idxs_of_frames_to_sample: List[int], max_frame_count: int) -> List[List[int]]:
-        frame_idxs_per_part = []
+        frame_idxs_to_sample = []
         while len(idxs_of_frames_to_sample) > max_frame_count:
-            frame_idxs_per_part.append(idxs_of_frames_to_sample[:max_frame_count])
+            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_frame_count])
             idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_frame_count:]
-        frame_idxs_per_part.append(idxs_of_frames_to_sample)
-        return frame_idxs_per_part
+        frame_idxs_to_sample.append(idxs_of_frames_to_sample)
+        return frame_idxs_to_sample
 
 
-    def _initiate_iterative_writing_of_individual_video_parts(self, frame_idxs_per_part: List[List[int]], target_fps: int) -> List[Path]:
+    def _initiate_iterative_writing_of_individual_video_parts(self, frame_idxs_to_sample: List[List[int]], target_fps: int) -> List[Path]:
         filepaths_to_all_video_parts = []
-        for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_per_part):
+        print(f'now synchronizing {self.video_metadata.filepath}')
+        for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_to_sample):
             part_id = str(idx).zfill(3)
             filepath_video_part = self._write_video_to_disk(idxs_of_frames_to_sample = idxs_of_frames_to_sample, target_fps = target_fps, part_id = part_id)
             filepaths_to_all_video_parts.append(filepath_video_part)
@@ -368,27 +444,25 @@ class Synchronizer(ABC):
 
     def _write_video_to_disk(self, idxs_of_frames_to_sample: List[int], target_fps: int, part_id: Optional[int]=None) -> Path:
         selected_frames = []
-        print('load original video')
         for i, frame in enumerate(iio.v3.imiter(self.video_metadata.filepath)):
             if i > idxs_of_frames_to_sample[-1]:
                 break
             if i in idxs_of_frames_to_sample:
                 selected_frames.append(frame)
         video_array = np.asarray(selected_frames)
-        print('writing video to disk')
         filepath_out = self._construct_video_filepath(part_id = part_id)
-        iio.mimwrite(filepath_out, video_array, fps=target_fps)
-        print('done!')
+        iio.v3.imwrite(filepath_out, video_array, fps=target_fps)
+        self.synchronized_object_filepath = filepath_out
         return filepath_out
 
 
-    def _construct_video_filepath(self, part_id: Optional[int]) -> Path:
+    def _construct_video_filepath(self, part_id: Optional[int] = None) -> Path:
         # ToDo: proper file & directory structure
         # ToDo: include mouse id & session id - OR - charuco
         if part_id == None:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.date}_{self.video_metadata.cam_id}_synchronized.mp4')
+            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4')
         else:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
+            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
         return filepath
     
     
@@ -416,21 +490,27 @@ class CharucoVideoSynchronizer(Synchronizer):
     
     @property
     def target_fps(self) -> int:
-        return 30
+        return self.video_metadata.target_fps
     
 
     def _adjust_video_to_target_fps_and_run_marker_detection(self, target_fps: int, start_idx: int, offset: float) -> Path:
-        return self._downsample_video(start_idx = start_idx, offset = offset, target_fps = target_fps)
+        return self._downsample_video(start_idx = start_idx, offset = offset, target_fps = self.target_fps)
 
 
 
 class RecordingVideoSynchronizer(Synchronizer):
 
     def _run_deep_lab_cut_for_marker_detection(self, video_filepath: Path) -> Path:
-        # initiate marker detection on filepath
-        # save .h5 file
-        # return filepath to .h5 file
-        pass
+        output_directory = Path.cwd()
+        output_filepath = Path(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+        
+        if not output_filepath.exists():
+            config_filepath = self.video_metadata.processing_path
+            dlc_interface = DeeplabcutInterface(object_to_analyse = str(video_filepath), output_directory = Path.cwd(), marker_detection_directory = config_filepath, dynamic = True)
+            h5_file = dlc_interface.analyze_objects()
+            Path(video_filepath.stem + h5_file + '.h5').rename(output_filepath)
+            
+        return output_filepath
 
 
 
@@ -438,10 +518,14 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
 
     @property
     def target_fps(self) -> int:
-        return 30
+        return self.video_metadata.target_fps
     
 
     def _adjust_video_to_target_fps_and_run_marker_detection(self, target_fps: int, start_idx: int, offset: float) -> Path:
-        downsampled_video_filepath = self._downsample_video(start_idx = start_idx, offset = offset, target_fps = target_fps)
-        detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(video_filepath = downsampled_video_filepath)
+        downsampled_video_filepath = self._downsample_video(start_idx = start_idx, offset = offset, target_fps = self.target_fps)
+        if self.video_metadata.processing_type == 'DLC':
+            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(video_filepath = downsampled_video_filepath)
+        else:
+            print('TemplateMatching and Manual Annotation of markers are not yet implemented!')
         return detected_markers_filepath
+    
