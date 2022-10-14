@@ -88,9 +88,10 @@ class MultiMotifTemplate(TimeseriesTemplate):
 
 class Synchronizer(ABC):
     
-    def __init__(self, video_metadata: VideoMetadata, use_gpu: bool) -> None:
+    def __init__(self, video_metadata: VideoMetadata, use_gpu: bool, output_directory: Path) -> None:
         self.video_metadata = video_metadata
         self.use_gpu = use_gpu
+        self.output_directory = output_directory
         
     @property
     @abstractmethod
@@ -112,10 +113,10 @@ class Synchronizer(ABC):
         pass
 
     
-    def run_synchronization(self) -> Path:
-        if self._construct_video_filepath().exists():
-            self.synchronized_object_filepath = self._construct_video_filepath()
-            return self.synchronized_object_filepath
+    def run_synchronization(self, overwrite: bool=False) -> Path:
+        if not overwrite:
+            if self._check_whether_output_file_already_exists():
+                return self.synchronized_object_filepath
         led_center_coordinates = self._get_LED_center_coordinates()
         self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
         template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.led_pattern)
@@ -126,6 +127,18 @@ class Synchronizer(ABC):
         return self._adjust_video_to_target_fps_and_run_marker_detection(target_fps = self.target_fps, start_idx = offset_adjusted_start_idx, offset = remaining_offset)
 
     
+    def _check_whether_output_file_already_exists(self)->bool:
+        if self.video_metadata.charuco_video:
+            if self._construct_video_filepath().exists():
+                self.synchronized_object_filepath = self._construct_video_filepath()
+                return True
+        else:
+            deeplabcut_output_file = self.output_directory.joinpath(
+                f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+            if deeplabcut_output_file.exists():
+                self.synchronized_object_filepath = deeplabcut_output_file
+                return True
+        return False
     
     def _construct_template_motif(self, blinking_patterns_metadata: Dict) -> Union[MotifTemplate, MultiMotifTemplate]:
         motif_templates = []
@@ -142,23 +155,21 @@ class Synchronizer(ABC):
             for template in motif_templates:
                 template_motif.add_motif_template(motif_template = template)
         return template_motif
-                
-                
-                        
-                          
-            
-            
-    
-    
 
     def _get_LED_center_coordinates(self) -> Coordinates:
         
         print(f'Now extracting LED position data from {self.video_metadata.filepath}.')
         
         if self.video_metadata.led_extraction_type == 'DLC':
-            video_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4')
+            temp_folder = self.output_directory.joinpath('temp')
+            Path.mkdir(temp_folder, exist_ok=True)
+            video_filepath_out = temp_folder.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4')
             config_filepath = self.video_metadata.led_extraction_path
-            dlc_filepath_out = Path(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5')
+            if self.video_metadata.charuco_video:
+                dlc_filepath_out = temp_folder.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5')
+            else:
+                dlc_filepath_out = temp_folder.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+
             
             if not video_filepath_out.exists():
                 sample_frame_idxs = random.sample(range(iio.v2.get_reader(self.video_metadata.filepath).count_frames()), 100)
@@ -180,7 +191,8 @@ class Synchronizer(ABC):
             x_key, y_key = [key for key in df.keys() if 'LED5' in key and 'x' in key], [key for key in df.keys() if 'LED5' in key and 'y' in key]
             x = int(df[x_key].mean().values)
             y = int(df[y_key].mean().values)
-        return Coordinates(y_or_row = y, x_or_column = x)
+            video_filepath_out.unlink()
+            return Coordinates(y_or_row = y, x_or_column = x)
 
 
     def _extract_led_pixel_intensities(self, led_center_coords: Coordinates, box_rows: int=5, box_cols: int=5) ->np.ndarray:
@@ -444,10 +456,17 @@ class Synchronizer(ABC):
     def _construct_video_filepath(self, part_id: Optional[int] = None) -> Path:
         # ToDo: proper file & directory structure
         # ToDo: include mouse id & session id - OR - charuco
-        if part_id == None:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4')
-        else:
-            filepath = self.video_metadata.filepath.parent.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
+        if self.video_metadata.charuco_video:
+            if part_id == None:
+                filepath = self.output_directory.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4')
+            else:
+                filepath = self.output_directory.joinpath(f'{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
+                
+        else: 
+            if part_id == None:
+                filepath = self.output_directory.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized.mp4')
+            else:
+                filepath = self.output_directory.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4')
         return filepath
     
     
@@ -486,8 +505,7 @@ class CharucoVideoSynchronizer(Synchronizer):
 class RecordingVideoSynchronizer(Synchronizer):
 
     def _run_deep_lab_cut_for_marker_detection(self, video_filepath: Path) -> Path:
-        output_directory = Path.cwd()
-        output_filepath = Path(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
+        output_filepath = self.output_directory.joinpath(f'{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5')
         
         if not output_filepath.exists():
             config_filepath = self.video_metadata.processing_path
@@ -514,3 +532,13 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
             print('TemplateMatching and Manual Annotation of markers are not yet implemented!')
         return detected_markers_filepath
     
+    
+class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
+    
+    @property
+    def target_fps(self) -> int:
+        return self.video_metadata.target_fps
+    
+
+    def _adjust_video_to_target_fps_and_run_marker_detection(self):
+        pass

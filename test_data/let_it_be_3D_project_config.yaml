@@ -1,3 +1,4 @@
+#animal lines need to be strings
 animal_lines:
 - "196"
 calibration_evaluation_path:
@@ -55,3 +56,9 @@ valid_cam_IDs:
 - Side2
 - Ground1
 - Ground2
+load_calibration: True
+
+# default values: only change, if you have to switch the computer
+max_frames_to_write: 3000
+max_calibration_frames: 300
+use_gpu: False
