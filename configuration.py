@@ -1,10 +1,8 @@
 """
 To do:
 
-    rewrite RecordingConfig class to get rid of inputs -> change to function variables
     GUI instead of function-input
-    get booleans instead of str from RecordingConfigs flipping and fisheye
-    improve led-pattern type
+    optional: refractor write_config to be in parent class
 
 """
 
@@ -20,6 +18,11 @@ class Configs(ABC):
     @abstractmethod
     def write_config(self):
         """ write extracted config information in a yaml file"""
+        pass
+
+    @abstractmethod
+    def user_input(self):
+        """get user input from function input"""
         pass
 
 
@@ -93,40 +96,25 @@ class RecordingConfigs(Configs):
                 " Oooops! Project config file not found. Please check the path_project_config variable you put into this function"
             )
 
-    def user_input(self):
-        user_input = {}
-        user_input["recording_date"] = input(
-            "Please write the recording date in the yymmdd format"
-        )
-        user_input["led_pattern"] = input("What´s the LED pattern?")
+    def user_input(self, recording_date, led_pattern):
+        user_input = {"recording_date": recording_date, "led_pattern": led_pattern}
 
         print(
             "The following cameras have been found:",
             self.project_config["valid_cam_IDs"],
+            "\nPlease add information for every camera by using the .add_camera_information function passing the parameters "
+            "camera, fps, offset_row_idx, offset_col_idx, fliph, flipv, fisheye",
         )
-        for cam in self.project_config["valid_cam_IDs"]:
-            print(
-                "\n--------------------------------------------------\n \
-            currently working on cameraID: "
-                + str(cam)
-                + "\
-                 \n--------------------------------------------------\n"
-            )
-            user_input[cam] = {}
-            user_input[cam]["fps"] = int(input("fps"))
-            user_input[cam]["offset_row_idx"] = int(input("offset row id x"))
-            user_input[cam]["offset_col_idx"] = int(input("offset_col_idx"))
-            user_input[cam]["fliph"] = input(
-                'flip horizontal write "True" for True  and "False" for False'
-            )
-            user_input[cam]["flipv"] = input(
-                'flip vertical write "True" for True  and "False" for False'
-            )
-            user_input[cam]["fisheye"] = input(
-                'fisheye write "True" for True  and "False" for False'
-            )
 
-        self.user_input = user_input
+    def add_camera_information(
+        self, fps, offset_row_idx, offset_col_idx, fliph, flipv, fisheye
+    ):
+        self.user_input[camera]["fps"] = fps
+        self.user_input[camera]["offset_row_idx"] = offset_row_idx
+        self.user_input[camera]["offset_col_idx"] = offset_col_idx
+        self.user_input[camera]["fliph"] = fliph
+        self.user_input[camera]["flipv"] = flipv
+        self.user_input[camera]["fisheye"] = fisheye
 
     def write_config(self):
         recording_name = (
