@@ -16,13 +16,6 @@ We are doing our best to enable people to use this 2D to 3D pipeline as soon as 
         <img src="https://static.wixstatic.com/media/547baf_87ffe507a5004e29925dbeb65fe110bb~mv2.png/v1/fill/w_406,h_246,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/LabLogo3black.png" alt="DefenseCircuitsLab" style="width: 250px;"/>
     </a>
 </td>
-
-<style type="text/css">
-  td {
-    padding: 0 15px;
-  }
-</style>
-
 </tr>
 </table>
 
