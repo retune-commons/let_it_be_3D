@@ -2,21 +2,18 @@ from typing import List, Tuple, Dict, Union, Optional
 import datetime
 from abc import ABC, abstractmethod
 
+from tqdm.auto import tqdm as TQDM
 from pathlib import Path
 import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from b06_source.video_metadata import VideoMetadata
 from b06_source.video_module import VideoInterface
 from b06_source.video_synchronization import RecordingVideoDownSynchronizer, RecordingVideoUpSynchronizer, CharucoVideoSynchronizer
-
-"""
-import pickle
-import itertools as it
-import imageio as iio
-"""
+from b06_source.plotting import Alignment_Plot_Crossvalidation
 
 
 class TestPositionsGroundTruth:
@@ -116,7 +113,7 @@ class Calibration():
         self._save_calibration()
         
             
-    def _create_video_objects(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, max_frame_count: int, load_calibration: bool, use_gpu: bool = True, overwrite: bool=False) -> None:
+    def _create_video_objects(self, calibration_directory: Path, project_config_filepath: Path, recording_config_filepath: Path, max_frame_count: int, overwrite: bool, load_calibration: bool, use_gpu: bool = True) -> None:
         avi_files = [file for file in calibration_directory.iterdir() if ('Charuco' in file.name or 'charuco' in file.name) and file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
@@ -137,13 +134,19 @@ class Calibration():
             self._make_output_dir(project_config_filepath = project_config_filepath)
         print(f'Started analysis. Saving files at {self.output_directory}.')
         
-        #bool to inspect and validate intrinsic calibration?
+        bar = TQDM(total = len(charuco_interfaces), desc = f'Synchronizing calibration videos from {self.recording_date}')
         for video_interface in charuco_interfaces:
-            video_interface.run_synchronizer(synchronizer = CharucoVideoSynchronizer, use_gpu = use_gpu, output_directory=self.output_directory)
+            video_interface.run_synchronizer(synchronizer = CharucoVideoSynchronizer, use_gpu = use_gpu, output_directory=self.output_directory, overwrite = overwrite)
+            bar.update(1)
+        bar.close()
         self.synchronized_charuco_videofiles = [str(video_interface.synchronized_object_filepath) for video_interface in charuco_interfaces]
         self.camera_objects = [video_interface.export_for_aniposelib() for video_interface in charuco_interfaces]
         # better solution for the 3 lines above?
-    
+        
+        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(template = charuco_interfaces[0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(fps=self.target_fps)[0][0], led_timeseries = {video_interface.metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation for video_interface in charuco_interfaces if not video_interface.already_synchronized}, metadata = {'recording_date': self.recording_date, 'charuco_video': True}, output_directory = self.output_directory)
+        self.synchronization_individuals = [video_interface.synchronizer_object.synchronization_individual for video_interface in charuco_interfaces if not video_interface.already_synchronized]
+        self.led_detection_individuals = [video_interface.synchronizer_object.led_detection for video_interface in charuco_interfaces if not video_interface.already_synchronized]
+
     def _validate_unique_cam_ids(self) -> None:
         cam_ids = []
         for ap_cam in self.camera_objects:
@@ -157,6 +160,7 @@ class Calibration():
     def _validate_and_save_metadata_for_recording(self) -> None:
         if all([metadata.recording_date for metadata in self.metadata_from_videos]):
             self.recording_date = self.metadata_from_videos[0].recording_date
+            self.target_fps = self.metadata_from_videos[0].target_fps
         else:
             raise ValueError (f'The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n'
                              'Please check the files and rename them properly!')
@@ -269,7 +273,7 @@ class Triangulation(ABC):
 
     
     def _save_dataframe_as_h5(self) -> None:
-        self.df.to_csv(self.csv_output_filepath)    
+        self.df.to_csv(self.csv_output_filepath)
     
     
             
@@ -284,7 +288,7 @@ class Triangulation_Recordings(Triangulation):
         self._validate_unique_cam_ids()
         # user input to choose the correct file, if there are multiple files for one cam_id?
             
-    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, overwrite: bool=False, load_calibration: bool = False, use_gpu: bool = True) -> None:
+    def _create_video_objects(self, recording_directory: Path, recording_config_filepath: Path, project_config_filepath: Path, max_frame_count: int, overwrite: bool, load_calibration: bool = False, use_gpu: bool = True) -> None:
         avi_files = [file for file in recording_directory.iterdir() if file.name.endswith('.AVI') and 'synchronized' not in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1] # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
@@ -305,14 +309,21 @@ class Triangulation_Recordings(Triangulation):
             self._make_output_dir(project_config_filepath = project_config_filepath)
         print(f'Started analysis. Saving files at {self.output_directory}.')
         
+        bar = TQDM(total = len(recording_interfaces), desc = f'Synchronizing recording videos from {self.mouse_id}_{self.paradigm}_{self.recording_date}')
         for video_interface in recording_interfaces:
             if video_interface.metadata.fps >= video_interface.metadata.target_fps:
                 video_interface.run_synchronizer(synchronizer = RecordingVideoDownSynchronizer, use_gpu = use_gpu, overwrite=overwrite, output_directory=self.output_directory)
             else:
                 video_interface.run_synchronizer(synchronizer = RecordingVideoUpSynchronizer, use_gpu = use_gpu, overwrite=overwrite, output_directory=self.output_directory)
+            bar.update(1)
+        bar.close()
                 
         self.csv_output_filepath = self.output_directory.joinpath(f'{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv')
         self.triangulation_dlc_cams_filepaths = {video_interface.metadata.cam_id: video_interface.export_for_aniposelib() for video_interface in recording_interfaces}
+        
+        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(template = recording_interfaces[0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(fps=self.target_fps)[0][0], led_timeseries = {video_interface.metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation for video_interface in recording_interfaces if not video_interface.already_synchronized}, metadata = {"mouse_id": self.mouse_id, "recording_date": self.recording_date, "paradigm": self.paradigm}, output_directory = self.output_directory)
+        self.synchronization_individuals = [video_interface.synchronizer_object.synchronization_individual for video_interface in recording_interfaces if not video_interface.already_synchronized]
+        self.led_detection_individuals = [video_interface.synchronizer_object.led_detection for video_interface in charuco_interfaces if not video_interface.already_synchronized]
     
     def _validate_unique_cam_ids(self) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
@@ -330,6 +341,7 @@ class Triangulation_Recordings(Triangulation):
             self.recording_date = self.metadata_from_videos[0].recording_date
             self.paradigm = self.metadata_from_videos[0].paradigm
             self.mouse_id = self.metadata_from_videos[0].mouse_id
+            self.target_fps = self.metadata_from_videos[0].target_fps
         else:
             raise ValueError (f'The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n'
                              'Please check the files and rename them properly!')
@@ -356,7 +368,7 @@ class Triangulation_Positions(Triangulation):
                 print(f'Using {reference_distance_id} as reference distance, the mean distance error is: {distance_errors["mean_error"]} cm.')
                 
                 
-    def _create_video_objects(positions_directory: Path, config_filepath: Path, load_calibration: bool) -> None:
+    def _create_video_objects(positions_directory: Path, config_filepath: Path, load_calibration: bool, overwrite: bool) -> None:
         avi_files = [file for file in recording_directory.iterdir() if file.name.endswith('.AVI') and 'Positions' in file.name]
         avi_files.sort()
         top_cam_file = avi_files[-1]# if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
