@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 import random
 
+from tqdm.auto import tqdm as TQDM
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ import pandas as pd
 from b06_source.video_metadata import VideoMetadata
 from b06_source.utils import Coordinates
 from b06_source.marker_detection import DeeplabcutInterface
+from b06_source.plotting import Alignment_Plot_Individual, LED_Marker_Plot
 
 
 class TimeseriesTemplate(ABC):
@@ -19,8 +21,6 @@ class TimeseriesTemplate(ABC):
     @property
     @abstractmethod
     def template_attribute_string(self) -> str:
-        # specifies the attribute name where the template timeseries is saved.
-        # will be used by the adjust_template_timeseries_to_fps method
         pass
     
     
@@ -92,13 +92,23 @@ class Synchronizer(ABC):
         self.video_metadata = video_metadata
         self.use_gpu = use_gpu
         self.output_directory = output_directory
+        self.bar = TQDM(total = 4, desc = f'Now synchronizing {self.video_metadata.cam_id}')
+        
+    @property
+    # differnet thresholds for different patterns!
+    def alignment_threshold(self) -> int:
+        return 100
+    
+    @property
+    # different thresholds for different patterns!
+    def box_size(self) -> int:
+        return 15
         
     @property
     @abstractmethod
     def target_fps(self) -> int:
         pass
         
-    
     @abstractmethod
     def _adjust_video_to_target_fps_and_run_marker_detection(self, target_fps: int, start_idx: int, offset: float) -> Path:
         # call corresponding private method that takes care of two things:
@@ -114,20 +124,44 @@ class Synchronizer(ABC):
 
     
     def run_synchronization(self, overwrite: bool=False) -> Path:
+        self.template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.led_pattern)
+        
         if not overwrite:
             if self._check_whether_output_file_already_exists():
-                return self.synchronized_object_filepath
-        led_center_coordinates = self._get_LED_center_coordinates()
-        self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
-        plt.figure()
-        plt.plot(self.led_timeseries)
-        plt.show()
-        template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata = self.video_metadata.led_pattern)
-        offset_adjusted_start_idx, remaining_offset= self._find_best_match_of_template(template = template_blinking_motif,
-                                                                                                    start_time = 0,
-                                                                                                    end_time = 60_000) # ToDo - make start & end time adaptable?
-        #self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
-        return self._adjust_video_to_target_fps_and_run_marker_detection(target_fps = self.target_fps, start_idx = offset_adjusted_start_idx, offset = remaining_offset)
+                already_synchronized = True
+                return self.synchronized_object_filepath, already_synchronized
+        already_synchronized = False
+        
+        i = 0
+        while(True):
+            self.bar.reset()
+            if i < 3:
+                led_center_coordinates = self._get_LED_center_coordinates()
+            elif i == 3:
+                led_center_coordinates = self._label_LED_manually()
+            else:
+                print('Could not synchronize the video. \n'
+                      'Make sure, that you chose the right synchronization pattern, \n'
+                      'that the LED is visible during the pattern\n'
+                      'and that you chose a proper alignment threshold!')
+                return None, True
+                
+            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords = led_center_coordinates)
+            self.bar.update(1)
+
+            offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(template = self.template_blinking_motif, start_time = 0, end_time = 60_000) # ToDo - make start & end time adaptable?
+            if alignment_error < self.alignment_threshold:
+                break
+            print('repeating synchronization due to bad alignment!')
+            i += 1
+        
+        self.led_detection = LED_Marker_Plot(image = iio.v3.imread(self.video_metadata.filepath, index=0), led_center_coordinates = led_center_coordinates, box_size = self.box_size, video_metadata = self.video_metadata, output_directory = self.output_directory)
+        
+        self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx = offset_adjusted_start_idx, offset = remaining_offset)
+        synchronized_path = self._adjust_video_to_target_fps_and_run_marker_detection(target_fps = self.target_fps, start_idx = offset_adjusted_start_idx, offset = remaining_offset)
+        self.bar.update(1)
+        self.bar.close()
+        return synchronized_path, already_synchronized
 
     
     def _check_whether_output_file_already_exists(self)->bool:
@@ -160,9 +194,6 @@ class Synchronizer(ABC):
         return template_motif
 
     def _get_LED_center_coordinates(self) -> Coordinates:
-        
-        print(f'Now extracting LED position data from {self.video_metadata.filepath}.')
-        
         if self.video_metadata.led_extraction_type == 'DLC':
             temp_folder = self.output_directory.joinpath('temp')
             Path.mkdir(temp_folder, exist_ok=True)
@@ -181,28 +212,39 @@ class Synchronizer(ABC):
                 for idx in sample_frame_idxs:
                     selected_frames.append(iio.v3.imread(self.video_metadata.filepath, index = idx))
                 video_array = np.asarray(selected_frames)
-                iio.v3.imwrite(str(video_filepath_out), video_array, fps=1)
+                iio.v3.imwrite(str(video_filepath_out), video_array, fps=1, macro_block_size = 1) #if dlc cant read video, remove attribute macro block size
+            self.bar.update(1)    
             
             if not dlc_filepath_out.exists():
                 
                 dlc_interface = DeeplabcutInterface(object_to_analyse = str(video_filepath_out), output_directory = Path.cwd(), marker_detection_directory = config_filepath, dynamic = False)
-                #how to delete automatically created .h5 file?
-                # save it to a temp folder and delete it after analysis?
                 dlc_ending = dlc_interface.analyze_objects()
                 Path(video_filepath_out.stem + dlc_ending + '.h5').rename(dlc_filepath_out)
             df = pd.read_hdf(dlc_filepath_out)
-            x_key, y_key = [key for key in df.keys() if 'LED5' in key and 'x' in key], [key for key in df.keys() if 'LED5' in key and 'y' in key]
-            x = int(df[x_key].mean().values)
-            y = int(df[y_key].mean().values)
-            video_filepath_out.unlink()
+            x_key, y_key, likelihood_key = [key for key in df.keys() if 'LED5' in key and 'x' in key], [key for key in df.keys() if 'LED5' in key and 'y' in key], [key for key in df.keys() if 'LED5' in key and 'likelihood' in key]
+            x =int(df.loc[df[likelihood_key].idxmax(), x_key].values)
+            y =int(df.loc[df[likelihood_key].idxmax(), y_key].values)
+            self.bar.update(1)
+
+            video_filepath_out.unlink() #comment for tests of later modules
+            dlc_filepath_out.unlink() #comment for tests of later modules
             return Coordinates(y_or_row = y, x_or_column = x)
 
+    def _label_LED_manually(self):
+        fig = plt.figure()
+        plt.imshow(iio.v3.imread(self.video_metadata.filepath, index=0))
+        plt.show()
+        print('Please enter the led coordinates!')
+        y = int(input('y or row'))
+        x = int(input('x or column'))
+        self.bar.update(2)
+        return Coordinates(y_or_row = y, x_or_column = x)
 
-    def _extract_led_pixel_intensities(self, led_center_coords: Coordinates, box_rows: int=5, box_cols: int=5) ->np.ndarray:
+    def _extract_led_pixel_intensities(self, led_center_coords: Coordinates) ->np.ndarray:
         box_row_indices = self._get_start_end_indices_from_center_coord_and_length(center_px = led_center_coords.row,
-                                                                                   length = box_rows)
+                                                                                   length = self.box_size)
         box_col_indices = self._get_start_end_indices_from_center_coord_and_length(center_px = led_center_coords.column,
-                                                                                   length = box_cols)
+                                                                                   length = self.box_size)
         mean_pixel_intensities = self._calculate_mean_pixel_intensities(box_row_indices = box_row_indices, box_col_indices = box_col_indices)
         return np.asarray(mean_pixel_intensities)   
     
@@ -226,13 +268,12 @@ class Synchronizer(ABC):
         adjusted_motif_timeseries = template.adjust_template_timeseries_to_fps(fps = self.video_metadata.fps)
         start_frame_idx = self._get_frame_index_closest_to_time(time = start_time)
         end_frame_idx = self._get_frame_index_closest_to_time(time = end_time)
-        best_match_start_frame_idx, best_match_offset = self._get_start_index_and_offset_of_best_match(adjusted_templates = adjusted_motif_timeseries,
-                                                                                                       start_frame_idx = start_frame_idx, 
-                                                                                                       end_frame_idx = end_frame_idx)
-        offset_adjusted_start_idx, remaining_offset = self._adjust_start_idx_and_offset(start_frame_idx = best_match_start_frame_idx,
-                                                                                                           offset = best_match_offset,
-                                                                                                           fps = self.video_metadata.fps)
-        return offset_adjusted_start_idx, remaining_offset
+        best_match_start_frame_idx, best_match_offset, alignment_error = self._get_start_index_and_offset_of_best_match(adjusted_templates = adjusted_motif_timeseries, start_frame_idx = start_frame_idx, end_frame_idx = end_frame_idx)
+        offset_adjusted_start_idx, remaining_offset = self._adjust_start_idx_and_offset(start_frame_idx = best_match_start_frame_idx, offset = best_match_offset, fps = self.video_metadata.fps)
+        
+        self.synchronization_individual = Alignment_Plot_Individual(template = adjusted_motif_timeseries[best_match_offset][0], led_timeseries = self.led_timeseries[best_match_start_frame_idx:], video_metadata = self.video_metadata, output_directory = self.output_directory)
+        
+        return offset_adjusted_start_idx, remaining_offset, alignment_error
 
 
     def _get_frame_index_closest_to_time(self, time: int) -> int:
@@ -262,8 +303,9 @@ class Synchronizer(ABC):
         lowest_sum_of_squared_error_per_template = np.asarray(lowest_sum_of_squared_error_per_template)
         best_matching_template_index = int(lowest_sum_of_squared_error_per_template.argmin())
         best_alignment_results = self._run_alignment(query=adjusted_templates[best_matching_template_index][0], subject=self.led_timeseries[start_frame_idx:end_frame_idx])
-        start_index = int(best_alignment_results.argmin())
-        return start_index, best_matching_template_index
+        start_index = best_alignment_results.argmin()
+        
+        return start_index, best_matching_template_index, best_alignment_results.min()
 
 
     def _adjust_start_idx_and_offset(self, start_frame_idx: int, offset: int, fps: int) -> Tuple[int, float]:
@@ -312,7 +354,11 @@ class Synchronizer(ABC):
         e = np.zeros(n, dtype=q.dtype)
         e[:m] = q
         r = np.fft.irfft(np.fft.rfft(e).conj()*np.fft.rfft(is_), n=n)
+        np.seterr(divide = 'ignore') #toggle output
+        np.seterr(invalid='ignore') #toggle output
         f = np.where(z > 0 , 2*(m-r[:-m+1]/z), m*np.ones_like(z))
+        np.seterr(divide = 'warn')
+        np.seterr(invalid='warn')
         return f[:len(s)-m+1]
 
     
@@ -327,27 +373,8 @@ class Synchronizer(ABC):
                 y += cumsum(r, kahan-1)
         return y
 
-
     def _znorm(self, x, epsilon):
-        return (x-np.mean(x))/max(np.std(x, ddof=0), epsilon)        
-    
-
-    def _plot_best_alignment_result(self, template: np.ndarray) -> None:
-        end_idx = self.best_match_start_idx + template.shape[0]
-        fig = plt.figure(figsize=(9, 6), facecolor='white')
-        gs = fig.add_gridspec(2, 1)
-        ax_raw = fig.add_subplot(gs[0,0])
-        ax_raw.plot(self.led_timeseries[self.best_match_start_idx:end_idx])
-        ax_raw.plot(template)
-        ax_zscored = fig.add_subplot(gs[1,0])
-        ax_zscored.plot(self._zscore(array = self.led_timeseries[self.best_match_start_idx:end_idx]))
-        ax_zscored.plot(self._zscore(array = template))
-        plt.show()
-    
-    
-    def _zscore(self, array: np.ndarray) -> np.ndarray:
-        return (array-np.mean(array))/np.std(array, ddof=0)    
-
+        return (x-np.mean(x))/max(np.std(x, ddof=0), epsilon)          
 
     def _adjust_led_timeseries_for_cross_validation(self, start_idx: int, offset: float) -> np.ndarray:
         adjusted_led_timeseries = self.led_timeseries[start_idx:].copy()
@@ -360,17 +387,8 @@ class Synchronizer(ABC):
         n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(original_n_frames = timeseries.shape[0], original_fps = self.video_metadata.fps, target_fps = self.video_metadata.target_fps)
         original_timestamps = self._compute_timestamps(n_frames = timeseries.shape[0], fps = self.video_metadata.fps, offset = offset)
         target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = self.video_metadata.target_fps)
-        print('led downsampling')
-        plt.figure()
-        plt.plot(original_timestamps)
-        plt.plot(target_timestamps)
-        plt.show()
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
-        try:
-            return timeseries[frame_idxs_with_best_matching_timestamps]
-        except NameError:
-            raise ValueError ('LED not properly detected. No function to set it manually for now.')
-            
+        return timeseries[frame_idxs_best_matching_timestamps]    
     
     def _compute_fps_adjusted_frame_count(self, original_n_frames: int, original_fps: int, target_fps: int) -> int:
         target_ms_per_frame = self._get_ms_interval_per_frame(fps = target_fps)
@@ -378,14 +396,13 @@ class Synchronizer(ABC):
         return int((original_n_frames * original_ms_per_frame) / target_ms_per_frame)
 
     
-    def _compute_timestamps(self, n_frames: int, fps: int, offset: Optional[float]=0.0) -> np.ndarray:
+    def _compute_timestamps(self, n_frames: int, fps: int, offset: float=0.0) -> np.ndarray:
         ms_per_frame = self._get_ms_interval_per_frame(fps = fps)
         timestamps = np.arange(n_frames*ms_per_frame, step=ms_per_frame)
         return timestamps + offset
 
     
     def _find_closest_timestamp_index(self, original_timestamps: np.ndarray, timestamp: float) -> int:
-        print(original_timestamps, timestamp)
         return np.abs(original_timestamps - timestamp).argmin()        
         
         
@@ -421,12 +438,6 @@ class Synchronizer(ABC):
         original_timestamps = self._compute_timestamps(n_frames = original_n_frames, fps = self.video_metadata.fps, offset = offset)
         target_timestamps = self._compute_timestamps(n_frames = n_frames_after_downsampling, fps = target_fps)
         frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(target_timestamps = target_timestamps, original_timestamps = original_timestamps)
-        print('video downsampling')
-        plt.close()
-        plt.figure()
-        plt.plot(original_timestamps)
-        plt.plot(target_timestamps)
-        plt.show()
         sampling_frame_idxs = self._adjust_frame_idxs_for_synchronization_shift(unadjusted_frame_idxs = frame_idxs_best_matching_timestamps, start_idx = start_idx)
         return sampling_frame_idxs
         
@@ -447,7 +458,6 @@ class Synchronizer(ABC):
 
     def _initiate_iterative_writing_of_individual_video_parts(self, frame_idxs_to_sample: List[List[int]], target_fps: int) -> List[Path]:
         filepaths_to_all_video_parts = []
-        print(f'now synchronizing {self.video_metadata.filepath}')
         for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_to_sample):
             part_id = str(idx).zfill(3)
             filepath_video_part = self._write_video_to_disk(idxs_of_frames_to_sample = idxs_of_frames_to_sample, target_fps = target_fps, part_id = part_id)
@@ -463,7 +473,7 @@ class Synchronizer(ABC):
                 selected_frames.append(frame)
         video_array = np.asarray(selected_frames)
         filepath_out = self._construct_video_filepath(part_id = part_id)
-        iio.v3.imwrite(filepath_out, video_array, fps=target_fps)
+        iio.v3.imwrite(filepath_out, video_array, fps=target_fps, macro_block_size = 1)
         self.synchronized_object_filepath = filepath_out
         return filepath_out
 
@@ -494,7 +504,7 @@ class Synchronizer(ABC):
                     concatenated_video = ffmpeg.concat(concatenated_video, part_stream)
         filepath_concatenated_video = self._construct_video_filepath(part_id = None)
         output_stream = ffmpeg.output(concatenated_video, filename=filepath_concatenated_video)
-        output_stream.run(overwrite_output = True)
+        output_stream.run(overwrite_output = True, quiet = True)
         return filepath_concatenated_video
 
 
