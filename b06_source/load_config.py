@@ -1,6 +1,7 @@
 import os
 import yaml
 
+
 def read_config(path):
     """
     Reads structured config file defining a project.
@@ -11,7 +12,9 @@ def read_config(path):
                 cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
         except FileNotFoundError:
             raise (
-            "Could not find the config file at "+ path + " \n Please make sure the path is correct and the file exists")
+                "Could not find the config file at "
+                + path
+                + " \n Please make sure the path is correct and the file exists"
+            )
 
     return cfg
-
