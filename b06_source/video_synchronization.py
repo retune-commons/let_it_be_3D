@@ -128,11 +128,11 @@ class Synchronizer(ABC):
         #   - filepath to the DLC output of the detected markers (.h5 file)
         pass
 
-    def run_synchronization(self, overwrite: bool = False) -> Path:
+    def run_synchronization(self, synchronize_only: bool, overwrite: bool = False) -> Path:
         self.template_blinking_motif = self._construct_template_motif(
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
-
+        
         if not overwrite:
             if self._check_whether_output_file_already_exists():
                 already_synchronized = True
@@ -187,6 +187,7 @@ class Synchronizer(ABC):
             target_fps=self.target_fps,
             start_idx=offset_adjusted_start_idx,
             offset=remaining_offset,
+            synchronize_only = synchronize_only
         )
         self.bar.update(1)
         self.bar.close()
@@ -702,7 +703,7 @@ class CharucoVideoSynchronizer(Synchronizer):
         return self.video_metadata.target_fps
 
     def _adjust_video_to_target_fps_and_run_marker_detection(
-        self, target_fps: int, start_idx: int, offset: float
+        self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool
     ) -> Path:
         return self._downsample_video(
             start_idx=start_idx, offset=offset, target_fps=self.target_fps
@@ -735,20 +736,23 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
         return self.video_metadata.target_fps
 
     def _adjust_video_to_target_fps_and_run_marker_detection(
-        self, target_fps: int, start_idx: int, offset: float
+        self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool
     ) -> Path:
         downsampled_video_filepath = self._downsample_video(
             start_idx=start_idx, offset=offset, target_fps=self.target_fps
         )
-        if self.video_metadata.processing_type == "DLC":
-            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
-                video_filepath=downsampled_video_filepath
-            )
+        if not synchronize_only:
+            if self.video_metadata.processing_type == "DLC":
+                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                    video_filepath=downsampled_video_filepath
+                )
+            else:
+                print(
+                    "TemplateMatching and Manual Annotation of markers are not yet implemented!"
+                )
+            return detected_markers_filepath
         else:
-            print(
-                "TemplateMatching and Manual Annotation of markers are not yet implemented!"
-            )
-        return detected_markers_filepath
+            return None
 
 
 class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):

@@ -453,9 +453,11 @@ class Triangulation_Recordings(Triangulation):
         load_calibration: bool = False,
         output_directory: Optional[Path] = None,
         use_gpu: bool = True,
+        synchronize_only: bool = False
     ) -> None:
         self.recording_directory = recording_directory
         self.output_directory = output_directory
+        self.synchronize_only = synchronize_only
         self._load_calibration(filepath=calibration_toml_filepath)
         self._create_video_objects(
             recording_directory=recording_directory,
@@ -535,6 +537,7 @@ class Triangulation_Recordings(Triangulation):
                     use_gpu=use_gpu,
                     overwrite=overwrite,
                     output_directory=self.output_directory,
+                    synchronize_only = self.synchronize_only
                 )
             else:
                 video_interface.run_synchronizer(
@@ -542,18 +545,11 @@ class Triangulation_Recordings(Triangulation):
                     use_gpu=use_gpu,
                     overwrite=overwrite,
                     output_directory=self.output_directory,
+                    synchronize_only = self.synchronize_only
                 )
             bar.update(1)
         bar.close()
-
-        self.csv_output_filepath = self.output_directory.joinpath(
-            f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
-        )
-        self.triangulation_dlc_cams_filepaths = {
-            video_interface.metadata.cam_id: video_interface.export_for_aniposelib()
-            for video_interface in recording_interfaces
-        }
-
+        
         self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
             template=recording_interfaces[
                 0
@@ -586,6 +582,17 @@ class Triangulation_Recordings(Triangulation):
             for video_interface in charuco_interfaces
             if not video_interface.already_synchronized
         ]
+        
+        if not synchronize_only:
+            self.csv_output_filepath = self.output_directory.joinpath(
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
+            )
+            self.triangulation_dlc_cams_filepaths = {
+                video_interface.metadata.cam_id: video_interface.export_for_aniposelib()
+                for video_interface in recording_interfaces
+            }
+
+        
 
     def _validate_unique_cam_ids(self) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
