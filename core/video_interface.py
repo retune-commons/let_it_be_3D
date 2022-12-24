@@ -12,9 +12,9 @@ import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 
-from b06_source.utils import load_single_frame_of_video
-from b06_source.video_synchronization import Synchronizer
-from b06_source.video_metadata import VideoMetadata
+from .utils import load_single_frame_of_video
+from .video_synchronization import Synchronizer
+from .video_metadata import VideoMetadata
 
 
 class VideoInterface:

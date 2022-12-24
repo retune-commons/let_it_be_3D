@@ -5,8 +5,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from b06_source.video_metadata import VideoMetadata
-from b06_source.utils import Coordinates
+from .video_metadata import VideoMetadata
+from .utils import Coordinates
 
 
 class Plotting(ABC):
