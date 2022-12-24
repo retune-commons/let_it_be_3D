@@ -10,14 +10,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from b06_source.video_metadata import VideoMetadata
-from b06_source.video_module import VideoInterface
-from b06_source.video_synchronization import (
+from .video_metadata import VideoMetadata
+from .video_interface import VideoInterface
+from .video_synchronization import (
     RecordingVideoDownSynchronizer,
     RecordingVideoUpSynchronizer,
     CharucoVideoSynchronizer,
 )
-from b06_source.plotting import Alignment_Plot_Crossvalidation
+from .plotting import Alignment_Plot_Crossvalidation
 
 
 class TestPositionsGroundTruth:
@@ -139,6 +139,7 @@ class Calibration:
             overwrite=overwrite,
             max_frame_count=max_frame_count,
             use_gpu=use_gpu,
+            synchronize_only = True,
         )
         self._validate_unique_cam_ids()
         # user input to choose the correct file, if there are multiple for one cam_id?
@@ -180,6 +181,7 @@ class Calibration:
         max_frame_count: int,
         overwrite: bool,
         load_calibration: bool,
+        synchronize_only: bool,
         use_gpu: bool = True,
     ) -> None:
         avi_files = [
@@ -207,6 +209,7 @@ class Calibration:
                 recording_config_filepath=recording_config_filepath,
                 project_config_filepath=project_config_filepath,
                 load_calibration=load_calibration,
+                calibration_dir = calibration_directory,
             )
             for filepath in charuco_videofiles
         ]
@@ -221,7 +224,9 @@ class Calibration:
 
         if self.output_directory != None:
             try:
-                if not self.output_directory.exists():
+                if self.output_directory.exists():
+                    pass
+                else:
                     self._make_output_dir(
                         project_config_filepath=project_config_filepath
                     )
@@ -241,6 +246,7 @@ class Calibration:
                 use_gpu=use_gpu,
                 output_directory=self.output_directory,
                 overwrite=overwrite,
+                synchronize_only = synchronize_only
             )
             bar.update(1)
         bar.close()
@@ -465,6 +471,7 @@ class Triangulation_Recordings(Triangulation):
             project_config_filepath=project_config_filepath,
             load_calibration=load_calibration,
             max_frame_count=max_frame_count,
+            calibration_directory=calibration_toml_filepath.parent,
             overwrite=overwrite,
             use_gpu=use_gpu,
         )
@@ -478,6 +485,7 @@ class Triangulation_Recordings(Triangulation):
         project_config_filepath: Path,
         max_frame_count: int,
         overwrite: bool,
+        calibration_directory: Path,
         load_calibration: bool = False,
         use_gpu: bool = True,
     ) -> None:
@@ -502,6 +510,7 @@ class Triangulation_Recordings(Triangulation):
                 recording_config_filepath=recording_config_filepath,
                 project_config_filepath=project_config_filepath,
                 load_calibration=load_calibration,
+                calibration_dir = calibration_directory
             )
             for filepath in recording_videofiles
         ]
@@ -516,7 +525,9 @@ class Triangulation_Recordings(Triangulation):
 
         if self.output_directory != None:
             try:
-                if not self.output_directory.exists():
+                if self.output_directory.exists():
+                    pass
+                else:
                     self._make_output_dir(
                         project_config_filepath=project_config_filepath
                     )
@@ -579,11 +590,11 @@ class Triangulation_Recordings(Triangulation):
         ]
         self.led_detection_individuals = [
             video_interface.synchronizer_object.led_detection
-            for video_interface in charuco_interfaces
+            for video_interface in recording_interfaces
             if not video_interface.already_synchronized
         ]
         
-        if not synchronize_only:
+        if not self.synchronize_only:
             self.csv_output_filepath = self.output_directory.joinpath(
                 f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
             )
@@ -641,6 +652,7 @@ class Triangulation_Positions(Triangulation):
             positions_directory=positions_directory,
             config_filepath=config_filepath,
             load_calibration=load_calibration,
+            calibration_directory=calibration_toml_filepath.parent,
             overwrite=overwrite,
         )
         self._validate_unique_cam_ids()
@@ -664,6 +676,7 @@ class Triangulation_Positions(Triangulation):
         positions_directory: Path,
         config_filepath: Path,
         load_calibration: bool,
+        calibration_directory: Path,
         overwrite: bool,
     ) -> None:
         avi_files = [
@@ -684,6 +697,7 @@ class Triangulation_Positions(Triangulation):
                 filepath=filepath,
                 config_filepath=config_filepath,
                 load_calibration=load_calibration,
+                calibration_dir = calibration_directory,
             )
             for filepath in position_files
         ]
@@ -692,7 +706,9 @@ class Triangulation_Positions(Triangulation):
 
         if self.output_directory != None:
             try:
-                if not self.output_directory.exists():
+                if self.output_directory.exists():
+                    pass
+                else:
                     self._make_output_dir(
                         project_config_filepath=project_config_filepath
                     )

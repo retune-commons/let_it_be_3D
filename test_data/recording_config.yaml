@@ -43,10 +43,10 @@ Top:
 led_pattern:
   0:
     'led_on_time_in_ms': 50
-    'on_off_period_length_in_ms': 1_000
-    'motif_duration_in_ms': 4_000
-  1:
-    'led_on_time_in_ms': 50
     'on_off_period_length_in_ms': 100
     'motif_duration_in_ms': 3_000
+  1:
+    'led_on_time_in_ms': 50
+    'on_off_period_length_in_ms': 1_000
+    'motif_duration_in_ms': 2_000
 recording_date: '220826'

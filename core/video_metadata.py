@@ -12,11 +12,11 @@ import cv2
 import matplotlib.pyplot as plt
 import yaml
 
-from b06_source.camera_intrinsics import (
+from .camera_intrinsics import (
     IntrinsicCalibratorFisheyeCamera,
     IntrinsicCalibratorRegularCameraCharuco,
 )
-from b06_source.utils import load_single_frame_of_video
+from .utils import load_single_frame_of_video
 
 
 class VideoMetadata:
@@ -25,9 +25,11 @@ class VideoMetadata:
         video_filepath: Path,
         recording_config_filepath: Path,
         project_config_filepath: Path,
+        calibration_dir: Path,
         max_calibration_frames: int = 300,
         load_calibration=False,
     ) -> None:
+        self.calibration_dir = calibration_dir
         if (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".AVI"
@@ -355,15 +357,16 @@ class VideoMetadata:
             try:
                 intrinsic_calibration_filepath = [
                     file
-                    for file in recording_config_filepath.parent.iterdir()
+                    for file in self.calibration_dir.iterdir()
                     if file.suffix == ".p" and self.cam_id in file.stem
                 ][0]
-                with open(intrinsic_calibration_filepath, "rb") as io:
-                    intrinsic_calibration = pickle.load(io)
             except IndexError:
                 raise FileNotFoundError(
-                    f"Could not find an intrinsic calibration for {self.cam_id} in {recording_config_filepath.parent}! \nRunning the 3D Calibration should also create an intrinsic calibration. \nMake sure, you run the 3D Calibration before Triangulation."
+                    f"Could not find an intrinsic calibration for {self.cam_id} in {self.calibration_dir.parent}! \nRunning the 3D Calibration should also create an intrinsic calibration. \nMake sure, you run the 3D Calibration before Triangulation."
                 )
+            with open(intrinsic_calibration_filepath, "rb") as io:
+                intrinsic_calibration = pickle.load(io)
+                
 
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(
             unadjusted_intrinsic_calibration=intrinsic_calibration
@@ -384,7 +387,7 @@ class VideoMetadata:
     def _save_calibration(self, intrinsic_calibration: Dict) -> None:
         video_filename = self.filepath.name
         filename = f'{video_filename[:video_filename.rfind(".")]}_intrinsic_calibration_results.p'
-        with open(self.filepath.parent.joinpath(filename), "wb") as io:
+        with open(self.calibration_dir.joinpath(filename), "wb") as io:
             pickle.dump(intrinsic_calibration, io)
 
     def _is_adjusting_of_intrinsic_calibration_required(

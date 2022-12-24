@@ -10,10 +10,10 @@ import imageio as iio
 import ffmpeg
 import pandas as pd
 
-from b06_source.video_metadata import VideoMetadata
-from b06_source.utils import Coordinates
-from b06_source.marker_detection import DeeplabcutInterface
-from b06_source.plotting import Alignment_Plot_Individual, LED_Marker_Plot
+from .video_metadata import VideoMetadata
+from .utils import Coordinates
+from .marker_detection import DeeplabcutInterface
+from .plotting import Alignment_Plot_Individual, LED_Marker_Plot
 
 
 class TimeseriesTemplate(ABC):

@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 
 import imageio as iio
-
-# ToDo: adapt to imageio.v3!
 import cv2
 import numpy as np
 import pickle
