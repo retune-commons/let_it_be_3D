@@ -38,3 +38,12 @@ def plot_single_frame_of_video(
     filepath: Path, frame_idx: int = 0, plot_size: Tuple[int, int] = (9, 6)
 ) -> None:
     plot_image(filepath=filepath, idx=frame_idx, plot_size=plot_size)
+
+    
+def convert_to_path(
+    attribute: Union[str, Path]
+) -> Path:
+    if type(attribute) == Path:
+        return attribute
+    elif type(attribute) == str:
+        return Path(attribute)

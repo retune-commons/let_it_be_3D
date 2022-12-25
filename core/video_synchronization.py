@@ -134,7 +134,7 @@ class Synchronizer(ABC):
         )
         
         if not overwrite:
-            if self._check_whether_output_file_already_exists():
+            if self._check_whether_output_file_already_exists(synchronize_only=synchronize_only):
                 already_synchronized = True
                 return self.synchronized_object_filepath, already_synchronized
         already_synchronized = False
@@ -193,8 +193,8 @@ class Synchronizer(ABC):
         self.bar.close()
         return synchronized_path, already_synchronized
 
-    def _check_whether_output_file_already_exists(self) -> bool:
-        if self.video_metadata.charuco_video:
+    def _check_whether_output_file_already_exists(self, synchronize_only: bool=False) -> bool:
+        if synchronize_only:
             if self._construct_video_filepath().exists():
                 self.synchronized_object_filepath = self._construct_video_filepath()
                 return True
@@ -367,6 +367,7 @@ class Synchronizer(ABC):
             led_timeseries=self.led_timeseries[best_match_start_frame_idx:],
             video_metadata=self.video_metadata,
             output_directory=self.output_directory,
+            led_box_size=self.box_size
         )
 
         return offset_adjusted_start_idx, remaining_offset, alignment_error
@@ -703,7 +704,7 @@ class CharucoVideoSynchronizer(Synchronizer):
         return self.video_metadata.target_fps
 
     def _adjust_video_to_target_fps_and_run_marker_detection(
-        self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool
+        self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool=True
     ) -> Path:
         return self._downsample_video(
             start_idx=start_idx, offset=offset, target_fps=self.target_fps

@@ -19,6 +19,8 @@ from .video_synchronization import (
 )
 from .plotting import Alignment_Plot_Crossvalidation
 
+from .utils import convert_to_path
+
 
 class TestPositionsGroundTruth:
 
@@ -130,7 +132,25 @@ class Calibration:
         max_frame_count: int = 300,
         use_gpu: bool = True,
     ) -> None:
-        self.output_directory = output_directory
+        
+        calibration_directory = convert_to_path(calibration_directory)
+        project_config_filepath = convert_to_path(project_config_filepath)
+        recording_config_filepath = convert_to_path(recording_config_filepath)
+        output_directory = convert_to_path(output_directory)
+        
+        if output_directory != None:
+            try:
+                if output_directory.exists():
+                    self.output_directory = output_directory
+                else:
+                    self._make_output_dir(
+                        project_config_filepath=project_config_filepath
+                    )
+            except AttributeError:
+                self._make_output_dir(project_config_filepath=project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath=project_config_filepath)
+        
         self._create_video_objects(
             calibration_directory=calibration_directory,
             load_calibration=load_calibration,
@@ -214,7 +234,7 @@ class Calibration:
             for filepath in charuco_videofiles
         ]
         charuco_interfaces = [
-            VideoInterface(metadata=video_metadata)
+            VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
             for video_metadata in charuco_metadata
         ]
         self.metadata_from_videos = [
@@ -222,18 +242,6 @@ class Calibration:
         ]
         self._validate_and_save_metadata_for_recording()
 
-        if self.output_directory != None:
-            try:
-                if self.output_directory.exists():
-                    pass
-                else:
-                    self._make_output_dir(
-                        project_config_filepath=project_config_filepath
-                    )
-            except AttributeError:
-                self._make_output_dir(project_config_filepath=project_config_filepath)
-        else:
-            self._make_output_dir(project_config_filepath=project_config_filepath)
         print(f"Started analysis. Saving files at {self.output_directory}.")
 
         bar = TQDM(
@@ -312,8 +320,14 @@ class Calibration:
             )
 
     def _make_output_dir(self, project_config_filepath: Path) -> None:
+        unnamed_idx = 0
+        for file in project_config_filepath.parent.iterdir():
+            if str(file.name).startswith("unnamed_calibration_"):
+                idx = int(file.stem[20:])
+                if idx > unnamed_idx:
+                    unnamed_idx = idx
         self.output_directory = project_config_filepath.parent.joinpath(
-            f"{self.recording_date}_Analysis"
+            f"unnamed_calibration_{str(unnamed_idx+1)}"
         )
         if not self.output_directory.exists():
             Path.mkdir(self.output_directory)
@@ -346,8 +360,14 @@ class Triangulation(ABC):
         pass
 
     def _make_output_dir(self, project_config_filepath: Path) -> None:
+        unnamed_idx = 0
+        for file in project_config_filepath.parent.iterdir():
+            if str(file.name).startswith("unnamed_recording_"):
+                idx = int(file.stem[18:])
+                if idx > unnamed_idx:
+                    unnamed_idx = idx
         self.output_directory = project_config_filepath.parent.joinpath(
-            f"{self.recording_date}_Analysis"
+            f"unnamed_recording_{str(unnamed_idx+1)}"
         )
         if not self.output_directory.exists():
             Path.mkdir(self.output_directory)
@@ -461,8 +481,27 @@ class Triangulation_Recordings(Triangulation):
         use_gpu: bool = True,
         synchronize_only: bool = False
     ) -> None:
+        
+        recording_directory = convert_to_path(recording_directory)
+        calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
+        project_config_filepath = convert_to_path(project_config_filepath)
+        recording_config_filepath = convert_to_path(recording_config_filepath)
+        output_directory = convert_to_path(output_directory)
+        
+        if output_directory != None:
+            try:
+                if output_directory.exists():
+                    self.output_directory = output_directory
+                else:
+                    self._make_output_dir(
+                        project_config_filepath=project_config_filepath
+                    )
+            except AttributeError:
+                self._make_output_dir(project_config_filepath=project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath=project_config_filepath)
+        
         self.recording_directory = recording_directory
-        self.output_directory = output_directory
         self.synchronize_only = synchronize_only
         self._load_calibration(filepath=calibration_toml_filepath)
         self._create_video_objects(
@@ -515,7 +554,7 @@ class Triangulation_Recordings(Triangulation):
             for filepath in recording_videofiles
         ]
         recording_interfaces = [
-            VideoInterface(metadata=video_metadata)
+            VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
             for video_metadata in recording_metadata
         ]
         self.metadata_from_videos = [
@@ -523,18 +562,6 @@ class Triangulation_Recordings(Triangulation):
         ]
         self._validate_and_save_metadata_for_recording()
 
-        if self.output_directory != None:
-            try:
-                if self.output_directory.exists():
-                    pass
-                else:
-                    self._make_output_dir(
-                        project_config_filepath=project_config_filepath
-                    )
-            except AttributeError:
-                self._make_output_dir(project_config_filepath=project_config_filepath)
-        else:
-            self._make_output_dir(project_config_filepath=project_config_filepath)
         print(f"Started analysis. Saving files at {self.output_directory}.")
 
         bar = TQDM(
@@ -640,17 +667,35 @@ class Triangulation_Positions(Triangulation):
         self,
         positions_directory: Path,
         calibration_toml_filepath: Path,
-        config_filepath: Path,
+        project_config_filepath: Path,
         output_directory: Optional[Path] = None,
         overwrite: bool = False,
         load_calibration: bool = False,
     ) -> None:
+        
+        positions_directory = convert_to_path(positions_directory)
+        calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
+        project_config_filepath = convert_to_path(project_config_filepath)
+        output_directory = convert_to_path(output_directory)
+        
+        if output_directory != None:
+            try:
+                if output_directory.exists():
+                    self.output_directory = output_directory
+                else:
+                    self._make_output_dir(
+                        project_config_filepath=project_config_filepath
+                    )
+            except AttributeError:
+                self._make_output_dir(project_config_filepath=project_config_filepath)
+        else:
+            self._make_output_dir(project_config_filepath=project_config_filepath)
+        
         self.positions_directory = positions_directory
         self._load_calibration(filepath=calibration_toml_filepath)
-        self.output_directory = output_directory
         self._create_video_objects(
             positions_directory=positions_directory,
-            config_filepath=config_filepath,
+            config_filepath=project_config_filepath,
             load_calibration=load_calibration,
             calibration_directory=calibration_toml_filepath.parent,
             overwrite=overwrite,
@@ -704,18 +749,6 @@ class Triangulation_Positions(Triangulation):
         self.metadata_from_videos = positions_metadata
         self._validate_and_save_metadata_for_recording()
 
-        if self.output_directory != None:
-            try:
-                if self.output_directory.exists():
-                    pass
-                else:
-                    self._make_output_dir(
-                        project_config_filepath=project_config_filepath
-                    )
-            except AttributeError:
-                self._make_output_dir(project_config_filepath=project_config_filepath)
-        else:
-            self._make_output_dir(project_config_filepath=project_config_filepath)
         print(f"Started analysis. Saving files at {self.output_directory}.")
 
         self.csv_output_filepath = self.positions_directory.joinpath(

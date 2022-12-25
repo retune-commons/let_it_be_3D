@@ -12,33 +12,18 @@ import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 
-from .utils import load_single_frame_of_video
 from .video_synchronization import Synchronizer
 from .video_metadata import VideoMetadata
+from .plotting import Intrinsics
 
 
 class VideoInterface:
-    def __init__(self, metadata: VideoMetadata) -> None:
+    def __init__(self, metadata: VideoMetadata, output_dir: Path) -> None:
         self.metadata = metadata
-
-    def inspect_intrinsic_calibration(self, frame_idx: int = 0) -> None:
-        distorted_input_image = load_single_frame_of_video(
-            filepath=self.metadata.filepath, frame_idx=frame_idx
-        )
-        if self.metadata.fisheye:
-            undistorted_output_image = self._undistort_fisheye_image_for_inspection(
-                image=distorted_input_image
-            )
-        else:
-            undistorted_output_image = cv2.undistort(
-                distorted_input_image,
-                self.metadata.intrinsic_calibration["K"],
-                self.metadata.intrinsic_calibration["D"],
-            )
-        self._plot_distorted_and_undistorted_image(
-            distorted_image=distorted_input_image,
-            undistorted_image=undistorted_output_image,
-        )
+        self.plot_camera_intrinsics = Intrinsics(metadata = metadata, output_dir = output_dir)
+        
+    def inspect_intrinsic_calibration(self) -> None:
+        self.plot_camera_intrinsics.plot(plot = True)
 
     def run_synchronizer(
         self,
@@ -80,43 +65,3 @@ class VideoInterface:
                 extra_dist=False,
             )
         return camera
-
-    def _plot_distorted_and_undistorted_image(
-        self, distorted_image: np.ndarray, undistorted_image: np.ndarray
-    ) -> None:
-        fig = plt.figure(figsize=(12, 5), facecolor="white")
-        gs = fig.add_gridspec(1, 2)
-        ax1 = fig.add_subplot(gs[0, 0])
-        plt.imshow(distorted_image)
-        plt.title("raw image")
-        ax2 = fig.add_subplot(gs[0, 1])
-        plt.imshow(undistorted_image)
-        plt.title("undistorted image based on intrinsic calibration")
-        plt.show()
-
-    def _undistort_fisheye_image_for_inspection(self, image: np.ndarray) -> np.ndarray:
-        k_for_fisheye = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
-            self.metadata.intrinsic_calibration["K"],
-            self.metadata.intrinsic_calibration["D"],
-            self.metadata.intrinsic_calibration["size"],
-            np.eye(3),
-            balance=0,
-        )
-        map1, map2 = cv2.fisheye.initUndistortRectifyMap(
-            self.metadata.intrinsic_calibration["K"],
-            self.metadata.intrinsic_calibration["D"],
-            np.eye(3),
-            k_for_fisheye,
-            (
-                self.metadata.intrinsic_calibration["size"][1],
-                self.metadata.intrinsic_calibration["size"][0],
-            ),
-            cv2.CV_16SC2,
-        )
-        return cv2.remap(
-            image,
-            map1,
-            map2,
-            interpolation=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
-        )
