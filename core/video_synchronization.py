@@ -586,7 +586,7 @@ class Synchronizer(ABC):
             start_idx=start_idx, offset=offset, target_fps=target_fps
         )
         sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
-            idxs_of_frames_to_sample=frame_idxs_to_sample, max_frame_count=3_000
+            idxs_of_frames_to_sample=frame_idxs_to_sample, max_frames_to_write=self.video_metadata.max_frames_to_write
         )
         if len(frame_idxs_to_sample) > 1:
             filepaths_all_video_parts = self._initiate_iterative_writing_of_individual_video_parts(
@@ -635,12 +635,12 @@ class Synchronizer(ABC):
         return list(adjusted_frame_idxs)
 
     def _split_into_ram_digestable_parts(
-        self, idxs_of_frames_to_sample: List[int], max_frame_count: int
+        self, idxs_of_frames_to_sample: List[int], max_frames_to_write: int
     ) -> List[List[int]]:
         frame_idxs_to_sample = []
-        while len(idxs_of_frames_to_sample) > max_frame_count:
-            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_frame_count])
-            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_frame_count:]
+        while len(idxs_of_frames_to_sample) > max_frames_to_write:
+            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_frames_to_write])
+            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_frames_to_write:]
         frame_idxs_to_sample.append(idxs_of_frames_to_sample)
         return frame_idxs_to_sample
 

@@ -26,7 +26,6 @@ class VideoMetadata:
         recording_config_filepath: Path,
         project_config_filepath: Path,
         calibration_dir: Path,
-        max_calibration_frames: int = 300,
         load_calibration=False,
     ) -> None:
         self.calibration_dir = calibration_dir
@@ -47,7 +46,7 @@ class VideoMetadata:
             )
         if (
             not project_config_filepath.exists()
-            and project_config_filepath.suffix == ".yaml"
+            or project_config_filepath.suffix == ".yaml"
         ):
             raise (
                 f"Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!"
@@ -60,7 +59,7 @@ class VideoMetadata:
         )
         self._get_intrinsic_parameters(
             recording_config_filepath=recording_config_filepath,
-            max_calibration_frames=max_calibration_frames,
+            max_calibration_frames=self.max_calibration_frames,
             load_calibration=load_calibration,
         )
 
@@ -84,6 +83,8 @@ class VideoMetadata:
             "intrinsic_calibration_dir",
             "led_extraction_type",
             "led_extraction_path",
+            "max_calibration_frames",
+            "max_frames_to_write"
         ]:
             try:
                 project_config[key]
@@ -99,6 +100,8 @@ class VideoMetadata:
         self.intrinsic_calibrations_directory = Path(
             project_config["intrinsic_calibration_dir"]
         )
+        self.max_calibration_frames = project_config["max_calibration_frames"]
+        self.max_frames_to_write = project_config["max_frames_to_write"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
 
@@ -325,7 +328,7 @@ class VideoMetadata:
                         ][0]
                         calibrator = IntrinsicCalibratorFisheyeCamera(
                             filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
-                            max_frame_count=max_calibration_frames,
+                            max_calibration_frames=self.max_calibration_frames,
                         )
                         intrinsic_calibration = calibrator.run()
                     except IndexError:
@@ -349,7 +352,7 @@ class VideoMetadata:
                 else:
                     calibrator = IntrinsicCalibratorRegularCameraCharuco(
                         filepath_calibration_video=self.filepath,
-                        max_frame_count=max_calibration_frames,
+                        max_calibration_frames=self.max_calibration_frames,
                     )
                     intrinsic_calibration = calibrator.run()
             self._save_calibration(intrinsic_calibration=intrinsic_calibration)

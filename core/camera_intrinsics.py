@@ -23,9 +23,9 @@ class IntrinsicCameraCalibrator(ABC):
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         pass
 
-    def __init__(self, filepath_calibration_video: Path, max_frame_count: int) -> None:
+    def __init__(self, filepath_calibration_video: Path, max_calibration_frames: int) -> None:
         self.video_filepath = filepath_calibration_video
-        self.max_frame_count = max_frame_count
+        self.max_calibration_frames = max_calibration_frames
         self.video_reader = iio.get_reader(filepath_calibration_video)
 
     @property
@@ -77,7 +77,7 @@ class IntrinsicCameraCalibrator(ABC):
 
         # check, how the charuco calibration works and whether the following function calls are needed in the abstract class
         # rename to board instead of checkerboard
-        if len(detected_checkerboard_corners_per_image) != self.max_frame_count:
+        if len(detected_checkerboard_corners_per_image) != self.max_calibration_frames:
             detected_checkerboard_corners_per_image = self._attempt_to_match_max_frame_count(
                 corners_per_image=detected_checkerboard_corners_per_image,
                 already_selected_frame_idxs=selected_frame_idxs,
@@ -101,7 +101,7 @@ class IntrinsicCameraCalibrator(ABC):
         already_selected_frame_idxs: List[int],
     ) -> List[np.ndarray]:
         print(f"Frames with detected checkerboard: {len(corners_per_image)}.")
-        if len(corners_per_image) < self.max_frame_count:
+        if len(corners_per_image) < self.max_calibration_frames:
             print("Trying to find some more ...")
             corners_per_image = self._attempt_to_reach_max_frame_count(
                 corners_per_image=corners_per_image,
@@ -110,7 +110,7 @@ class IntrinsicCameraCalibrator(ABC):
             print(
                 f"Done. Now we are at a total of {len(corners_per_image)} frames in which I could detect a checkerboard."
             )
-        elif len(corners_per_image) > self.max_frame_count:
+        elif len(corners_per_image) > self.max_calibration_frames:
             corners_per_image = self._limit_to_max_frame_count(
                 all_detected_corners=corners_per_image
             )
@@ -126,7 +126,7 @@ class IntrinsicCameraCalibrator(ABC):
         # limit time?
         total_frame_count = self.video_reader.count_frames()
         for idx in range(total_frame_count):
-            if len(corners_per_image) < self.max_frame_count:
+            if len(corners_per_image) < self.max_calibration_frames:
                 if idx not in already_selected_frame_idxs:
                     (
                         checkerboard_detected,
@@ -155,8 +155,8 @@ class IntrinsicCameraCalibrator(ABC):
 
     def _determine_sampling_rate(self) -> int:
         total_frame_count = self.video_reader.count_frames()
-        if total_frame_count >= 5 * self.max_frame_count:
-            sampling_rate = total_frame_count // (5 * self.max_frame_count)
+        if total_frame_count >= 5 * self.max_calibration_frames:
+            sampling_rate = total_frame_count // (5 * self.max_calibration_frames)
         else:
             sampling_rate = 1
         return sampling_rate
@@ -179,7 +179,7 @@ class IntrinsicCameraCalibrator(ABC):
         sampling_idxs = np.linspace(
             0,
             len(all_detected_corners),
-            self.max_frame_count,
+            self.max_calibration_frames,
             endpoint=False,
             dtype=int,
         )
