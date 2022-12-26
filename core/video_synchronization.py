@@ -142,10 +142,11 @@ class Synchronizer(ABC):
         i = 0
         while True:
             self.bar.reset()
-            if i < 3:
+            if i == 3:
+                self.video_metadata.led_extraction_type = "manual"
                 led_center_coordinates = self._get_LED_center_coordinates()
-            elif i == 3:
-                led_center_coordinates = self._label_LED_manually()
+            elif i < 3:
+                led_center_coordinates = self._get_LED_center_coordinates()
             else:
                 print(
                     "Could not synchronize the video. \n"
@@ -330,16 +331,6 @@ class Synchronizer(ABC):
             return Coordinates(y_or_row=y, x_or_column=x)
         else:
             print("Template Matching is not yet implemented!")
-
-    def _label_LED_manually(self):
-        fig = plt.figure()
-        plt.imshow(iio.v3.imread(self.video_metadata.filepath, index=0))
-        plt.show()
-        print("Please enter the led coordinates!")
-        y = int(input("y or row"))
-        x = int(input("x or column"))
-        self.bar.update(2)
-        return Coordinates(y_or_row=y, x_or_column=x)
 
     def _extract_led_pixel_intensities(
         self, led_center_coords: Coordinates
