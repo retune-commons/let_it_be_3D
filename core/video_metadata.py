@@ -151,6 +151,7 @@ class VideoMetadata:
         self.led_extraction_path = project_config["led_extraction_path"][self.cam_id]
 
     def _extract_filepath_metadata(self, filepath_name: str) -> None:
+        self.charuco_video = False
         if filepath_name[-4:] == ".AVI":
             filepath_name = filepath_name.replace(
                 filepath_name[
@@ -198,7 +199,6 @@ class VideoMetadata:
                     self._check_attribute(attribute_to_check=attribute)
 
         else:
-            self.charuco_video = False
             for piece in filepath_name[:-4].split("_"):
                 if piece in self.valid_cam_ids:
                     self.cam_id = piece
@@ -433,8 +433,10 @@ class VideoMetadata:
         return adjusted_intrinsic_calibration
 
     def _get_cropped_video_size(self) -> Tuple[int, int]:
-        props = iio.improps(self.filepath, index=0)
-        size = props.shape[0:2]
+        try:
+            size = iio.immeta(self.filepath, exclude_applied=False)['size']
+        except KeyError:
+            size = iio.immeta(self.filepath, exclude_applied=False)['shape']
         return size
 
     def _get_correct_x_y_offsets(

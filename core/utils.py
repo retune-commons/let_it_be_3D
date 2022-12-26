@@ -1,6 +1,7 @@
 from typing import List, Tuple, Dict, Optional, Union
 from pathlib import Path
 
+import pandas as pd
 import imageio as iio
 import numpy as np
 import matplotlib.pyplot as plt
@@ -47,3 +48,22 @@ def convert_to_path(
         return attribute
     elif type(attribute) == str:
         return Path(attribute)
+    
+def construct_dlc_output_style_df_from_manual_marker_coords(manual_test_position_marker_coords_pred: Dict) -> pd.DataFrame:
+    multi_index = get_multi_index(markers = manual_test_position_marker_coords_pred.keys())
+    df = pd.DataFrame(data = {}, columns = multi_index)
+    for scorer, marker_id, key in df.columns:
+        df[(scorer, marker_id, key)] = manual_test_position_marker_coords_pred[marker_id][key]
+    return df
+
+def get_multi_index(markers: List) -> pd.MultiIndex:
+    multi_index_column_names = [[], [], []]
+    for marker_id in markers:
+        for column_name in ("x", "y", "likelihood"):
+            multi_index_column_names[0].append("manually_annotated_marker_positions")
+            multi_index_column_names[1].append(marker_id)
+            multi_index_column_names[2].append(column_name)
+    return pd.MultiIndex.from_arrays(multi_index_column_names, names=('scorer', 'bodyparts', 'coords'))
+    
+    
+    

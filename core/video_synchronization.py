@@ -12,7 +12,7 @@ import pandas as pd
 
 from .video_metadata import VideoMetadata
 from .utils import Coordinates
-from .marker_detection import DeeplabcutInterface
+from .marker_detection import DeeplabcutInterface, ManualAnnotation
 from .plotting import Alignment_Plot_Individual, LED_Marker_Plot
 
 
@@ -271,7 +271,7 @@ class Synchronizer(ABC):
 
                 dlc_interface = DeeplabcutInterface(
                     object_to_analyse=str(video_filepath_out),
-                    output_directory=Path.cwd(),
+                    output_directory=self.output_directory,
                     marker_detection_directory=config_filepath,
                 )
                 dlc_ending = dlc_interface.analyze_objects()
@@ -288,9 +288,48 @@ class Synchronizer(ABC):
             y = int(df.loc[df[likelihood_key].idxmax(), y_key].values)
             self.bar.update(1)
 
-            video_filepath_out.unlink()  # comment for tests of later modules
-            dlc_filepath_out.unlink()  # comment for tests of later modules
+            video_filepath_out.unlink()
+            dlc_filepath_out.unlink()
             return Coordinates(y_or_row=y, x_or_column=x)
+        elif self.video_metadata.led_extraction_type == "manual":
+            temp_folder = self.output_directory.joinpath("temp")
+            Path.mkdir(temp_folder, exist_ok=True)
+            
+            config_filepath = self.video_metadata.led_extraction_path
+            if self.video_metadata.charuco_video:
+                manual_filepath_out = temp_folder.joinpath(
+                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5"
+                )
+            else:
+                manual_filepath_out = temp_folder.joinpath(
+                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
+                )
+
+            self.bar.update(1)
+
+            if not manual_filepath_out.exists():
+
+                manual_interface = ManualAnnotation(
+                    object_to_analyse=self.video_metadata.filepath,
+                    output_directory=self.output_directory,
+                    marker_detection_directory=config_filepath,
+                )
+                manual_interface.analyze_objects(filename=manual_filepath_out, labels = ["LED5"], only_first_frame = True)
+                
+            df = pd.read_hdf(manual_filepath_out)
+            x_key, y_key = (
+                [key for key in df.keys() if "LED5" in key and "x" in key],
+                [key for key in df.keys() if "LED5" in key and "y" in key],
+            )
+            x = int(df.loc[0, x_key].values)
+            y = int(df.loc[0, y_key].values)
+            
+            self.bar.update(1)
+
+            manual_filepath_out.unlink()
+            return Coordinates(y_or_row=y, x_or_column=x)
+        else:
+            print("Template Matching is not yet implemented!")
 
     def _label_LED_manually(self):
         fig = plt.figure()
@@ -712,21 +751,38 @@ class CharucoVideoSynchronizer(Synchronizer):
 
 class RecordingVideoSynchronizer(Synchronizer):
     def _run_deep_lab_cut_for_marker_detection(self, video_filepath: Path) -> Path:
-        output_filepath = self.output_directory.joinpath(
-            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
-        )
+        output_filepath = self._create_h5_filepath()
 
         if not output_filepath.exists():
             config_filepath = self.video_metadata.processing_path
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
-                output_directory=Path.cwd(),
+                output_directory=self.output_directory,
                 marker_detection_directory=config_filepath,
             )
             h5_file = dlc_interface.analyze_objects()
             Path(video_filepath.stem + h5_file + ".h5").rename(output_filepath)
 
         return output_filepath
+    
+    def _run_manual_marker_detection(self, video_filepath: Path) -> Path:
+        output_filepath = self._create_h5_filepath()
+        
+        if not output_filepath.exists():
+            config_filepath = self.video_metadata.processing_path
+            manual_interface = ManualAnnotation(
+                object_to_analyse=video_filepath,
+                output_directory=self.output_directory,
+                marker_detection_directory=config_filepath,
+            )
+
+        return manual_interface.analyze_objects(filename = output_filepath)
+    
+    
+    
+    def _create_h5_filepath(self) -> Path:
+        h5_filepath = self.output_directory.joinpath(f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5")
+        return h5_filepath
 
 
 class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
@@ -745,9 +801,13 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
                 detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
                     video_filepath=downsampled_video_filepath
                 )
+            elif self.video_metadata.processing_type == "manual":
+                detected_markers_filepath = self._run_manual_marker_detection(
+                    video_filepath=downsampled_video_filepath
+                )
             else:
                 print(
-                    "TemplateMatching and Manual Annotation of markers are not yet implemented!"
+                    "TemplateMatching is not yet implemented!"
                 )
             return detected_markers_filepath
         else:

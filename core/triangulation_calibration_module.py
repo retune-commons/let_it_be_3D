@@ -12,13 +12,9 @@ import matplotlib.pyplot as plt
 
 from .video_metadata import VideoMetadata
 from .video_interface import VideoInterface
-from .video_synchronization import (
-    RecordingVideoDownSynchronizer,
-    RecordingVideoUpSynchronizer,
-    CharucoVideoSynchronizer,
-)
+from .video_synchronization import RecordingVideoDownSynchronizer, RecordingVideoUpSynchronizer, CharucoVideoSynchronizer
 from .plotting import Alignment_Plot_Crossvalidation
-
+from .marker_detection import ManualAnnotation
 from .utils import convert_to_path
 
 
@@ -381,7 +377,7 @@ class Triangulation(ABC):
             p3ds_flat=p3ds_flat
         )
         self._get_dataframe_of_triangulated_points()
-        self._save_dataframe_as_h5()
+        self._save_dataframe_as_csv()
 
     def _load_calibration(self, filepath: Path) -> None:
         if filepath.name.endswith(".toml") and filepath.exists():
@@ -463,8 +459,8 @@ class Triangulation(ABC):
         df["fnum"] = np.arange(n_frames)
         self.df = df
 
-    def _save_dataframe_as_h5(self) -> None:
-        self.df.to_csv(self.csv_output_filepath)
+    def _save_dataframe_as_csv(self) -> None:
+        self.df.to_csv(self.csv_output_filepath, index = False)
 
 
 class Triangulation_Recordings(Triangulation):
@@ -667,6 +663,7 @@ class Triangulation_Positions(Triangulation):
         self,
         positions_directory: Path,
         calibration_toml_filepath: Path,
+        recording_config_filepath: Path,
         project_config_filepath: Path,
         output_directory: Optional[Path] = None,
         overwrite: bool = False,
@@ -677,6 +674,7 @@ class Triangulation_Positions(Triangulation):
         calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         project_config_filepath = convert_to_path(project_config_filepath)
         output_directory = convert_to_path(output_directory)
+        recording_config_filepath = convert_to_path(recording_config_filepath)
         
         if output_directory != None:
             try:
@@ -695,13 +693,33 @@ class Triangulation_Positions(Triangulation):
         self._load_calibration(filepath=calibration_toml_filepath)
         self._create_video_objects(
             positions_directory=positions_directory,
-            config_filepath=project_config_filepath,
+            project_config_filepath=project_config_filepath,
+            recording_config_filepath=recording_config_filepath,
             load_calibration=load_calibration,
             calibration_directory=calibration_toml_filepath.parent,
             overwrite=overwrite,
         )
         self._validate_unique_cam_ids()
-        # user input to choose the correct file, if there are multiple files for one cam_id?
+        self.csv_output_filepath = self.output_directory.joinpath(
+                f"Positions_{self.recording_date}.csv"
+            )
+        
+    def get_marker_predictions(self)->None:        
+        self.triangulation_dlc_cams_filepaths = {}
+        for cam in self.metadata_from_videos:
+            h5_output_filepath = self.output_directory.joinpath(f"Positions_{cam.recording_date}_{cam.cam_id}.h5")
+            self.triangulation_dlc_cams_filepaths[cam.cam_id] = h5_output_filepath
+            if cam.calibration_evaluation_type == "manual":
+                config = cam.calibration_evaluation_path
+                if not h5_output_filepath.exists():
+                    manual_interface = ManualAnnotation(
+                        object_to_analyse=cam.filepath,
+                        output_directory=self.output_directory,
+                        marker_detection_directory=config,
+                    )
+                    manual_interface.analyze_objects(filename=h5_output_filepath, only_first_frame = True)
+            else: 
+                print("Template Matching and DLC are not yet implemented for Marker Detection in Positions!")
 
     def evaluate_calibration(
         self, test_positions_gt: TestPositionsGroundTruth, verbose: bool = True
@@ -717,57 +735,53 @@ class Triangulation_Positions(Triangulation):
                     f'Using {reference_distance_id} as reference distance, the mean distance error is: {distance_errors["mean_error"]} cm.'
                 )
 
-    def _create_video_objects(
+    def _create_video_objects(self,
         positions_directory: Path,
-        config_filepath: Path,
+        project_config_filepath: Path,
+        recording_config_filepath: Path,
         load_calibration: bool,
         calibration_directory: Path,
         overwrite: bool,
     ) -> None:
         avi_files = [
             file
-            for file in recording_directory.iterdir()
+            for file in positions_directory.iterdir()
             if file.name.endswith(".AVI") and "Positions" in file.name
         ]
         avi_files.sort()
         top_cam_file = avi_files[
             -1
-        ]  # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
+        ]  # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file
         position_files = [
-            file for file in positions_directory.iterdir() if file.name.endswith(".mp4")
+            file for file in positions_directory.iterdir() if (file.name.endswith(".tiff") or file.name.endswith(".bmp") or file.name.endswith(".jpg")) and "Positions" in file.name
         ]
         position_files.append(top_cam_file)
         positions_metadata = [
             VideoMetadata(
-                filepath=filepath,
-                config_filepath=config_filepath,
+                video_filepath=filepath,
+                recording_config_filepath =recording_config_filepath,
+                project_config_filepath=project_config_filepath,
                 load_calibration=load_calibration,
                 calibration_dir = calibration_directory,
             )
             for filepath in position_files
         ]
         self.metadata_from_videos = positions_metadata
+        self.cameras = [video.cam_id for video in positions_metadata]
         self._validate_and_save_metadata_for_recording()
 
         print(f"Started analysis. Saving files at {self.output_directory}.")
 
-        self.csv_output_filepath = self.positions_directory.joinpath(
-            f"Positions_{self.recording_date}.csv"
-        )
-        self.triangulation_dlc_cams_filepaths = {
-            metadata.cam_id: metadata.filepath for metadata in positions_metadata
-        }
-
-    def _validate_unique_cam_ids():
-        self.cameras = [camera.name for camera in self.camera_group.cameras]
+    def _validate_unique_cam_ids(self):
+        cameras = [camera.name for camera in self.camera_group.cameras]
         # possibility to create empty .h5 for missing recordings?
-        if self.triangulation_dlc_cams_filepaths.keys().sort() != self.cameras.sort():
+        if self.cameras.sort() != cameras.sort():
             raise ValueError(
                 f"The cam_ids of the recordings in {self.positions_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
                 "Are there missing or additional files in the calibration or the recording folder?"
             )
 
-    def _validate_and_save_metadata_for_recording():
+    def _validate_and_save_metadata_for_recording(self):
         if all([metadata.recording_date for metadata in self.metadata_from_videos]):
             self.recording_date = self.metadata_from_videos[0].recording_date
         else:
