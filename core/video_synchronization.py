@@ -273,7 +273,6 @@ class Synchronizer(ABC):
                     object_to_analyse=str(video_filepath_out),
                     output_directory=Path.cwd(),
                     marker_detection_directory=config_filepath,
-                    dynamic=False,
                 )
                 dlc_ending = dlc_interface.analyze_objects()
                 Path(video_filepath_out.stem + dlc_ending + ".h5").rename(
@@ -723,7 +722,6 @@ class RecordingVideoSynchronizer(Synchronizer):
                 object_to_analyse=str(video_filepath),
                 output_directory=Path.cwd(),
                 marker_detection_directory=config_filepath,
-                dynamic=True,
             )
             h5_file = dlc_interface.analyze_objects()
             Path(video_filepath.stem + h5_file + ".h5").rename(output_filepath)
