@@ -39,14 +39,15 @@ class VideoInterface:
             output_directory=output_directory,
         )
         (
-            self.synchronized_object_filepath,
+            self.marker_detection_path,
+            self.synchronized_video_filepath,
             self.already_synchronized,
         ) = self.synchronizer_object.run_synchronization(overwrite=overwrite, synchronize_only = synchronize_only)
 
     def export_for_aniposelib(self) -> Union[ap_lib.cameras.Camera, Path]:
-        if self.synchronized_object_filepath.name.endswith(".h5"):
-            return self.synchronized_object_filepath
-        elif self.synchronized_object_filepath.name.endswith(".mp4"):
+        if not self.metadata.charuco_video:
+            return self.marker_detection_path
+        else:
             return self._export_as_aniposelib_Camera_object()
 
     def _export_as_aniposelib_Camera_object(self) -> ap_lib.cameras.Camera:

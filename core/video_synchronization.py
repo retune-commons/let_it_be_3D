@@ -96,7 +96,6 @@ class Synchronizer(ABC):
         self.video_metadata = video_metadata
         self.use_gpu = use_gpu
         self.output_directory = output_directory
-        self.bar = TQDM(total=4, desc=f"Now synchronizing {self.video_metadata.cam_id}")
 
     @property
     # differnet thresholds for different patterns!
@@ -128,7 +127,7 @@ class Synchronizer(ABC):
         #   - filepath to the DLC output of the detected markers (.h5 file)
         pass
 
-    def run_synchronization(self, synchronize_only: bool, overwrite: bool = False) -> Path:
+    def run_synchronization(self, synchronize_only: bool, overwrite: bool = False) -> Tuple[Path, bool]:
         self.template_blinking_motif = self._construct_template_motif(
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
@@ -136,12 +135,14 @@ class Synchronizer(ABC):
         if not overwrite:
             if self._check_whether_output_file_already_exists(synchronize_only=synchronize_only):
                 already_synchronized = True
-                return self.synchronized_object_filepath, already_synchronized
+                if self.video_metadata.charuco_video:
+                    return None, self._construct_video_filepath(), already_synchronized
+                else:
+                    return self._create_h5_filepath(), self._construct_video_filepath(), already_synchronized
         already_synchronized = False
 
         i = 0
         while True:
-            self.bar.reset()
             if i == 3:
                 self.video_metadata.led_extraction_type = "manual"
                 led_center_coordinates = self._get_LED_center_coordinates()
@@ -154,12 +155,11 @@ class Synchronizer(ABC):
                     "that the LED is visible during the pattern\n"
                     "and that you chose a proper alignment threshold!"
                 )
-                return None, True
+                return None, None, True
 
             self.led_timeseries = self._extract_led_pixel_intensities(
                 led_center_coords=led_center_coordinates
             )
-            self.bar.update(1)
 
             (
                 offset_adjusted_start_idx,
@@ -184,15 +184,13 @@ class Synchronizer(ABC):
         self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(
             start_idx=offset_adjusted_start_idx, offset=remaining_offset
         )
-        synchronized_path = self._adjust_video_to_target_fps_and_run_marker_detection(
+        marker_detection_path, synchronized_video_path = self._adjust_video_to_target_fps_and_run_marker_detection(
             target_fps=self.target_fps,
             start_idx=offset_adjusted_start_idx,
             offset=remaining_offset,
             synchronize_only = synchronize_only
         )
-        self.bar.update(1)
-        self.bar.close()
-        return synchronized_path, already_synchronized
+        return marker_detection_path, synchronized_video_path, already_synchronized
 
     def _check_whether_output_file_already_exists(self, synchronize_only: bool=False) -> bool:
         if synchronize_only:
@@ -266,7 +264,6 @@ class Synchronizer(ABC):
                 iio.v3.imwrite(
                     str(video_filepath_out), video_array, fps=1, macro_block_size=1
                 )  # if dlc cant read video, remove attribute macro block size
-            self.bar.update(1)
 
             if not dlc_filepath_out.exists():
 
@@ -287,7 +284,6 @@ class Synchronizer(ABC):
             )
             x = int(df.loc[df[likelihood_key].idxmax(), x_key].values)
             y = int(df.loc[df[likelihood_key].idxmax(), y_key].values)
-            self.bar.update(1)
 
             video_filepath_out.unlink()
             dlc_filepath_out.unlink()
@@ -306,7 +302,6 @@ class Synchronizer(ABC):
                     f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
 
-            self.bar.update(1)
 
             if not manual_filepath_out.exists():
 
@@ -325,8 +320,6 @@ class Synchronizer(ABC):
             x = int(df.loc[0, x_key].values)
             y = int(df.loc[0, y_key].values)
             
-            self.bar.update(1)
-
             manual_filepath_out.unlink()
             return Coordinates(y_or_row=y, x_or_column=x)
         else:
@@ -677,8 +670,6 @@ class Synchronizer(ABC):
         return filepath_out
 
     def _construct_video_filepath(self, part_id: Optional[int] = None) -> Path:
-        # ToDo: proper file & directory structure
-        # ToDo: include mouse id & session id - OR - charuco
         if self.video_metadata.charuco_video:
             if part_id == None:
                 filepath = self.output_directory.joinpath(
@@ -734,8 +725,8 @@ class CharucoVideoSynchronizer(Synchronizer):
 
     def _adjust_video_to_target_fps_and_run_marker_detection(
         self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool=True
-    ) -> Path:
-        return self._downsample_video(
+    ) -> Tuple[Path]:
+        return None, self._downsample_video(
             start_idx=start_idx, offset=offset, target_fps=self.target_fps
         )
 
@@ -783,7 +774,7 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
 
     def _adjust_video_to_target_fps_and_run_marker_detection(
         self, target_fps: int, start_idx: int, offset: float, synchronize_only: bool
-    ) -> Path:
+    ) -> Tuple[Path]:
         downsampled_video_filepath = self._downsample_video(
             start_idx=start_idx, offset=offset, target_fps=self.target_fps
         )
@@ -800,9 +791,9 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
                 print(
                     "TemplateMatching is not yet implemented!"
                 )
-            return detected_markers_filepath
+            return detected_markers_filepath, downsampled_video_filepath
         else:
-            return None
+            return None, downsampled_video_filepath
 
 
 class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):

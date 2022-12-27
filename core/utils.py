@@ -1,5 +1,5 @@
 from typing import List, Tuple, Dict, Optional, Union
-from pathlib import Path
+from pathlib import Path, PosixPath
 
 import pandas as pd
 import imageio as iio
@@ -44,7 +44,7 @@ def plot_single_frame_of_video(
 def convert_to_path(
     attribute: Union[str, Path]
 ) -> Path:
-    if type(attribute) == Path:
+    if type(attribute) == PosixPath:
         return attribute
     elif type(attribute) == str:
         return Path(attribute)
