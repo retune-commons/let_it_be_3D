@@ -16,7 +16,7 @@ from .camera_intrinsics import (
     IntrinsicCalibratorFisheyeCamera,
     IntrinsicCalibratorRegularCameraCharuco,
 )
-from .utils import load_single_frame_of_video
+from .utils import load_single_frame_of_video, convert_to_path
 
 
 class VideoMetadata:
@@ -26,10 +26,8 @@ class VideoMetadata:
         recording_config_filepath: Path,
         project_config_filepath: Path,
         calibration_dir: Path,
-        max_calibration_frames: int = 300,
-        load_calibration=False,
     ) -> None:
-        self.calibration_dir = calibration_dir
+        self.calibration_dir = convert_to_path(calibration_dir)
         if (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".AVI"
@@ -47,7 +45,7 @@ class VideoMetadata:
             )
         if (
             not project_config_filepath.exists()
-            and project_config_filepath.suffix == ".yaml"
+            or project_config_filepath.suffix != ".yaml"
         ):
             raise (
                 f"Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!"
@@ -60,8 +58,7 @@ class VideoMetadata:
         )
         self._get_intrinsic_parameters(
             recording_config_filepath=recording_config_filepath,
-            max_calibration_frames=max_calibration_frames,
-            load_calibration=load_calibration,
+            max_calibration_frames=self.max_calibration_frames,
         )
 
     def _read_metadata(
@@ -77,13 +74,16 @@ class VideoMetadata:
             recording_config = yaml.load(ymlfile2, Loader=yaml.SafeLoader)
 
         for key in [
-            "target_fps",
             "valid_cam_IDs",
             "paradigms",
             "animal_lines",
             "intrinsic_calibration_dir",
             "led_extraction_type",
             "led_extraction_path",
+            "max_calibration_frames",
+            "max_frames_to_write",
+            "use_gpu",
+            "load_calibration"
         ]:
             try:
                 project_config[key]
@@ -92,17 +92,20 @@ class VideoMetadata:
                     f"Missing metadata information in the project_config_file {project_config_filepath} for {key}."
                 )
 
-        self.target_fps = project_config["target_fps"]
         self.valid_cam_ids = project_config["valid_cam_IDs"]
         self.valid_paradigms = project_config["paradigms"]
         self.valid_mouse_lines = project_config["animal_lines"]
         self.intrinsic_calibrations_directory = Path(
             project_config["intrinsic_calibration_dir"]
         )
+        self.max_calibration_frames = project_config["max_calibration_frames"]
+        self.max_frames_to_write = project_config["max_frames_to_write"]
+        self.use_gpu = project_config["use_gpu"]
+        self.load_calibration = project_config["load_calibration"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
 
-        for key in ["led_pattern", self.cam_id]:
+        for key in ["led_pattern", self.cam_id, "target_fps"]:
             try:
                 recording_config[key]
             except KeyError:
@@ -111,6 +114,7 @@ class VideoMetadata:
                 )
 
         self.led_pattern = recording_config["led_pattern"]
+        self.target_fps = recording_config["target_fps"]
         if self.recording_date != recording_config["recording_date"]:
             raise ValueError(
                 f"The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
@@ -151,6 +155,7 @@ class VideoMetadata:
         self.led_extraction_path = project_config["led_extraction_path"][self.cam_id]
 
     def _extract_filepath_metadata(self, filepath_name: str) -> None:
+        self.charuco_video = False
         if filepath_name[-4:] == ".AVI":
             filepath_name = filepath_name.replace(
                 filepath_name[
@@ -198,7 +203,6 @@ class VideoMetadata:
                     self._check_attribute(attribute_to_check=attribute)
 
         else:
-            self.charuco_video = False
             for piece in filepath_name[:-4].split("_"):
                 if piece in self.valid_cam_ids:
                     self.cam_id = piece
@@ -303,7 +307,6 @@ class VideoMetadata:
     def _get_intrinsic_parameters(
         self,
         recording_config_filepath: Path,
-        load_calibration: bool,
         max_calibration_frames: int,
     ) -> None:
         if self.charuco_video:
@@ -325,7 +328,7 @@ class VideoMetadata:
                         ][0]
                         calibrator = IntrinsicCalibratorFisheyeCamera(
                             filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
-                            max_frame_count=max_calibration_frames,
+                            max_calibration_frames=self.max_calibration_frames,
                         )
                         intrinsic_calibration = calibrator.run()
                     except IndexError:
@@ -333,7 +336,7 @@ class VideoMetadata:
                             f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\nIt is required having a intrinsic_calibration .p file or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibrations_directory}) for a fisheye-camera!"
                         )
             else:
-                if load_calibration:
+                if self.load_calibration:
                     try:
                         intrinsic_calibration_filepath = [
                             file
@@ -344,12 +347,12 @@ class VideoMetadata:
                             intrinsic_calibration = pickle.load(io)
                     except IndexError:
                         raise FileNotFoundError(
-                            f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" to calibrate now!'
+                            f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" in project_config to calibrate now!'
                         )
                 else:
                     calibrator = IntrinsicCalibratorRegularCameraCharuco(
                         filepath_calibration_video=self.filepath,
-                        max_frame_count=max_calibration_frames,
+                        max_calibration_frames=self.max_calibration_frames,
                     )
                     intrinsic_calibration = calibrator.run()
             self._save_calibration(intrinsic_calibration=intrinsic_calibration)
@@ -367,7 +370,8 @@ class VideoMetadata:
             with open(intrinsic_calibration_filepath, "rb") as io:
                 intrinsic_calibration = pickle.load(io)
                 
-
+        self.intrinsic_calibration_filepath = intrinsic_calibration_filepath
+        
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(
             unadjusted_intrinsic_calibration=intrinsic_calibration
         )
@@ -375,14 +379,6 @@ class VideoMetadata:
             intrinsic_calibration=intrinsic_calibration,
             adjusting_required=adjusting_required,
         )
-
-        # ToDo:
-        # We might need some methods to inspect the quality of the intrinsic calibration
-        # after adjusting it to the cropped video, since flipping the video streams in
-        # ICcapture has different effects, depending on whether it was applied right from
-        # launching the software / cameras, or whether it was manually activated once the
-        # software is running and the camera was loaded. This is at least our best guess
-        # for the inconsistent behavior & warrants further testing.
 
     def _save_calibration(self, intrinsic_calibration: Dict) -> None:
         video_filename = self.filepath.name
@@ -433,8 +429,10 @@ class VideoMetadata:
         return adjusted_intrinsic_calibration
 
     def _get_cropped_video_size(self) -> Tuple[int, int]:
-        props = iio.improps(self.filepath, index=0)
-        size = props.shape[0:2]
+        try:
+            size = iio.immeta(self.filepath, exclude_applied=False)['size']
+        except KeyError:
+            size = iio.immeta(self.filepath, exclude_applied=False)['shape']
         return size
 
     def _get_correct_x_y_offsets(
