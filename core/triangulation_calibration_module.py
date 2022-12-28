@@ -15,7 +15,7 @@ from .video_interface import VideoInterface
 from .video_synchronization import RecordingVideoDownSynchronizer, RecordingVideoUpSynchronizer, CharucoVideoSynchronizer
 from .plotting import Alignment_Plot_Crossvalidation
 from .marker_detection import ManualAnnotation
-from .utils import convert_to_path
+from .utils import convert_to_path, create_calibration_key
 
 
 class TestPositionsGroundTruth:
@@ -123,12 +123,13 @@ class Calibration:
         project_config_filepath: Path,
         recording_config_filepath: Path,
         output_directory: Optional[Path] = None,
+        subgroup: bool = False, 
         overwrite: bool = False,
     ) -> None:
         
-        calibration_directory = convert_to_path(calibration_directory)
-        project_config_filepath = convert_to_path(project_config_filepath)
-        recording_config_filepath = convert_to_path(recording_config_filepath)
+        self.calibration_directory = convert_to_path(calibration_directory)
+        self.project_config_filepath = convert_to_path(project_config_filepath)
+        self.recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
         self.overwrite = overwrite
         
@@ -138,18 +139,19 @@ class Calibration:
                     self.output_directory = output_directory
                 else:
                     self._make_output_dir(
-                        project_config_filepath=project_config_filepath
+                        project_config_filepath=self.project_config_filepath
                     )
             except AttributeError:
-                self._make_output_dir(project_config_filepath=project_config_filepath)
+                self._make_output_dir(project_config_filepath=self.project_config_filepath)
         else:
-            self._make_output_dir(project_config_filepath=project_config_filepath)
+            self._make_output_dir(project_config_filepath=self.project_config_filepath)
         
-        self._create_video_objects(
-            calibration_directory=calibration_directory,
-            project_config_filepath=project_config_filepath,
-            recording_config_filepath=recording_config_filepath,
-        )
+        if not subgroup:
+            self._create_video_objects(
+                calibration_directory=self.calibration_directory,
+                project_config_filepath=self.project_config_filepath,
+                recording_config_filepath=self.recording_config_filepath,
+            )
         
     def run_synchronization(self)->None:
         for video_interface in self.charuco_interfaces:
@@ -198,7 +200,7 @@ class Calibration:
             if not video_interface.already_synchronized
         ]
         self._validate_unique_cam_ids()
-        self._initialize_camera_group()
+        self.initialize_camera_group()
 
     def run_calibration(
         self,
@@ -206,9 +208,11 @@ class Calibration:
         verbose: bool = False,
         charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
     ) -> None:
-        self.calibration_output_filepath = self.output_directory.joinpath(
-            f"calibration_{self.recording_date}.toml"
-        )
+        
+        cams = [video.cam_id for video in self.metadata_from_videos]
+        filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml"
+        
+        self.calibration_output_filepath = self.output_directory.joinpath(filename)
         if not self.calibration_output_filepath.exists() and not self.overwrite:
             if charuco_calibration_board == None:
                 aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
@@ -229,6 +233,23 @@ class Calibration:
                 verbose=verbose,
             )
             self._save_calibration()
+            
+    def create_subgroup(self, cam_ids: List[str])->None:
+        subgroup = Calibration(calibration_directory = self.calibration_directory, project_config_filepath = self.project_config_filepath, recording_config_filepath = self.recording_config_filepath, output_directory = self.output_directory, subgroup = True)
+        subgroup.recording_date = self.recording_date
+        subgroup.target_fps = self.target_fps
+        subgroup.calibration_index = self.calibration_index
+        subgroup.metadata_from_videos = []
+        subgroup.camera_objects = []
+        subgroup.synchronized_charuco_videofiles = {}
+        for cam in cam_ids:
+            subgroup.metadata_from_videos.append([metadata for metadata in self.metadata_from_videos if metadata.cam_id == cam][0]) 
+            subgroup.camera_objects.append([camera_object for camera_object in self.camera_objects if camera_object.name == cam][0])
+            subgroup.synchronized_charuco_videofiles[cam] = self.synchronized_charuco_videofiles[cam]
+        
+        subgroup.initialize_camera_group()
+        return subgroup
+        
 
     def _create_video_objects(
         self,
@@ -290,6 +311,7 @@ class Calibration:
             self.recording_date = self.metadata_from_videos[0].recording_date
             self.target_fps = self.metadata_from_videos[0].target_fps
             self.led_pattern = self.metadata_from_videos[0].led_pattern
+            self.calibration_index = self.metadata_from_videos[0].calibration_index
         else:
             raise ValueError(
                 f"The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n"
@@ -309,7 +331,7 @@ class Calibration:
         if not self.output_directory.exists():
             Path.mkdir(self.output_directory)
 
-    def _initialize_camera_group(self) -> None:
+    def initialize_camera_group(self) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
 
     def _save_calibration(self) -> None:
@@ -346,10 +368,10 @@ class Triangulation(ABC):
         if not self.output_directory.exists():
             Path.mkdir(self.output_directory)
 
-    def run_triangulation(self, calibration_toml_filepath: Path):
+    def run_triangulation(self, calibration_toml_filepath: Path, adapt_to_calibration: bool=False):
         self.calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self._load_calibration(filepath=self.calibration_toml_filepath)
-        self._validate_unique_cam_ids()
+        self._validate_unique_cam_ids(adapt_to_calibration=adapt_to_calibration)
         if not self.calibration_toml_filepath.exists() and not self.overwrite:
             self._preprocess_dlc_predictions_for_anipose()
             p3ds_flat = self.camera_group.triangulate(
@@ -589,17 +611,29 @@ class Triangulation_Recordings(Triangulation):
         ]
         self._validate_and_save_metadata_for_recording()
 
-    def _validate_unique_cam_ids(self) -> None:
+    def _validate_unique_cam_ids(self, adapt_to_calibration: bool) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
         # possibility to create empty .h5 for missing recordings?
         filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
         filepath_keys.sort()
         self.cameras.sort()
-        if filepath_keys != self.cameras:
-            raise ValueError(
-                f"The cam_ids of the recordings in {self.recording_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
-                "Are there missing or additional files in the calibration or the recording folder?"
-            )
+        if not adapt_to_calibration:
+            if filepath_keys != self.cameras:
+                raise ValueError(
+                    f"The cam_ids of the recordings in {self.recording_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
+                    "Are there missing or additional files in the calibration or the recording folder?"
+                )
+        else:
+            for camera in filepath_keys:
+                if camera not in self.cameras:
+                    self.triangulation_dlc_cams_filepaths.pop(camera)
+            
+            for camera in self.cameras:
+                if camera not in filepath_keys:
+                    raise ValueError(
+                        f"Missing filepath for {camera}!")
+                
+                    
 
     def _validate_and_save_metadata_for_recording(self) -> None:
         if (

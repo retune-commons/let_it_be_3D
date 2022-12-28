@@ -7,7 +7,7 @@ from tkinter.filedialog import askopenfilenames
 from pathlib import Path
 import imageio as iio #we need .v2 functions!
 
-from .utils import convert_to_path
+from .utils import convert_to_path, create_calibration_key
 from .triangulation_calibration_module import Calibration, Triangulation_Positions, Triangulation_Recordings
 from .video_metadata import VideoMetadata
 
@@ -56,7 +56,7 @@ class meta_interface(ABC):
                     f"Missing metadata information in the recording_config_file {recording_config_path} for {key}."
                 )
         self.recording_dates.append(recording_config["recording_date"])
-        return str(recording_config["recording_date"])
+        return str(recording_config["recording_date"]), str(recording_config["calibration_index"])
         
     def select_recording_configs(self)->None:
         Tk().withdraw()
@@ -69,14 +69,8 @@ class meta_interface(ABC):
         path_to_recording_config = convert_to_path(path_to_recording_config)
         if path_to_recording_config.suffix == ".yaml" and path_to_recording_config.exists():
             self.recording_configs.append(path_to_recording_config)
-            recording_date = self._read_recording_config(recording_config_path=path_to_recording_config)
-            flag = -1
-            for key in self.meta['recording_days'].keys():
-                if key.startswith(f'Recording_Day_{recording_date}'):
-                    found_flag = int(key[-1:])
-                    if found_flag > flag:
-                        flag = found_flag
-            self.meta['recording_days'][f'Recording_Day_{recording_date}_{str(flag+1)}'] = {'recording_config_path': str(path_to_recording_config), 'recording_date': recording_date, 'recording_directories': [], 'recordings': {}, 'calibrations': {}, 'calibration_directory': str(path_to_recording_config.parent)}
+            recording_date, calibration_index = self._read_recording_config(recording_config_path=path_to_recording_config)
+            self.meta['recording_days'][f'Recording_Day_{recording_date}_{str(calibration_index)}'] = {'recording_config_path': str(path_to_recording_config), 'recording_date': recording_date, 'recording_directories': [], 'recordings': {}, 'calibrations': {}, 'calibration_directory': str(path_to_recording_config.parent), 'calibration_index': calibration_index}
         
     def initialize_meta_config(self)->None:
         for recording_day in self.meta['recording_days'].values():
@@ -84,7 +78,7 @@ class meta_interface(ABC):
                 if file.name[:len(recording_day['recording_date'])] == recording_day['recording_date'] and file.name[-3:] in self.paradigms:#hardcoded length of paradigm
                     recording_day['recording_directories'].append(str(file))
             recording_day['num_recordings'] = len(recording_day['recording_directories'])
-                    
+        self.meta['meta_step'] = 1
                     
     def add_recording_manually(self, file: Path, recording_day: str)->None:
         file = convert_to_path(file)
@@ -103,8 +97,53 @@ class meta_interface(ABC):
         
         for recording_day in self.meta['recording_days'].values():
             recording_day['num_recordings'] = len(recording_day['recording_directories'])
-        #update class attributes?
-    
+            
+        if self.meta['meta_step'] == 2:
+            for recording_day in self.meta['recording_days'].values():
+                for recording in recording_day['recordings']:
+                    self.objects['triangulation_recordings_objects'][recording].target_fps = recording_day["recordings"][recording]['target_fps']
+                    for video_metadata in self.objects['triangulation_recordings_objects'][recording].metadata_from_videos:
+                        video_metadata.fps = recording_day['recordings'][recording]["videos"][video_metadata.cam_id]['fps']
+                        video_metadata.filepath = recording_day['recordings'][recording]["videos"][video_metadata.cam_id]['filepath']
+            
+        elif self.meta['meta_step'] == 4:
+            for recording_day in self.meta['recording_days'].values():
+                for calibration in recording_day['calibrations']['calibration_keys'].values():
+                    self.objects['calibration_objects'][calibration['key']].target_fps = recording_day["calibrations"]['target_fps']
+                    for video_metadata in self.objects['calibration_objects'][calibration['key']].metadata_from_videos:
+                        video_metadata.fps = recording_day['calibrations']["videos"][video_metadata.cam_id]['fps']
+                        video_metadata.filepath = recording_day['calibrations']["videos"][video_metadata.cam_id]['filepath']
+                  
+        elif self.meta['meta_step'] == 5:
+            for recording_day in self.meta['recording_days'].values():
+                videos = [video for video in recording_day['calibrations']["videos"].keys() if recording_day['calibrations']["videos"][video]['exclusion_state'] == 'valid']
+                all_videos = [video for video in recording_day['calibrations']["videos"].keys()]
+                calibration_key = create_calibration_key(videos=videos, recording_date = recording_day['recording_date'], calibration_index = recording_day['calibration_index'])
+                all_calibrations_key = create_calibration_key(videos=all_videos, recording_date = recording_day['recording_date'], calibration_index = recording_day['calibration_index'])
+                full_calibrations = self.objects["calibration_objects"][all_calibrations_key]
+                
+                if not calibration_key == all_calibrations_key:
+                    calibration_object = full_calibrations.create_subgroup(cam_ids = videos)
+                    self.objects['calibration_objects'][calibration_key] = calibration_object
+                    recording_day['calibrations']['calibration_keys'][calibration_key] = {'key': calibration_key}
+                    necessary_calibrations, _ = self._get_necessary_calibrations(possible_videos = videos, recording_day = recording_day)
+                    self._create_subgroups_for_necessary_calibrations(necessary_calibrations = necessary_calibrations, calibration_object = calibration_object, calibrations = recording_day['calibrations']['calibration_keys'])
+                    self.objects["calibration_objects"].pop(all_calibrations_key)
+                    recording_day['calibrations']['calibration_keys'].pop(all_calibrations_key)
+
+                
+    def _get_necessary_calibrations(self, possible_videos: List[str], recording_day: Dict)->Tuple[List, str]:
+        necessary_calibrations = {}
+        for recording in recording_day['recordings']:
+            videos = [video for video in recording_day['recordings'][recording]["videos"].keys() if recording_day['recordings'][recording]["videos"][video]['exclusion_state'] == 'valid' and video in possible_videos]
+            calibration_key = create_calibration_key(videos=videos, recording_date = recording_day['recording_date'], calibration_index = recording_day['calibration_index'])
+            recording_day['recordings'][recording]['calibration_to_use'] = calibration_key
+            if not calibration_key in necessary_calibrations.keys():
+                necessary_calibrations[calibration_key] = videos
+        all_cams_key = create_calibration_key(videos=videos, recording_date = recording_day['recording_date'], calibration_index = recording_day['calibration_index'])
+        
+        return necessary_calibrations, all_cams_key
+
     def export_meta_to_yaml(self, filename: Path)->None:
         filename = convert_to_path(filename)
         with open(filename, "w") as file:
@@ -128,6 +167,7 @@ class meta_interface(ABC):
                                                                             'led_pattern': triangulation_recordings_object.led_pattern,
                                                                             'videos': videos}
                 self.objects["triangulation_recordings_objects"][individual_key] = triangulation_recordings_object
+        self.meta['meta_step'] = 2
             
     def synchronize_recordings(self)->None:
         for recording_day in self.meta['recording_days'].values():
@@ -137,6 +177,7 @@ class meta_interface(ABC):
                     recording_day['recordings'][recording]["videos"][video]["marker_detection_filepath"] = str(self.objects["triangulation_recordings_objects"][recording].triangulation_dlc_cams_filepaths[video])
                     recording_day['recordings'][recording]["videos"][video]["synchronized_video"] = str(self.objects["triangulation_recordings_objects"][recording].synchronized_videos[video])
                     recording_day['recordings'][recording]["videos"][video]["framenum_synchronized"] = iio.v2.get_reader(self.objects["triangulation_recordings_objects"][recording].synchronized_videos[video]).count_frames()
+        self.meta['meta_step'] = 3
             
     def _create_video_dict(self, video: VideoMetadata, intrinsics: bool=False)->Dict:
         dictionary = {'cam_id': video.cam_id, 
@@ -151,74 +192,85 @@ class meta_interface(ABC):
     def create_calibrations(self)->None:
         self.objects['calibration_objects'] = {}
         self.objects['position_objects'] = {}
+        self.necessary_calibrations = {}
         for recording_day in self.meta['recording_days'].values():
-            for recording in recording_day['recordings']:
-                videos = [video for video in recording_day['recordings'][recording]["videos"].keys() if recording_day['recordings'][recording]["videos"][video]['exclusion_state'] == 'valid']
-                
-                calibration_string = ""
-                videos.sort()
-                for elem in videos:
-                    calibration_string = calibration_string + "_" + elem
-                recording_day['recordings'][recording]['calibration_to_use'] = recording_day['recording_date'] + calibration_string
-            
+
+            recording_day['calibrations']['calibration_keys'] = {}
+    
             calibration_object = Calibration(calibration_directory = recording_day['calibration_directory'], 
                 project_config_filepath = self.project_config_path,
                 recording_config_filepath = recording_day['recording_config_path'],
                 output_directory = recording_day['calibration_directory'],
                 overwrite = False)
+            
             cams = [video.cam_id for video in calibration_object.metadata_from_videos]
-            key = ""
-            cams.sort()
-            for elem in cams:
-                key = key + "_" + elem
-            key = recording_day['recording_date'] + key
-            #possibility to create subgroups!!!
-            self.objects['calibration_objects'][key] = calibration_object
-            videos = {video.cam_id: self._create_video_dict(video, intrinsics=True) for video in calibration_object.metadata_from_videos}
-            recording_day['calibrations'][key] = {
-                        'target_fps': calibration_object.target_fps,
-                        'led_pattern': calibration_object.led_pattern,
-                        'videos': videos,
-                        'key': key}
-            #possibility to add only subgroup (=videos)!!!
+            
+            necessary_calibrations, all_cams_key = self._get_necessary_calibrations(possible_videos = cams, recording_day = recording_day)
+            necessary_calibrations.pop(all_cams_key)
+            
+            self.objects['calibration_objects'][all_cams_key] = calibration_object
+
+            
+            video_dict = {video.cam_id: self._create_video_dict(video, intrinsics=True) for video in calibration_object.metadata_from_videos}
+            recording_day['calibrations']['calibration_keys'][all_cams_key] = {'key': all_cams_key}
+            recording_day['calibrations']['target_fps'] = calibration_object.target_fps
+            recording_day['calibrations']['led_pattern'] = calibration_object.led_pattern
+            recording_day['calibrations']['videos'] = video_dict
+            self.necessary_calibrations[all_cams_key] = necessary_calibrations
+                            
             positions_object = Triangulation_Positions(positions_directory = recording_day['calibration_directory'], 
                     calibration_directory = recording_day['calibration_directory'],
                     recording_config_filepath = recording_day['recording_config_path'], 
                     project_config_filepath= self.project_config_path,
                     output_directory = recording_day['calibration_directory'], 
                     overwrite = False)
-            self.objects['position_objects'][key] = positions_object
+            self.objects['position_objects'][all_cams_key] = positions_object
             for video in positions_object.metadata_from_videos:
                 try:
                     recording_day['calibrations'][key]['videos'][video.cam_id]['positions_image_filepath'] = str(video.filepath) 
                 except:
                     pass
+        self.meta['meta_step'] = 4
+        
                         
     def synchronize_calibrations(self)->None:
         for recording_day in self.meta['recording_days'].values():
-            for calibration in recording_day['calibrations']:
-                self.objects["calibration_objects"][calibration].run_synchronization()
-                for video in recording_day['calibrations'][calibration]["videos"]:
-                    recording_day['calibrations'][calibration]["videos"][video]["synchronized_video"] = str(self.objects["calibration_objects"][calibration].synchronized_charuco_videofiles[video])
-                    recording_day['calibrations'][calibration]["videos"][video]["framenum_synchronized"] = iio.v2.get_reader(self.objects["calibration_objects"][calibration].synchronized_charuco_videofiles[video]).count_frames()
+            for calibration in recording_day['calibrations']['calibration_keys'].values():
+                calibration_object = self.objects["calibration_objects"][calibration['key']]
+                calibration_object.run_synchronization()
+                for video in recording_day['calibrations']["videos"]:
+                    recording_day['calibrations']["videos"][video]["synchronized_video"] = str(calibration_object.synchronized_charuco_videofiles[video])
+                    recording_day['calibrations']["videos"][video]["framenum_synchronized"] = iio.v2.get_reader(calibration_object.synchronized_charuco_videofiles[video]).count_frames()
+                self._create_subgroups_for_necessary_calibrations(necessary_calibrations = self.necessary_calibrations[calibration['key']], calibration_object = calibration_object, calibrations = recording_day['calibrations']['calibration_keys'])
 
-                self.objects["position_objects"][calibration].get_marker_predictions()
-                for video in recording_day['calibrations'][calibration]["videos"]:
-                    recording_day['calibrations'][calibration]["videos"][video]["positions_marker_detection_filepath"] = str(self.objects["position_objects"][calibration].triangulation_dlc_cams_filepaths[video])
+                self.objects["position_objects"][calibration['key']].get_marker_predictions()
+                for video in recording_day['calibrations']["videos"]:
+                    recording_day['calibrations']["videos"][video]["positions_marker_detection_filepath"] = str(self.objects["position_objects"][calibration['key']].triangulation_dlc_cams_filepaths[video])
+        self.meta['meta_step'] = 5
+        
+        
+    def _create_subgroups_for_necessary_calibrations(self, necessary_calibrations: Dict, calibration_object: Calibration, calibrations: Dict)->None:
+        for key in necessary_calibrations:
+            calibration_subgroup = calibration_object.create_subgroup(cam_ids = necessary_calibrations[key])
 
+            cams = [video.cam_id for video in calibration_subgroup.metadata_from_videos]
+            self.objects['calibration_objects'][key] = calibration_subgroup
+            calibrations[key] = {'key': key}
               
     def calibrate(self, verbose: bool=False)->None:
         for recording_day in self.meta['recording_days'].values():
-            for calibration in recording_day['calibrations']:
-                self.objects["calibration_objects"][calibration].run_calibration(verbose=verbose)
-                recording_day['calibrations'][calibration]['toml_filepath'] = str(self.objects["calibration_objects"][calibration].calibration_output_filepath)
+            for calibration in recording_day['calibrations']['calibration_keys'].values():
+                self.objects["calibration_objects"][calibration['key']].run_calibration(verbose=verbose)
+                calibration['toml_filepath'] = str(self.objects["calibration_objects"][calibration['key']].calibration_output_filepath)
                 #add calibration log? reprojerr, etc.
+        self.meta['meta_step'] = 6
         
         
     def triangulate_recordings(self)->None:
         for recording_day in self.meta['recording_days'].values():
             for recording in recording_day['recordings']:
-                toml_path = recording_day['calibrations'][recording_day['recordings'][recording]["calibration_to_use"]]['toml_filepath']
-                self.objects["triangulation_recordings_objects"][recording].run_triangulation(calibration_toml_filepath = toml_path)
+                toml_path = recording_day['calibrations']['calibration_keys'][recording_day['recordings'][recording]["calibration_to_use"]]['toml_filepath']
+                self.objects["triangulation_recordings_objects"][recording].run_triangulation(calibration_toml_filepath = toml_path, adapt_to_calibration = True)
                 recording_day['recordings'][recording]['3D_csv'] = str(self.objects["triangulation_recordings_objects"][recording].csv_output_filepath)
                 #add reprojection_error
+        self.meta['meta_step'] = 7

@@ -65,5 +65,10 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
             multi_index_column_names[2].append(column_name)
     return pd.MultiIndex.from_arrays(multi_index_column_names, names=('scorer', 'bodyparts', 'coords'))
     
-    
+def create_calibration_key(videos: List[str], recording_date: str, calibration_index: int)->str:
+    key = ""
+    videos.sort()
+    for elem in videos:
+        key = key + "_" + elem
+    return recording_date +  "_" + str(calibration_index) + key
     

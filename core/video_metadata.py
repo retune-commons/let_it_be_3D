@@ -105,7 +105,7 @@ class VideoMetadata:
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
 
-        for key in ["led_pattern", self.cam_id, "target_fps"]:
+        for key in ["led_pattern", self.cam_id, "target_fps", "calibration_index"]:
             try:
                 recording_config[key]
             except KeyError:
@@ -115,6 +115,7 @@ class VideoMetadata:
 
         self.led_pattern = recording_config["led_pattern"]
         self.target_fps = recording_config["target_fps"]
+        self.calibration_index = recording_config["calibration_index"]
         if self.recording_date != recording_config["recording_date"]:
             raise ValueError(
                 f"The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
