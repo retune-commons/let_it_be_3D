@@ -5,7 +5,7 @@ from pathlib import Path
 import datetime
 import pickle
 import itertools as it
-import imageio.v3 as iio
+import imageio as iio
 import numpy as np
 import aniposelib as ap_lib
 import cv2
@@ -28,6 +28,7 @@ class VideoMetadata:
         calibration_dir: Path,
     ) -> None:
         self.calibration_dir = convert_to_path(calibration_dir)
+        self.exclusion_state = "valid"
         if (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".AVI"
@@ -51,15 +52,19 @@ class VideoMetadata:
                 f"Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!"
             )
 
-        self._read_metadata(
-            recording_config_filepath=recording_config_filepath,
-            project_config_filepath=project_config_filepath,
-            video_filepath=video_filepath,
-        )
-        self._get_intrinsic_parameters(
-            recording_config_filepath=recording_config_filepath,
-            max_calibration_frames=self.max_calibration_frames,
-        )
+        try:
+            self._read_metadata(
+                recording_config_filepath=recording_config_filepath,
+                project_config_filepath=project_config_filepath,
+                video_filepath=video_filepath,
+            )
+            self.framenum = iio.v2.get_reader(video_filepath).count_frames()
+            self._get_intrinsic_parameters(
+                recording_config_filepath=recording_config_filepath,
+                max_calibration_frames=self.max_calibration_frames,
+            )
+        except:
+            self.exclusion_state = "exclude"
 
     def _read_metadata(
         self,
@@ -77,7 +82,6 @@ class VideoMetadata:
             "valid_cam_IDs",
             "paradigms",
             "animal_lines",
-            "intrinsic_calibration_dir",
             "led_extraction_type",
             "led_extraction_path",
             "max_calibration_frames",
@@ -95,13 +99,17 @@ class VideoMetadata:
         self.valid_cam_ids = project_config["valid_cam_IDs"]
         self.valid_paradigms = project_config["paradigms"]
         self.valid_mouse_lines = project_config["animal_lines"]
-        self.intrinsic_calibrations_directory = Path(
-            project_config["intrinsic_calibration_dir"]
-        )
+        self.load_calibration = project_config["load_calibration"]
+        if self.load_calibration:
+            try:
+                self.intrinsic_calibrations_directory = Path(
+                    project_config["intrinsic_calibration_dir"]
+                )
+            except:
+                raise ValueError ("If you use load_calibration = True, you need to set an intrinsic calibrations directory!")
         self.max_calibration_frames = project_config["max_calibration_frames"]
         self.max_frames_to_write = project_config["max_frames_to_write"]
         self.use_gpu = project_config["use_gpu"]
-        self.load_calibration = project_config["load_calibration"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
 

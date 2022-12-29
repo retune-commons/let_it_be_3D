@@ -123,15 +123,13 @@ class Calibration:
         project_config_filepath: Path,
         recording_config_filepath: Path,
         output_directory: Optional[Path] = None,
-        subgroup: bool = False, 
-        overwrite: bool = False,
+        subgroup: bool = False
     ) -> None:
         
         self.calibration_directory = convert_to_path(calibration_directory)
         self.project_config_filepath = convert_to_path(project_config_filepath)
         self.recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
-        self.overwrite = overwrite
         
         if output_directory != None:
             try:
@@ -154,25 +152,32 @@ class Calibration:
             )
         
     def run_synchronization(self)->None:
-        for video_interface in self.charuco_interfaces:
-            video_interface.run_synchronizer(
-                synchronizer=CharucoVideoSynchronizer,
-                use_gpu=video_interface.metadata.use_gpu,
-                output_directory=self.output_directory,
-                overwrite=self.overwrite,
-                synchronize_only = True
-            )
-        self.synchronized_charuco_videofiles = {video_interface.metadata.cam_id:
-            str(video_interface.synchronized_video_filepath)
-            for video_interface in self.charuco_interfaces
-        }
-        self.camera_objects = [
-            video_interface.export_for_aniposelib()
-            for video_interface in self.charuco_interfaces
-        ]
+        self.synchronized_charuco_videofiles = {}
+        self.camera_objects = []
+        self.synchronization_individuals = []
+        self.led_detection_individuals = []
+        
+        for video_interface in self.charuco_interfaces.values():
+            try:
+                video_interface.run_synchronizer(
+                    synchronizer=CharucoVideoSynchronizer,
+                    use_gpu=video_interface.metadata.use_gpu,
+                    output_directory=self.output_directory,
+                    synchronize_only = True
+                )
+                self.synchronized_charuco_videofiles[video_interface.metadata.cam_id] = str(video_interface.synchronized_video_filepath)
+                self.camera_objects.append(video_interface.export_for_aniposelib())
 
+                if not video_interface.already_synchronized:
+                    self.synchronization_individuals.append(video_interface.synchronizer_object.synchronization_individual)
+                    self.led_detection_individuals.append(video_interface.synchronizer_object.led_detection)
+            
+            except:
+                video_interface.metadata.exclusion_state = 'exclude'
+                self.synchronized_charuco_videofiles[video_interface.metadata.cam_id] = None
+        
         self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-            template=self.charuco_interfaces[
+            template=self.charuco_interfaces.values()[
                 0
             ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
                 fps=self.target_fps
@@ -183,24 +188,15 @@ class Calibration:
             ],
             led_timeseries={
                 video_interface.metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                for video_interface in self.charuco_interfaces
+                for video_interface in self.charuco_interfaces.values()
                 if not video_interface.already_synchronized
             },
             metadata={"recording_date": self.recording_date, "charuco_video": True},
             output_directory=self.output_directory,
         )
-        self.synchronization_individuals = [
-            video_interface.synchronizer_object.synchronization_individual
-            for video_interface in self.charuco_interfaces
-            if not video_interface.already_synchronized
-        ]
-        self.led_detection_individuals = [
-            video_interface.synchronizer_object.led_detection
-            for video_interface in self.charuco_interfaces
-            if not video_interface.already_synchronized
-        ]
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
+        exclude_by_framenum(metadata_from_videos = metadata_from_videos, target_fps = self.target_fps)
 
     def run_calibration(
         self,
@@ -209,30 +205,29 @@ class Calibration:
         charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
     ) -> None:
         
-        cams = [video.cam_id for video in self.metadata_from_videos]
+        cams = [self.metadata_from_videos.keys()]
         filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml"
         
         self.calibration_output_filepath = self.output_directory.joinpath(filename)
-        if not self.calibration_output_filepath.exists() and not self.overwrite:
-            if charuco_calibration_board == None:
-                aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
-                charuco_calibration_board = ap_lib.boards.CharucoBoard(
-                    7,
-                    5,
-                    square_length=1,
-                    marker_length=0.8,
-                    marker_bits=6,
-                    aruco_dict=aruco_dict,
-                )
-            videos = [[video] for video in self.synchronized_charuco_videofiles.values()]
-            self.camera_group.calibrate_videos(
-                videos=videos,
-                board=charuco_calibration_board,
-                init_intrinsics=not use_own_intrinsic_calibration,
-                init_extrinsics=True,
-                verbose=verbose,
+        if charuco_calibration_board == None:
+            aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
+            charuco_calibration_board = ap_lib.boards.CharucoBoard(
+                7,
+                5,
+                square_length=1,
+                marker_length=0.8,
+                marker_bits=6,
+                aruco_dict=aruco_dict,
             )
-            self._save_calibration()
+        videos = [[video] for video in self.synchronized_charuco_videofiles.values()]
+        self.camera_group.calibrate_videos(
+            videos=videos,
+            board=charuco_calibration_board,
+            init_intrinsics=not use_own_intrinsic_calibration,
+            init_extrinsics=True,
+            verbose=verbose,
+        )
+        self._save_calibration()
             
     def create_subgroup(self, cam_ids: List[str])->None:
         subgroup = Calibration(calibration_directory = self.calibration_directory, project_config_filepath = self.project_config_filepath, recording_config_filepath = self.recording_config_filepath, output_directory = self.output_directory, subgroup = True)
@@ -243,10 +238,12 @@ class Calibration:
         subgroup.camera_objects = []
         subgroup.synchronized_charuco_videofiles = {}
         for cam in cam_ids:
-            subgroup.metadata_from_videos.append([metadata for metadata in self.metadata_from_videos if metadata.cam_id == cam][0]) 
-            subgroup.camera_objects.append([camera_object for camera_object in self.camera_objects if camera_object.name == cam][0])
-            subgroup.synchronized_charuco_videofiles[cam] = self.synchronized_charuco_videofiles[cam]
-        
+            if cam in self.metadata_from_videos.keys():
+                if self.metadata_from_videos[cam].exclusion_state == 'valid':
+                    subgroup.metadata_from_videos.append(self.metadata_from_videos[cam]) 
+                    subgroup.camera_objects.append(self.camera_objects[cam])
+                    subgroup.synchronized_charuco_videofiles[cam] = self.synchronized_charuco_videofiles[cam]
+
         subgroup.initialize_camera_group()
         return subgroup
         
@@ -267,7 +264,7 @@ class Calibration:
         avi_files.sort()
         top_cam_file = avi_files[
             -1
-        ]  # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file (alternative: file with highest filesize based on pathlib)
+        ]  # hard coded!
         charuco_videofiles = [
             file
             for file in calibration_directory.iterdir()
@@ -276,22 +273,19 @@ class Calibration:
             and "synchronized" not in file.name
         ]
         charuco_videofiles.append(top_cam_file)
-        charuco_metadata = [
-            VideoMetadata(
+        
+        self.charuco_interfaces = {}
+        self.metadata_from_videos = {}
+        for filepath in charuco_videofiles:
+            video_metadata = VideoMetadata(
                 video_filepath=filepath,
                 recording_config_filepath=recording_config_filepath,
                 project_config_filepath=project_config_filepath,
-                calibration_dir = calibration_directory,
-            )
-            for filepath in charuco_videofiles
-        ]
-        self.charuco_interfaces = [
-            VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
-            for video_metadata in charuco_metadata
-        ]
-        self.metadata_from_videos = [
-            video_interface.metadata for video_interface in self.charuco_interfaces
-        ]
+                calibration_dir = calibration_directory)
+
+            self.charuco_interfaces[video_metadata.cam_id] = VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
+            self.metadata_from_videos[video_metadata.cam_id] = video_metadata
+            
         self._validate_and_save_metadata_for_recording()
 
     def _validate_unique_cam_ids(self) -> None:
@@ -307,11 +301,11 @@ class Calibration:
                 )
 
     def _validate_and_save_metadata_for_recording(self) -> None:
-        if all([metadata.recording_date for metadata in self.metadata_from_videos]):
-            self.recording_date = self.metadata_from_videos[0].recording_date
-            self.target_fps = self.metadata_from_videos[0].target_fps
-            self.led_pattern = self.metadata_from_videos[0].led_pattern
-            self.calibration_index = self.metadata_from_videos[0].calibration_index
+        if all([metadata.recording_date for metadata in self.metadata_from_videos.values()]):
+            self.recording_date = self.metadata_from_videos.values()[0].recording_date
+            self.target_fps = self.metadata_from_videos.values()[0].target_fps
+            self.led_pattern = self.metadata_from_videos.values()[0].led_pattern
+            self.calibration_index = self.metadata_from_videos.values()[0].calibration_index
         else:
             raise ValueError(
                 f"The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n"
@@ -372,16 +366,15 @@ class Triangulation(ABC):
         self.calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self._load_calibration(filepath=self.calibration_toml_filepath)
         self._validate_unique_cam_ids(adapt_to_calibration=adapt_to_calibration)
-        if not self.calibration_toml_filepath.exists() and not self.overwrite:
-            self._preprocess_dlc_predictions_for_anipose()
-            p3ds_flat = self.camera_group.triangulate(
-                self.anipose_io["points_flat"], progress=True
-            )
-            self._postprocess_triangulations_and_calculate_reprojection_error(
-                p3ds_flat=p3ds_flat
-            )
-            self._get_dataframe_of_triangulated_points()
-            self._save_dataframe_as_csv()
+        self._preprocess_dlc_predictions_for_anipose()
+        p3ds_flat = self.camera_group.triangulate(
+            self.anipose_io["points_flat"], progress=True
+        )
+        self._postprocess_triangulations_and_calculate_reprojection_error(
+            p3ds_flat=p3ds_flat
+        )
+        self._get_dataframe_of_triangulated_points()
+        self._save_dataframe_as_csv()
 
     def _load_calibration(self, filepath: Path) -> None:
         if filepath.name.endswith(".toml") and filepath.exists():
@@ -474,16 +467,13 @@ class Triangulation_Recordings(Triangulation):
         recording_config_filepath: Path,
         project_config_filepath: Path,
         calibration_directory: Path,
-        overwrite: bool = False,
-        output_directory: Optional[Path] = None,
-        synchronize_only: bool = False
+        output_directory: Optional[Path] = None
     ) -> None:
         
         recording_directory = convert_to_path(recording_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
-        self.overwrite = overwrite
         
         if output_directory != None:
             try:
@@ -499,7 +489,6 @@ class Triangulation_Recordings(Triangulation):
             self._make_output_dir(project_config_filepath=project_config_filepath)
         
         self.recording_directory = recording_directory
-        self.synchronize_only = synchronize_only
         self._create_video_objects(
             recording_directory=recording_directory,
             recording_config_filepath=recording_config_filepath,
@@ -507,29 +496,37 @@ class Triangulation_Recordings(Triangulation):
             calibration_directory=calibration_directory,
         )
         
-    def run_synchronization(self)->None:
-        for video_interface in self.recording_interfaces:
-            if video_interface.metadata.fps >= video_interface.metadata.target_fps:
-                video_interface.run_synchronizer(
-                    synchronizer=RecordingVideoDownSynchronizer,
-                    use_gpu=video_interface.metadata.use_gpu,
-                    overwrite=self.overwrite,
-                    output_directory=self.output_directory,
-                    synchronize_only = self.synchronize_only
-                )
-            else:
-                video_interface.run_synchronizer(
-                    synchronizer=RecordingVideoUpSynchronizer,
-                    use_gpu=video_interface.metadata.use_gpu,
-                    overwrite=self.overwrite,
-                    output_directory=self.output_directory,
-                    synchronize_only = self.synchronize_only
-                )
+    def run_synchronization(self, synchronize_only: bool=False)->None:
+        self.synchronization_individuals = []
+        self.led_detection_individuals = []
+        self.synchronized_videos = {}
         
-        self.synchronized_videos = {video_interface.metadata.cam_id: video_interface.synchronized_video_filepath for video_interface in self.recording_interfaces}
+        for video_interface in self.recording_interfaces.values():
+            try:
+                if video_interface.metadata.fps >= video_interface.metadata.target_fps:
+                    video_interface.run_synchronizer(
+                        synchronizer=RecordingVideoDownSynchronizer,
+                        use_gpu=video_interface.metadata.use_gpu,
+                        output_directory=self.output_directory,
+                        synchronize_only = synchronize_only
+                    )
+                else:
+                    video_interface.run_synchronizer(
+                        synchronizer=RecordingVideoUpSynchronizer,
+                        use_gpu=video_interface.metadata.use_gpu,
+                        output_directory=self.output_directory,
+                        synchronize_only = self.synchronize_only
+                    )
+                self.synchronized_videos[video_interface.metadata.cam_id] = video_interface.synchronized_video_filepath
+                if not video_interface.already_synchronized:
+                    self.synchronization_individuals.append(video_interface.synchronizer_object.synchronization_individual)
+                    self.led_detection_individuals.append(video_interface.synchronizer_object.led_detection)
+            except:
+                video_interface.metadata.exclusion_state = "exclude"
+                self.synchronized_videos[video_interface.metadata.cam_id] = None
         
         self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-            template=self.recording_interfaces[
+            template=self.recording_interfaces.values()[
                 0
             ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
                 fps=self.target_fps
@@ -540,7 +537,7 @@ class Triangulation_Recordings(Triangulation):
             ],
             led_timeseries={
                 video_interface.metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                for video_interface in self.recording_interfaces
+                for video_interface in self.recording_interfaces.values()
                 if not video_interface.already_synchronized
             },
             metadata={
@@ -551,26 +548,21 @@ class Triangulation_Recordings(Triangulation):
             },
             output_directory=self.output_directory,
         )
-        self.synchronization_individuals = [
-            video_interface.synchronizer_object.synchronization_individual
-            for video_interface in self.recording_interfaces
-            if not video_interface.already_synchronized
-        ]
-        self.led_detection_individuals = [
-            video_interface.synchronizer_object.led_detection
-            for video_interface in self.recording_interfaces
-            if not video_interface.already_synchronized
-        ]
         
-        if not self.synchronize_only:
-            self.csv_output_filepath = self.output_directory.joinpath(
-                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
-            )
+        if not synchronize_only:
+            self.csv_output_filepath = self.create_csv_filepath()
             self.triangulation_dlc_cams_filepaths = {
-                video_interface.metadata.cam_id: video_interface.export_for_aniposelib()
+                video_interface: self.recording_interfaces[video_interface].export_for_aniposelib()
                 for video_interface in self.recording_interfaces
             }
 
+        exclude_by_framenum(metadata_from_videos = metadata_from_videos, target_fps = target_fps) 
+        
+    def create_csv_filepath(self)->None:
+        self.output_directory.joinpath(
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
+            )
+        
     def _create_video_objects(
         self,
         recording_directory: Path,
@@ -593,22 +585,18 @@ class Triangulation_Recordings(Triangulation):
             if file.name.endswith(".mp4") and "synchronized" not in file.name
         ]
         recording_videofiles.append(top_cam_file)
-        recording_metadata = [
-            VideoMetadata(
+        
+        self.recording_interfaces = {}
+        self.metadata_from_videos = {}
+        for filepath in charuco_videofiles:
+            video_metadata = VideoMetadata(
                 video_filepath=filepath,
                 recording_config_filepath=recording_config_filepath,
                 project_config_filepath=project_config_filepath,
-                calibration_dir = calibration_directory
-            )
-            for filepath in recording_videofiles
-        ]
-        self.recording_interfaces = [
-            VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
-            for video_metadata in recording_metadata
-        ]
-        self.metadata_from_videos = [
-            video_interface.metadata for video_interface in self.recording_interfaces
-        ]
+                calibration_dir = calibration_directory)
+
+            self.recording_interfaces[video_metadata.cam_id] = VideoInterface(metadata=video_metadata, output_dir=self.output_directory)
+            self.metadata_from_videos[video_metadata.cam_id] = video_metadata
         self._validate_and_save_metadata_for_recording()
 
     def _validate_unique_cam_ids(self, adapt_to_calibration: bool) -> None:
@@ -637,16 +625,16 @@ class Triangulation_Recordings(Triangulation):
 
     def _validate_and_save_metadata_for_recording(self) -> None:
         if (
-            all([metadata.recording_date for metadata in self.metadata_from_videos])
-            and all([metadata.paradigm for metadata in self.metadata_from_videos])
-            and all([metadata.mouse_id for metadata in self.metadata_from_videos])
-            and all([metadata.led_pattern for metadata in self.metadata_from_videos])
+            all([metadata.recording_date for metadata in self.metadata_from_videos.values()])
+            and all([metadata.paradigm for metadata in self.metadata_from_videos.values()])
+            and all([metadata.mouse_id for metadata in self.metadata_from_videos.values()])
+            and all([metadata.led_pattern for metadata in self.metadata_from_videos.values()])
         ):
-            self.recording_date = self.metadata_from_videos[0].recording_date
-            self.paradigm = self.metadata_from_videos[0].paradigm
-            self.mouse_id = self.metadata_from_videos[0].mouse_id
-            self.target_fps = self.metadata_from_videos[0].target_fps
-            self.led_pattern = self.metadata_from_videos[0].led_pattern
+            self.recording_date = self.metadata_from_videos.values()[0].recording_date
+            self.paradigm = self.metadata_from_videos.values()[0].paradigm
+            self.mouse_id = self.metadata_from_videos.values()[0].mouse_id
+            self.target_fps = self.metadata_from_videos.values()[0].target_fps
+            self.led_pattern = self.metadata_from_videos.values()[0].led_pattern
         else:
             raise ValueError(
                 f"The metadata, that was read from the videos in {self.recording_directory}, is not identical.\n"
@@ -661,8 +649,7 @@ class Triangulation_Positions(Triangulation):
         calibration_directory: Path,
         recording_config_filepath: Path,
         project_config_filepath: Path,
-        output_directory: Optional[Path] = None,
-        overwrite: bool = False,
+        output_directory: Optional[Path] = None
     ) -> None:
         
         positions_directory = convert_to_path(positions_directory)
@@ -689,7 +676,6 @@ class Triangulation_Positions(Triangulation):
             project_config_filepath=project_config_filepath,
             recording_config_filepath=recording_config_filepath,
             calibration_directory=calibration_directory,
-            overwrite=overwrite,
         )
         self.csv_output_filepath = self.output_directory.joinpath(
                 f"Positions_{self.recording_date}.csv"
@@ -697,7 +683,7 @@ class Triangulation_Positions(Triangulation):
         
     def get_marker_predictions(self)->None:        
         self.triangulation_dlc_cams_filepaths = {}
-        for cam in self.metadata_from_videos:
+        for cam in self.metadata_from_videos.values():
             h5_output_filepath = self.output_directory.joinpath(f"Positions_{cam.recording_date}_{cam.cam_id}.h5")
             self.triangulation_dlc_cams_filepaths[cam.cam_id] = h5_output_filepath
             if cam.calibration_evaluation_type == "manual":
@@ -730,8 +716,7 @@ class Triangulation_Positions(Triangulation):
         positions_directory: Path,
         project_config_filepath: Path,
         recording_config_filepath: Path,
-        calibration_directory: Path,
-        overwrite: bool,
+        calibration_directory: Path
     ) -> None:
         avi_files = [
             file
@@ -741,22 +726,21 @@ class Triangulation_Positions(Triangulation):
         avi_files.sort()
         top_cam_file = avi_files[
             -1
-        ]  # if there are multiple .AVI files, since CinePlex doesnt overwrite files if the recording was started more than once, the last file is used as topcam file
+        ]  # hardcoded
         position_files = [
             file for file in positions_directory.iterdir() if (file.name.endswith(".tiff") or file.name.endswith(".bmp") or file.name.endswith(".jpg")) and "Positions" in file.name
         ]
         position_files.append(top_cam_file)
-        positions_metadata = [
-            VideoMetadata(
-                video_filepath=filepath,
-                recording_config_filepath =recording_config_filepath,
-                project_config_filepath=project_config_filepath,
-                calibration_dir = calibration_directory,
-            )
-            for filepath in position_files
-        ]
-        self.metadata_from_videos = positions_metadata
-        self.cameras = [video.cam_id for video in positions_metadata]
+        
+        self.metadata_from_videos = {}
+        for filepath in position_files:
+            video_metadata = VideoMetadata(
+                    video_filepath=filepath,
+                    recording_config_filepath =recording_config_filepath,
+                    project_config_filepath=project_config_filepath,
+                    calibration_dir = calibration_directory)
+            self.metadata_from_videos[video_metadata.cam_id] = video_metadata
+        self.cameras = self.metadata_from_videos.keys()
         self._validate_and_save_metadata_for_recording()
 
     def _validate_unique_cam_ids(self):
@@ -769,8 +753,8 @@ class Triangulation_Positions(Triangulation):
             )
 
     def _validate_and_save_metadata_for_recording(self):
-        if all([metadata.recording_date for metadata in self.metadata_from_videos]):
-            self.recording_date = self.metadata_from_videos[0].recording_date
+        if all([metadata.recording_date for metadata in self.metadata_from_videos.values()]):
+            self.recording_date = self.metadata_from_videos.values()[0].recording_date
         else:
             raise ValueError(
                 f"The metadata, that was read from the positions.jpgs in {self.positions_directory}, is not identical.\n"
@@ -907,3 +891,10 @@ class Triangulation_Positions(Triangulation):
                         (marker_id_a, marker_id_b, distance_error)
                     )
         return marker_ids_with_distance_error
+
+def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int)->None:
+    synch_framenum_median = np.median([metadata.framenum_synchronized for metadata in metadata_from_videos.values()])
+    synch_duration_median = synch_framenum_median/target_fps
+    for metadata in metadata_from_videos.values():
+        if metadata.duration_synchronized < synch_duration_median -1:
+            metadata.exclusion_state = "exclude"

@@ -127,19 +127,10 @@ class Synchronizer(ABC):
         #   - filepath to the DLC output of the detected markers (.h5 file)
         pass
 
-    def run_synchronization(self, synchronize_only: bool, overwrite: bool = False) -> Tuple[Path, bool]:
+    def run_synchronization(self, synchronize_only: bool) -> Tuple[Path, bool]:
         self.template_blinking_motif = self._construct_template_motif(
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
-        
-        if not overwrite:
-            if self._check_whether_output_file_already_exists(synchronize_only=synchronize_only):
-                already_synchronized = True
-                if self.video_metadata.charuco_video:
-                    return None, self._construct_video_filepath(), already_synchronized
-                else:
-                    return self._create_h5_filepath(), self._construct_video_filepath(), already_synchronized
-        already_synchronized = False
 
         i = 0
         while True:
@@ -190,6 +181,8 @@ class Synchronizer(ABC):
             offset=remaining_offset,
             synchronize_only = synchronize_only
         )
+        self.video_metadata.framenum_synchronized = iio.v2.get_reader(synchronized_video_path).count_frames()
+        self.video_metadata.duration_synchronized = self.video_metadata.framenum_synchronized/self.video_metadata.target_fps
         return marker_detection_path, synchronized_video_path, already_synchronized
 
     def _check_whether_output_file_already_exists(self, synchronize_only: bool=False) -> bool:

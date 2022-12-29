@@ -30,7 +30,6 @@ class VideoInterface:
         synchronizer: Synchronizer,
         use_gpu: bool,
         output_directory: Path,
-        overwrite: bool,
         synchronize_only: bool
     ) -> None:
         self.synchronizer_object = synchronizer(
@@ -42,7 +41,7 @@ class VideoInterface:
             self.marker_detection_path,
             self.synchronized_video_filepath,
             self.already_synchronized,
-        ) = self.synchronizer_object.run_synchronization(overwrite=overwrite, synchronize_only = synchronize_only)
+        ) = self.synchronizer_object.run_synchronization(synchronize_only = synchronize_only)
 
     def export_for_aniposelib(self) -> Union[ap_lib.cameras.Camera, Path]:
         if not self.metadata.charuco_video:

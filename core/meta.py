@@ -5,16 +5,11 @@ import yaml
 from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
 from pathlib import Path
-import imageio as iio #we need .v2 functions!
+import imageio as iio
 
 from .utils import convert_to_path, create_calibration_key
 from .triangulation_calibration_module import Calibration, Triangulation_Positions, Triangulation_Recordings
 from .video_metadata import VideoMetadata
-
-class meta_config():
-    def __init__(self, recording_days: List)->None:
-        pass
-    
 
 class meta_interface(ABC):
     
@@ -102,7 +97,7 @@ class meta_interface(ABC):
             for recording_day in self.meta['recording_days'].values():
                 for recording in recording_day['recordings']:
                     self.objects['triangulation_recordings_objects'][recording].target_fps = recording_day["recordings"][recording]['target_fps']
-                    for video_metadata in self.objects['triangulation_recordings_objects'][recording].metadata_from_videos:
+                    for video_metadata in self.objects['triangulation_recordings_objects'][recording].metadata_from_videos.values():
                         video_metadata.fps = recording_day['recordings'][recording]["videos"][video_metadata.cam_id]['fps']
                         video_metadata.filepath = recording_day['recordings'][recording]["videos"][video_metadata.cam_id]['filepath']
             
@@ -110,9 +105,12 @@ class meta_interface(ABC):
             for recording_day in self.meta['recording_days'].values():
                 for calibration in recording_day['calibrations']['calibration_keys'].values():
                     self.objects['calibration_objects'][calibration['key']].target_fps = recording_day["calibrations"]['target_fps']
-                    for video_metadata in self.objects['calibration_objects'][calibration['key']].metadata_from_videos:
+                    for video_metadata in self.objects['calibration_objects'][calibration['key']].metadata_from_videos.values():
                         video_metadata.fps = recording_day['calibrations']["videos"][video_metadata.cam_id]['fps']
                         video_metadata.filepath = recording_day['calibrations']["videos"][video_metadata.cam_id]['filepath']
+                    for video_metadata in self.objects['position_objects'][calibration['key']].metadata_from_videos.values():
+                        video_metadata.filepath = recording_day['calibrations']["videos"][video_metadata.cam_id]['positions_image_filepath']
+                    
                   
         elif self.meta['meta_step'] == 5:
             for recording_day in self.meta['recording_days'].values():
@@ -130,6 +128,10 @@ class meta_interface(ABC):
                     self._create_subgroups_for_necessary_calibrations(necessary_calibrations = necessary_calibrations, calibration_object = calibration_object, calibrations = recording_day['calibrations']['calibration_keys'])
                     self.objects["calibration_objects"].pop(all_calibrations_key)
                     recording_day['calibrations']['calibration_keys'].pop(all_calibrations_key)
+                    
+                for calibration in recording_day['calibrations']['calibration_keys'].values():                    
+                    for video_metadata in self.objects['position_objects'][calibration['key']].metadata_from_video.values():
+                        video_metadata.filepath = recording_day['calibrations']["videos"][video_metadata.cam_id]['positions_marker_detection_filepath']
 
                 
     def _get_necessary_calibrations(self, possible_videos: List[str], recording_day: Dict)->Tuple[List, str]:
@@ -158,9 +160,9 @@ class meta_interface(ABC):
                      calibration_directory = self.meta["recording_days"][recording_day]['calibration_directory'],
                      recording_config_filepath = self.meta["recording_days"][recording_day]['recording_config_path'], 
                      project_config_filepath= self.meta['project_config_path'],
-                     output_directory = recording, overwrite = False)
+                     output_directory = recording)
                 individual_key = f"{triangulation_recordings_object.mouse_id}_{triangulation_recordings_object.recording_date}_{triangulation_recordings_object.paradigm}"
-                videos = {video.cam_id: self._create_video_dict(video=video) for video in triangulation_recordings_object.metadata_from_videos}
+                videos = {video: self._create_video_dict(video=triangulation_recordings_object.metadata_from_videos[video]) for video in triangulation_recordings_object.metadata_from_videos}
                 self.meta['recording_days'][recording_day]['recordings'][individual_key] = {'recording_directory': recording,
                                                                             'key': individual_key,
                                                                             'target_fps': triangulation_recordings_object.target_fps,
@@ -176,15 +178,17 @@ class meta_interface(ABC):
                 for video in recording_day['recordings'][recording]["videos"]:
                     recording_day['recordings'][recording]["videos"][video]["marker_detection_filepath"] = str(self.objects["triangulation_recordings_objects"][recording].triangulation_dlc_cams_filepaths[video])
                     recording_day['recordings'][recording]["videos"][video]["synchronized_video"] = str(self.objects["triangulation_recordings_objects"][recording].synchronized_videos[video])
-                    recording_day['recordings'][recording]["videos"][video]["framenum_synchronized"] = iio.v2.get_reader(self.objects["triangulation_recordings_objects"][recording].synchronized_videos[video]).count_frames()
+                    recording_day['recordings'][recording]["videos"][video]["framenum_synchronized"] = self.objects["triangulation_recordings_objects"][recording].metadata_from_videos[video].framenum_synchronized
         self.meta['meta_step'] = 3
             
     def _create_video_dict(self, video: VideoMetadata, intrinsics: bool=False)->Dict:
         dictionary = {'cam_id': video.cam_id, 
                     'filepath': str(video.filepath), 
                     'fps': video.fps, 
-                    'framenum': iio.v2.get_reader(video.filepath).count_frames(), 
-                    'exclusion_state': 'valid'}
+                    'framenum': video.framenum, 
+                    'exclusion_state': video.exclusion_state,
+                    'marker_detection_filepath': "",
+                    'synchronized_filepath': ""}
         if intrinsics:
             dictionary['intrinsic_calibration_filepath'] = str(video.intrinsic_calibration_filepath)
         return dictionary
@@ -200,10 +204,9 @@ class meta_interface(ABC):
             calibration_object = Calibration(calibration_directory = recording_day['calibration_directory'], 
                 project_config_filepath = self.project_config_path,
                 recording_config_filepath = recording_day['recording_config_path'],
-                output_directory = recording_day['calibration_directory'],
-                overwrite = False)
+                output_directory = recording_day['calibration_directory'])
             
-            cams = [video.cam_id for video in calibration_object.metadata_from_videos]
+            cams = [video for video in calibration_object.metadata_from_videos]
             
             necessary_calibrations, all_cams_key = self._get_necessary_calibrations(possible_videos = cams, recording_day = recording_day)
             necessary_calibrations.pop(all_cams_key)
@@ -211,7 +214,7 @@ class meta_interface(ABC):
             self.objects['calibration_objects'][all_cams_key] = calibration_object
 
             
-            video_dict = {video.cam_id: self._create_video_dict(video, intrinsics=True) for video in calibration_object.metadata_from_videos}
+            video_dict = {video: self._create_video_dict(calibration_object.metadata_from_videos[video], intrinsics=True) for video in calibration_object.metadata_from_videos}
             recording_day['calibrations']['calibration_keys'][all_cams_key] = {'key': all_cams_key}
             recording_day['calibrations']['target_fps'] = calibration_object.target_fps
             recording_day['calibrations']['led_pattern'] = calibration_object.led_pattern
@@ -222,12 +225,11 @@ class meta_interface(ABC):
                     calibration_directory = recording_day['calibration_directory'],
                     recording_config_filepath = recording_day['recording_config_path'], 
                     project_config_filepath= self.project_config_path,
-                    output_directory = recording_day['calibration_directory'], 
-                    overwrite = False)
+                    output_directory = recording_day['calibration_directory'])
             self.objects['position_objects'][all_cams_key] = positions_object
-            for video in positions_object.metadata_from_videos:
+            for video in positions_object.metadata_from_videos.values():
                 try:
-                    recording_day['calibrations'][key]['videos'][video.cam_id]['positions_image_filepath'] = str(video.filepath) 
+                    recording_day['calibrations']['videos'][video.cam_id]['positions_image_filepath'] = str(video.filepath) 
                 except:
                     pass
         self.meta['meta_step'] = 4
@@ -240,7 +242,7 @@ class meta_interface(ABC):
                 calibration_object.run_synchronization()
                 for video in recording_day['calibrations']["videos"]:
                     recording_day['calibrations']["videos"][video]["synchronized_video"] = str(calibration_object.synchronized_charuco_videofiles[video])
-                    recording_day['calibrations']["videos"][video]["framenum_synchronized"] = iio.v2.get_reader(calibration_object.synchronized_charuco_videofiles[video]).count_frames()
+                    recording_day['calibrations']["videos"][video]["framenum_synchronized"] = calibration_object.metadata_from_videos[video].framenum_synchronized
                 self._create_subgroups_for_necessary_calibrations(necessary_calibrations = self.necessary_calibrations[calibration['key']], calibration_object = calibration_object, calibrations = recording_day['calibrations']['calibration_keys'])
 
                 self.objects["position_objects"][calibration['key']].get_marker_predictions()
@@ -253,9 +255,10 @@ class meta_interface(ABC):
         for key in necessary_calibrations:
             calibration_subgroup = calibration_object.create_subgroup(cam_ids = necessary_calibrations[key])
 
-            cams = [video.cam_id for video in calibration_subgroup.metadata_from_videos]
-            self.objects['calibration_objects'][key] = calibration_subgroup
-            calibrations[key] = {'key': key}
+            cams = [video for video in calibration_subgroup.metadata_from_videos]
+            calibration_key = create_calibration_key(videos=cams, recording_date = subgroup.recording_date, calibration_index = subgroup.calibration_index)
+            self.objects['calibration_objects'][calibration_key] = calibration_subgroup
+            calibrations[calibration_key] = {'key': calibration_key}
               
     def calibrate(self, verbose: bool=False)->None:
         for recording_day in self.meta['recording_days'].values():
