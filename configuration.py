@@ -17,7 +17,7 @@ class Configs(ABC):
 
     @abstractmethod
     def write_config(self):
-        """ write extracted config information in a yaml file"""
+        """write extracted config information in a yaml file"""
         pass
 
     @abstractmethod
@@ -83,7 +83,7 @@ class RecordingConfigs(Configs):
     input: path of the project config file, which is named
     UI-input: recording_date, led_pattern, fps, offset_row_idx, offset_col_idx, fliph, flipv, fisheye
     output:
-    
+
     """
 
     def load_projectconfig(self, path_project_config=None):

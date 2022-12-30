@@ -1,11 +1,10 @@
 from typing import List, Tuple, Optional, Union, Dict
 from abc import ABC, abstractmethod
-
 from pathlib import Path
 import datetime
+
 import pickle
-import itertools as it
-import imageio.v3 as iio
+import imageio as iio
 import numpy as np
 import aniposelib as ap_lib
 import cv2
@@ -27,11 +26,44 @@ class VideoMetadata:
         project_config_filepath: Path,
         calibration_dir: Path,
     ) -> None:
+
         self.calibration_dir = convert_to_path(calibration_dir)
+        self.exclusion_state = "valid"
+
+        self._check_filepaths(
+            video_filepath=video_filepath,
+            recording_config_filepath=recording_config_filepath,
+            project_config_filepath=project_config_filepath,
+        )
+
+        try:
+            self._read_metadata(
+                recording_config_filepath=recording_config_filepath,
+                project_config_filepath=project_config_filepath,
+                video_filepath=video_filepath,
+            )
+            self.framenum = iio.v2.get_reader(video_filepath).count_frames()
+            self._get_intrinsic_parameters(
+                recording_config_filepath=recording_config_filepath,
+                max_calibration_frames=self.max_calibration_frames,
+            )
+        except:
+            self.exclusion_state = "exclude"
+
+    def _check_filepaths(
+        self,
+        video_filepath: Path,
+        recording_config_filepath: Path,
+        project_config_filepath: Path,
+    ) -> None:
         if (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".AVI"
             or video_filepath.suffix == ".jpg"
+            or video_filepath.suffix == ".png"
+            or video_filepath.suffix == ".tiff"
+            or video_filepath.suffix == ".bmp"
+            and video_filepath.exists()
         ):
             self.filepath = video_filepath
         else:
@@ -51,16 +83,6 @@ class VideoMetadata:
                 f"Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!"
             )
 
-        self._read_metadata(
-            recording_config_filepath=recording_config_filepath,
-            project_config_filepath=project_config_filepath,
-            video_filepath=video_filepath,
-        )
-        self._get_intrinsic_parameters(
-            recording_config_filepath=recording_config_filepath,
-            max_calibration_frames=self.max_calibration_frames,
-        )
-
     def _read_metadata(
         self,
         project_config_filepath: Path,
@@ -77,13 +99,12 @@ class VideoMetadata:
             "valid_cam_IDs",
             "paradigms",
             "animal_lines",
-            "intrinsic_calibration_dir",
             "led_extraction_type",
-            "led_extraction_path",
+            "led_extraction_filepath",
             "max_calibration_frames",
             "max_frames_to_write",
             "use_gpu",
-            "load_calibration"
+            "load_calibration",
         ]:
             try:
                 project_config[key]
@@ -95,17 +116,23 @@ class VideoMetadata:
         self.valid_cam_ids = project_config["valid_cam_IDs"]
         self.valid_paradigms = project_config["paradigms"]
         self.valid_mouse_lines = project_config["animal_lines"]
-        self.intrinsic_calibrations_directory = Path(
-            project_config["intrinsic_calibration_dir"]
-        )
+        self.load_calibration = project_config["load_calibration"]
+        if self.load_calibration:
+            try:
+                self.intrinsic_calibrations_directory = Path(
+                    project_config["intrinsic_calibration_directory"]
+                )
+            except:
+                raise ValueError(
+                    "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
+                )
         self.max_calibration_frames = project_config["max_calibration_frames"]
         self.max_frames_to_write = project_config["max_frames_to_write"]
         self.use_gpu = project_config["use_gpu"]
-        self.load_calibration = project_config["load_calibration"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
 
-        for key in ["led_pattern", self.cam_id, "target_fps"]:
+        for key in ["led_pattern", self.cam_id, "target_fps", "calibration_index"]:
             try:
                 recording_config[key]
             except KeyError:
@@ -115,6 +142,7 @@ class VideoMetadata:
 
         self.led_pattern = recording_config["led_pattern"]
         self.target_fps = recording_config["target_fps"]
+        self.calibration_index = recording_config["calibration_index"]
         if self.recording_date != recording_config["recording_date"]:
             raise ValueError(
                 f"The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
@@ -147,12 +175,16 @@ class VideoMetadata:
         self.calibration_evaluation_type = project_config[
             "calibration_evaluation_type"
         ][self.cam_id]
-        self.processing_path = Path(project_config["processing_path"][self.cam_id])
-        self.calibration_evaluation_path = Path(
-            project_config["calibration_evaluation_path"][self.cam_id]
+        self.processing_filepath = Path(
+            project_config["processing_filepath"][self.cam_id]
+        )
+        self.calibration_evaluation_filepath = Path(
+            project_config["calibration_evaluation_filepath"][self.cam_id]
         )
         self.led_extraction_type = project_config["led_extraction_type"][self.cam_id]
-        self.led_extraction_path = project_config["led_extraction_path"][self.cam_id]
+        self.led_extraction_filepath = project_config["led_extraction_filepath"][
+            self.cam_id
+        ]
 
     def _extract_filepath_metadata(self, filepath_name: str) -> None:
         self.charuco_video = False
@@ -312,8 +344,10 @@ class VideoMetadata:
         if self.charuco_video:
             if self.fisheye:
                 try:
-                    intrinsic_calibration_filepath = self.intrinsic_calibrations_directory.joinpath(
-                        "Bottom_checkerboard_intrinsic_calibration_results.p"
+                    intrinsic_calibration_filepath = (
+                        self.intrinsic_calibrations_directory.joinpath(
+                            "Bottom_checkerboard_intrinsic_calibration_results.p"
+                        )
                     )
                     with open(intrinsic_calibration_filepath, "rb") as io:
                         intrinsic_calibration = pickle.load(io)
@@ -369,9 +403,9 @@ class VideoMetadata:
                 )
             with open(intrinsic_calibration_filepath, "rb") as io:
                 intrinsic_calibration = pickle.load(io)
-                
+
         self.intrinsic_calibration_filepath = intrinsic_calibration_filepath
-        
+
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(
             unadjusted_intrinsic_calibration=intrinsic_calibration
         )
@@ -421,18 +455,20 @@ class VideoMetadata:
             new_video_size=new_video_size,
         )
         adjusted_K = self._get_adjusted_K(K=unadjusted_intrinsic_calibration["K"])
-        adjusted_intrinsic_calibration = self._incorporate_adjustments_in_intrinsic_calibration(
-            intrinsic_calibration=unadjusted_intrinsic_calibration.copy(),
-            new_size=new_video_size,
-            adjusted_K=adjusted_K,
+        adjusted_intrinsic_calibration = (
+            self._incorporate_adjustments_in_intrinsic_calibration(
+                intrinsic_calibration=unadjusted_intrinsic_calibration.copy(),
+                new_size=new_video_size,
+                adjusted_K=adjusted_K,
+            )
         )
         return adjusted_intrinsic_calibration
 
     def _get_cropped_video_size(self) -> Tuple[int, int]:
         try:
-            size = iio.immeta(self.filepath, exclude_applied=False)['size']
+            size = iio.v3.immeta(self.filepath, exclude_applied=False)["size"]
         except KeyError:
-            size = iio.immeta(self.filepath, exclude_applied=False)['shape']
+            size = iio.v3.immeta(self.filepath, exclude_applied=False)["shape"]
         return size
 
     def _get_correct_x_y_offsets(
@@ -442,15 +478,15 @@ class VideoMetadata:
     ) -> None:
         if self.flip_v:
             self.offset_row_idx = (
-                intrinsic_calibration_video_size[0]
-                - new_video_size[1]
+                intrinsic_calibration_video_size[1]
+                - new_video_size[0]
                 - self.offset_row_idx
             )
             # rows or cols first in intrinsic_calibration_video_size? (rows for now, but maybe this will be changed?)
         if self.flip_h:
             self.offset_col_idx = (
-                intrinsic_calibration_video_size[1]
-                - new_video_size[0]
+                intrinsic_calibration_video_size[0]
+                - new_video_size[1]
                 - self.offset_col_idx
             )
 

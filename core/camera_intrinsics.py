@@ -23,7 +23,9 @@ class IntrinsicCameraCalibrator(ABC):
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         pass
 
-    def __init__(self, filepath_calibration_video: Path, max_calibration_frames: int) -> None:
+    def __init__(
+        self, filepath_calibration_video: Path, max_calibration_frames: int
+    ) -> None:
         self.video_filepath = filepath_calibration_video
         self.max_calibration_frames = max_calibration_frames
         self.video_reader = iio.get_reader(filepath_calibration_video)
@@ -78,9 +80,11 @@ class IntrinsicCameraCalibrator(ABC):
         # check, how the charuco calibration works and whether the following function calls are needed in the abstract class
         # rename to board instead of checkerboard
         if len(detected_checkerboard_corners_per_image) != self.max_calibration_frames:
-            detected_checkerboard_corners_per_image = self._attempt_to_match_max_frame_count(
-                corners_per_image=detected_checkerboard_corners_per_image,
-                already_selected_frame_idxs=selected_frame_idxs,
+            detected_checkerboard_corners_per_image = (
+                self._attempt_to_match_max_frame_count(
+                    corners_per_image=detected_checkerboard_corners_per_image,
+                    already_selected_frame_idxs=selected_frame_idxs,
+                )
             )
         object_points = self._compute_object_points(
             n_detected_boards=len(detected_checkerboard_corners_per_image)
