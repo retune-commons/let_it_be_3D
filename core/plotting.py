@@ -12,6 +12,8 @@ from .utils import Coordinates, load_single_frame_of_video
 
 class Plotting(ABC):
     def _save(self, filepath: str):
+        if filepath.exists():
+            filepath.unlink()
         plt.savefig(filepath, dpi=400)
 
     @abstractmethod
@@ -33,20 +35,20 @@ class Alignment_Plot_Individual(Plotting):
         led_timeseries: np.ndarray,
         video_metadata: VideoMetadata,
         output_directory: Path,
-        led_box_size: int
+        led_box_size: int,
     ) -> None:
         self.template = template
         self.led_timeseries = led_timeseries
         self.video_metadata = video_metadata
         self.output_directory = output_directory
         self.led_box_size = led_box_size
-        self.filepath = self._create_filename()
-        self._create_plot(plot = False)
+        self.filepath = self._create_filepath()
+        self._create_plot(plot=False)
 
     def plot(self) -> None:
-        self._create_plot(plot = True)
+        self._create_plot(plot=True)
 
-    def _create_filename(self) -> str:
+    def _create_filepath(self) -> str:
         if self.video_metadata.charuco_video:
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_synchronization_individual"
         else:
@@ -79,13 +81,13 @@ class Alignment_Plot_Crossvalidation(Plotting):
         self.led_timeseries = led_timeseries
         self.metadata = metadata
         self.output_directory = output_directory
-        self.filepath = self._create_filename()
-        self._create_plot(plot = False)
+        self.filepath = self._create_filepath()
+        self._create_plot(plot=False)
 
     def plot(self) -> None:
-        self._create_plot(plot = True)
+        self._create_plot(plot=True)
 
-    def _create_filename(self) -> str:
+    def _create_filepath(self) -> str:
         if self.metadata["charuco_video"]:
             filename = f'{self.metadata["recording_date"]}_charuco_synchronization_crossvalidation'
         else:
@@ -105,7 +107,7 @@ class Alignment_Plot_Crossvalidation(Plotting):
         if plot:
             plt.show()
         plt.close()
-            
+
 
 class LED_Marker_Plot(Plotting):
     def __init__(
@@ -121,13 +123,13 @@ class LED_Marker_Plot(Plotting):
         self.box_size = box_size
         self.video_metadata = video_metadata
         self.output_directory = output_directory
-        self.filepath = self._create_filename()
+        self.filepath = self._create_filepath()
         self._create_plot(plot=False)
 
     def plot(self) -> None:
-        self._create_plot(plot = True)
+        self._create_plot(plot=True)
 
-    def _create_filename(self) -> Path:
+    def _create_filepath(self) -> Path:
         if self.video_metadata.charuco_video:
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_LED_marker"
         else:
@@ -139,42 +141,51 @@ class LED_Marker_Plot(Plotting):
         fig = plt.figure()
         plt.imshow(self.image)
         plt.scatter(self.led_center_coordinates.x, self.led_center_coordinates.y)
-        
+
         x_start_index = self.led_center_coordinates.x - (self.box_size // 2)
-        x_end_index = self.led_center_coordinates.x + (self.box_size - (self.box_size // 2))
+        x_end_index = self.led_center_coordinates.x + (
+            self.box_size - (self.box_size // 2)
+        )
         y_start_index = self.led_center_coordinates.y - (self.box_size // 2)
-        y_end_index = self.led_center_coordinates.y + (self.box_size - (self.box_size // 2))
-        plt.plot([x_start_index, x_start_index, x_end_index, x_end_index, x_start_index], [y_start_index, y_end_index, y_end_index, y_start_index, y_start_index])
-        
+        y_end_index = self.led_center_coordinates.y + (
+            self.box_size - (self.box_size // 2)
+        )
+        plt.plot(
+            [x_start_index, x_start_index, x_end_index, x_end_index, x_start_index],
+            [y_start_index, y_end_index, y_end_index, y_start_index, y_start_index],
+        )
+
         self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()
 
+
 class Intrinsics(Plotting):
-    def __init__(self, metadata: VideoMetadata, output_dir: Path)->None:
-        self.metadata = metadata
-        self._create_all_images(frame_idx = 0)
-        self.filepath = self._create_filename(output_dir = output_dir)
+    def __init__(self, video_metadata: VideoMetadata, output_dir: Path) -> None:
+        self.video_metadata = video_metadata
+        self._create_all_images(frame_idx=0)
+        self.filepath = self._create_filepath(output_dir=output_dir)
         self.plot(plot=False)
-        
+
     def _create_all_images(self, frame_idx: int = 0) -> None:
         self.distorted_input_image = load_single_frame_of_video(
-            filepath=self.metadata.filepath, frame_idx=frame_idx
+            filepath=self.video_metadata.filepath, frame_idx=frame_idx
         )
-        if self.metadata.fisheye:
-            self.undistorted_output_image = self._undistort_fisheye_image_for_inspection(
-                image=self.distorted_input_image
+        if self.video_metadata.fisheye:
+            self.undistorted_output_image = (
+                self._undistort_fisheye_image_for_inspection(
+                    image=self.distorted_input_image
+                )
             )
         else:
             self.undistorted_output_image = cv2.undistort(
                 self.distorted_input_image,
-                self.metadata.intrinsic_calibration["K"],
-                self.metadata.intrinsic_calibration["D"],
+                self.video_metadata.intrinsic_calibration["K"],
+                self.video_metadata.intrinsic_calibration["D"],
             )
-        
-    def plot(
-        self, plot: bool) -> None:
+
+    def plot(self, plot: bool) -> None:
         fig = plt.figure(figsize=(12, 5), facecolor="white")
         gs = fig.add_gridspec(1, 2)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -187,32 +198,31 @@ class Intrinsics(Plotting):
         if plot:
             plt.show()
         plt.close()
-        
-    def _create_filename(self, output_dir: Path)->Path:
-        if self.metadata.charuco_video:
-            filename = f"{self.metadata.recording_date}_{self.metadata.cam_id}_charuco_undistorted_image"
+
+    def _create_filepath(self, output_dir: Path) -> Path:
+        if self.video_metadata.charuco_video:
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_undistorted_image"
         else:
-            filename = f"{self.metadata.mouse_id}_{self.metadata.recording_date}_{self.metadata.paradigm}_{self.metadata.cam_id}_undistorted_image"
+            filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
         filepath = output_dir.joinpath(filename)
         return filepath
-        
 
     def _undistort_fisheye_image_for_inspection(self, image: np.ndarray) -> np.ndarray:
         k_for_fisheye = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
-            self.metadata.intrinsic_calibration["K"],
-            self.metadata.intrinsic_calibration["D"],
-            self.metadata.intrinsic_calibration["size"],
+            self.video_metadata.intrinsic_calibration["K"],
+            self.video_metadata.intrinsic_calibration["D"],
+            self.video_metadata.intrinsic_calibration["size"],
             np.eye(3),
             balance=0,
         )
         map1, map2 = cv2.fisheye.initUndistortRectifyMap(
-            self.metadata.intrinsic_calibration["K"],
-            self.metadata.intrinsic_calibration["D"],
+            self.video_metadata.intrinsic_calibration["K"],
+            self.video_metadata.intrinsic_calibration["D"],
             np.eye(3),
             k_for_fisheye,
             (
-                self.metadata.intrinsic_calibration["size"][1],
-                self.metadata.intrinsic_calibration["size"][0],
+                self.video_metadata.intrinsic_calibration["size"][0],
+                self.video_metadata.intrinsic_calibration["size"][1],
             ),
             cv2.CV_16SC2,
         )
@@ -223,4 +233,3 @@ class Intrinsics(Plotting):
             interpolation=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
         )
-    
