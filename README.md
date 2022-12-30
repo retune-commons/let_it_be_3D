@@ -45,6 +45,6 @@ At the Sfb-Retune Hackathon 2022, [Elisa Garulli](https://github.com/ELGarulli),
 joined the taskforce to push the project towards completion. 
 
 If you want to help with writing this pipeline, please <a href = "mailto: schellenb_m1@ukw.de">get in touch</a>.
-If you want to try out the Code yourself (on Google Colab) or need dummy data to test it, <a href = "mailto: schellenb_m1@ukw.de">contact us</a>!
+If you want to try out the Code yourself (on Google Colab) or need dummy data to test it, <a href = "mailto: Kobel_K@ukw.de">contact us</a>!
 
 
