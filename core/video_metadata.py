@@ -57,12 +57,15 @@ class VideoMetadata:
         project_config_filepath: Path,
     ) -> None:
         if (
+            (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".AVI"
+            or video_filepath.suffix == ".avi"
             or video_filepath.suffix == ".jpg"
             or video_filepath.suffix == ".png"
             or video_filepath.suffix == ".tiff"
             or video_filepath.suffix == ".bmp"
+            )
             and video_filepath.exists()
         ):
             self.filepath = video_filepath

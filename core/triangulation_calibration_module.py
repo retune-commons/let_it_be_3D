@@ -174,25 +174,24 @@ class Calibration:
             ] = str(video_interface.synchronized_video_filepath)
             self.camera_objects.append(video_interface.export_for_aniposelib())
 
-        if not test_mode:
-            template = list(self.charuco_interfaces.values())[
-                0
-            ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
-                fps=self.target_fps
-            )[
-                0
-            ][
-                0
-            ]
-            self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-                template=template,
-                led_timeseries={
-                    video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                    for video_interface in self.charuco_interfaces.values()
-                },
-                metadata={"recording_date": self.recording_date, "charuco_video": True},
-                output_directory=self.output_directory,
-            )
+        template = list(self.charuco_interfaces.values())[
+            0
+        ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
+            fps=self.target_fps
+        )[
+            0
+        ][
+            0
+        ]
+        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
+            template=template,
+            led_timeseries={
+                video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
+                for video_interface in self.charuco_interfaces.values()
+            },
+            metadata={"recording_date": self.recording_date, "charuco_video": True},
+            output_directory=self.output_directory,
+        )
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
         exclude_by_framenum(
@@ -326,7 +325,7 @@ class Calibration:
             )
 
             self.charuco_interfaces[video_metadata.cam_id] = VideoInterface(
-                metadata=video_metadata, output_dir=self.output_directory
+                video_metadata=video_metadata, output_dir=self.output_directory
             )
             self.metadata_from_videos[video_metadata.cam_id] = video_metadata
 
@@ -572,30 +571,29 @@ class Triangulation_Recordings(Triangulation):
                 video_interface.video_metadata.cam_id
             ] = video_interface.synchronized_video_filepath
 
-        if not test_mode:
-            template = list(self.recording_interfaces.values())[
-                0
-            ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
-                fps=self.target_fps
-            )[
-                0
-            ][
-                0
-            ]
-            self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-                template=template,
-                led_timeseries={
-                    video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                    for video_interface in self.recording_interfaces.values()
-                },
-                metadata={
-                    "mouse_id": self.mouse_id,
-                    "recording_date": self.recording_date,
-                    "paradigm": self.paradigm,
-                    "charuco_video": False,
-                },
-                output_directory=self.output_directory,
-            )
+        template = list(self.recording_interfaces.values())[
+            0
+        ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
+            fps=self.target_fps
+        )[
+            0
+        ][
+            0
+        ]
+        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
+            template=template,
+            led_timeseries={
+                video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
+                for video_interface in self.recording_interfaces.values()
+            },
+            metadata={
+                "mouse_id": self.mouse_id,
+                "recording_date": self.recording_date,
+                "paradigm": self.paradigm,
+                "charuco_video": False,
+            },
+            output_directory=self.output_directory,
+        )
 
         if not synchronize_only:
             self.csv_output_filepath = self.create_csv_filepath()
@@ -607,13 +605,14 @@ class Triangulation_Recordings(Triangulation):
             }
 
         exclude_by_framenum(
-            metadata_from_videos=self.metadata_from_videos, target_fps=target_fps
+            metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps
         )
 
     def create_csv_filepath(self) -> None:
-        self.output_directory.joinpath(
+        filepath_out = self.output_directory.joinpath(
             f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
         )
+        return filepath_out
 
     def _create_video_objects(
         self,
@@ -723,16 +722,17 @@ class Triangulation_Positions(Triangulation):
     ) -> None:
 
         self.positions_directory = convert_to_path(positions_directory)
-        project_config_filepath = convert_to_path(project_config_filepath)
-        recording_config_filepath = convert_to_path(recording_config_filepath)
+        self.project_config_filepath = convert_to_path(project_config_filepath)
+        self.recording_config_filepath = convert_to_path(recording_config_filepath)
+        self.calibration_directory = convert_to_path(calibration_directory)
         output_directory = convert_to_path(output_directory)
         self._check_output_directory(output_directory=output_directory)
 
         self._create_video_objects(
-            positions_directory=positions_directory,
-            project_config_filepath=project_config_filepath,
-            recording_config_filepath=recording_config_filepath,
-            calibration_directory=calibration_directory,
+            positions_directory=self.positions_directory,
+            project_config_filepath=self.project_config_filepath,
+            recording_config_filepath=self.recording_config_filepath,
+            calibration_directory=self.calibration_directory,
         )
         self.csv_output_filepath = self.output_directory.joinpath(
             f"Positions_{self.recording_date}.csv"
@@ -785,7 +785,7 @@ class Triangulation_Positions(Triangulation):
         avi_files = [
             file
             for file in positions_directory.iterdir()
-            if file.name.endswith(".AVI") and "Positions" in file.name
+            if file.name.endswith(".AVI") and ("Positions" in file.name or "positions" in file.name)
         ]
         avi_files.sort()
         top_cam_file = avi_files[-1]  # hardcoded
