@@ -265,7 +265,7 @@ class Synchronizer(ABC):
                 video_filepath_out.stem + dlc_ending + ".h5"
             )
             dlc_created_picklefile = temp_folder.joinpath(
-                video_filepath_out.stem + dlc_ending + ".pickle"
+                video_filepath_out.stem + dlc_ending + "_meta.pickle"
             )
             dlc_created_h5file.rename(dlc_filepath_out)
             df = pd.read_hdf(dlc_filepath_out)
@@ -768,11 +768,11 @@ class RecordingVideoSynchronizer(Synchronizer):
             config_filepath = self.video_metadata.processing_filepath
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
-                output_directory=self.output_directory,
+                output_directory=self.output_directory.joinpath,
                 marker_detection_directory=config_filepath,
             )
             h5_file = dlc_interface.analyze_objects(filtering=True)
-            output_filepath = self.output_directory.joinpath(
+            output_filepath = self.output_directory.joinpath( +
                 video_filepath.stem + h5_file
             )
             output_filepath.joinpath("includingmetadata.pickle").unlink()

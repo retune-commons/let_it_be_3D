@@ -49,7 +49,7 @@ class meta_interface(ABC):
             )
 
     def add_recording_config(self, filepath_to_recording_config: Path) -> None:
-        filepath_to_recording_config = convert_to_path(path_to_recording_config)
+        filepath_to_recording_config = convert_to_path(filepath_to_recording_config)
         if (
             filepath_to_recording_config.suffix == ".yaml"
             and filepath_to_recording_config.exists()
@@ -110,7 +110,7 @@ class meta_interface(ABC):
                 "recording_directories"
             ]:
                 triangulation_recordings_object = Triangulation_Recordings(
-                    recording_directory=recording,
+                    recording_directory=Path(recording),
                     calibration_directory=self.meta["recording_days"][recording_day][
                         "calibration_directory"
                     ],

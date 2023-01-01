@@ -1,19 +1,17 @@
 from typing import List, Tuple, Optional, Union, Dict
 from abc import ABC, abstractmethod
 from pathlib import Path
+import sys
+import io
+import warnings
+
 import yaml
 import imageio.v3 as iio
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from .utils import construct_dlc_output_style_df_from_manual_marker_coords
 
-"""
-import datetime
-import itertools as it
-import aniposelib as ap_lib
-import cv2
-"""
+from .utils import construct_dlc_output_style_df_from_manual_marker_coords
 
 
 class MarkerDetection(ABC):
@@ -35,17 +33,27 @@ class MarkerDetection(ABC):
 
 class DeeplabcutInterface(MarkerDetection):
     def analyze_objects(self, filtering: bool = False):
-        import deeplabcut as dlc
+        
+        #mute deeplabcut
+        text_trap = io.StringIO()
+        sys.stdout = text_trap
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-        filename = dlc.analyze_videos(
-            config=self.marker_detection_directory,
-            videos=[self.object_to_analyse],
-            destfolder=self.output_directory,
-        )
-        if filtering:
-            dlc.post_processing.filtering.filterpredictions(
-                config=self.marker_detection_directory, video=self.object_to_analyse
+            import deeplabcut as dlc
+
+            filename = dlc.analyze_videos(
+                config=self.marker_detection_directory,
+                videos=[self.object_to_analyse],
+                destfolder=self.output_directory,
             )
+            if filtering:
+                dlc.post_processing.filtering.filterpredictions(
+                    config=self.marker_detection_directory, video=self.object_to_analyse
+                )
+            
+        #unmute 
+        sys.stdout = sys.__stdout__
 
         return filename
 

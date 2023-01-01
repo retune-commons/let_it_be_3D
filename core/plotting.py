@@ -7,13 +7,13 @@ import numpy as np
 import cv2
 
 from .video_metadata import VideoMetadata
-from .utils import Coordinates, load_single_frame_of_video
+from .utils import Coordinates, load_single_frame_of_video, convert_to_path
 
 
 class Plotting(ABC):
     def _save(self, filepath: str):
-        if filepath.exists():
-            filepath.unlink()
+        if convert_to_path(filepath).exists():
+            convert_to_path(filepath).unlink()
         plt.savefig(filepath, dpi=400)
 
     @abstractmethod
@@ -21,7 +21,7 @@ class Plotting(ABC):
         pass
 
     @abstractmethod
-    def _create_filename(self):
+    def _create_filepath(self):
         pass
 
     def _zscore(self, array: np.ndarray) -> np.ndarray:
