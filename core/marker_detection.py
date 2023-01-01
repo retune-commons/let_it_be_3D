@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-from .utils import construct_dlc_output_style_df_from_manual_marker_coords
+from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path
 
 
 class MarkerDetection(ABC):
@@ -21,10 +21,10 @@ class MarkerDetection(ABC):
         output_directory: Path,
         marker_detection_directory: Optional[Path] = None,
     ):
-        self.object_to_analyse = object_to_analyse
-        self.output_directory = output_directory
+        self.object_to_analyse = convert_to_path(object_to_analyse)
+        self.output_directory = convert_to_path(output_directory)
         if type(marker_detection_directory) != None:
-            self.marker_detection_directory = marker_detection_directory
+            self.marker_detection_directory = convert_to_path(marker_detection_directory)
 
     @abstractmethod
     def analyze_objects():
@@ -43,13 +43,13 @@ class DeeplabcutInterface(MarkerDetection):
             import deeplabcut as dlc
 
             filename = dlc.analyze_videos(
-                config=self.marker_detection_directory,
-                videos=[self.object_to_analyse],
-                destfolder=self.output_directory,
+                config=str(self.marker_detection_directory),
+                videos=[str(self.object_to_analyse)],
+                destfolder=str(self.output_directory),
             )
             if filtering:
                 dlc.post_processing.filtering.filterpredictions(
-                    config=self.marker_detection_directory, video=self.object_to_analyse
+                    config=str(self.marker_detection_directory), video=str(self.object_to_analyse)
                 )
             
         #unmute 
