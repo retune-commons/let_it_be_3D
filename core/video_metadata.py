@@ -36,19 +36,21 @@ class VideoMetadata:
             project_config_filepath=project_config_filepath,
         )
 
+        self._read_metadata(
+            recording_config_filepath=recording_config_filepath,
+            project_config_filepath=project_config_filepath,
+            video_filepath=video_filepath,
+        )
+        
+        self._get_intrinsic_parameters(
+            recording_config_filepath=recording_config_filepath,
+            max_calibration_frames=self.max_calibration_frames,
+        )
         try:
-            self._read_metadata(
-                recording_config_filepath=recording_config_filepath,
-                project_config_filepath=project_config_filepath,
-                video_filepath=video_filepath,
-            )
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
-            self._get_intrinsic_parameters(
-                recording_config_filepath=recording_config_filepath,
-                max_calibration_frames=self.max_calibration_frames,
-            )
         except:
-            self.exclusion_state = "exclude"
+            pass
+            
 
     def _check_filepaths(
         self,
@@ -344,69 +346,55 @@ class VideoMetadata:
         recording_config_filepath: Path,
         max_calibration_frames: int,
     ) -> None:
-        if self.charuco_video:
-            if self.fisheye:
+        if self.fisheye:
+            try:
+                intrinsic_calibration_filepath = [file for file in self.intrinsic_calibrations_directory.iterdir() if file.suffix == ".p" and self.cam_id in file.stem][0]
+                with open(intrinsic_calibration_filepath, "rb") as io:
+                    intrinsic_calibration = pickle.load(io)
+            except IndexError:
                 try:
-                    intrinsic_calibration_filepath = (
-                        self.intrinsic_calibrations_directory.joinpath(
-                            "Bottom_checkerboard_intrinsic_calibration_results.p"
-                        )
-                    )
-                    with open(intrinsic_calibration_filepath, "rb") as io:
-                        intrinsic_calibration = pickle.load(io)
-                except FileNotFoundError:
-                    try:
-                        intrinsic_calibration_checkerboard_video_filepath = [
-                            file
-                            for file in self.intrinsic_calibrations_directory.iterdir()
-                            if file.suffix == ".mp4"
-                            and "checkerboard" in file.stem
-                            and self.cam_id in file.stem
-                        ][0]
-                        calibrator = IntrinsicCalibratorFisheyeCamera(
-                            filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
-                            max_calibration_frames=self.max_calibration_frames,
-                        )
-                        intrinsic_calibration = calibrator.run()
-                    except IndexError:
-                        raise FileNotFoundError(
-                            f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\nIt is required having a intrinsic_calibration .p file or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibrations_directory}) for a fisheye-camera!"
-                        )
-            else:
-                if self.load_calibration:
-                    try:
-                        intrinsic_calibration_filepath = [
-                            file
-                            for file in self.intrinsic_calibrations_directory.iterdir()
-                            if file.suffix == ".p" and self.cam_id in file.stem
-                        ][0]
-                        with open(intrinsic_calibration_filepath, "rb") as io:
-                            intrinsic_calibration = pickle.load(io)
-                    except IndexError:
-                        raise FileNotFoundError(
-                            f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" in project_config to calibrate now!'
-                        )
-                else:
-                    calibrator = IntrinsicCalibratorRegularCameraCharuco(
-                        filepath_calibration_video=self.filepath,
+                    intrinsic_calibration_checkerboard_video_filepath = [
+                        file
+                        for file in self.intrinsic_calibrations_directory.iterdir()
+                        if file.suffix == ".mp4"
+                        and "checkerboard" in file.stem
+                        and self.cam_id in file.stem
+                    ][0]
+                    calibrator = IntrinsicCalibratorFisheyeCamera(
+                        filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
                         max_calibration_frames=self.max_calibration_frames,
                     )
                     intrinsic_calibration = calibrator.run()
-            self._save_calibration(intrinsic_calibration=intrinsic_calibration)
+                except IndexError:
+                    raise FileNotFoundError(
+                        f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\nIt is required having a intrinsic_calibration .p file or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibrations_directory}) for a fisheye-camera!"
+                    )
         else:
-            try:
-                intrinsic_calibration_filepath = [
-                    file
-                    for file in self.calibration_dir.iterdir()
-                    if file.suffix == ".p" and self.cam_id in file.stem
-                ][0]
-            except IndexError:
-                raise FileNotFoundError(
-                    f"Could not find an intrinsic calibration for {self.cam_id} in {self.calibration_dir.parent}! \nRunning the 3D Calibration should also create an intrinsic calibration. \nMake sure, you run the 3D Calibration before Triangulation."
+            if self.load_calibration:
+                try:
+                    intrinsic_calibration_filepath = [
+                        file
+                        for file in self.intrinsic_calibrations_directory.iterdir()
+                        if file.suffix == ".p" and self.cam_id in file.stem
+                    ][0]
+                    with open(intrinsic_calibration_filepath, "rb") as io:
+                        intrinsic_calibration = pickle.load(io)
+                except IndexError:
+                    raise FileNotFoundError(
+                        f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" in project_config to calibrate now!'
+                    )
+            else:
+                raise NotImplementedError("currently not working!")
+                """
+                calibrator = IntrinsicCalibratorRegularCameraCharuco(
+                    filepath_calibration_video=self.filepath,
+                    max_calibration_frames=self.max_calibration_frames,
                 )
-            with open(intrinsic_calibration_filepath, "rb") as io:
-                intrinsic_calibration = pickle.load(io)
-
+                intrinsic_calibration = calibrator.run()
+                with open(intrinsic_calibration_filepath, "rb") as io:
+                    intrinsic_calibration = pickle.load(io)
+                """     
+            
         self.intrinsic_calibration_filepath = intrinsic_calibration_filepath
 
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(
@@ -416,12 +404,6 @@ class VideoMetadata:
             intrinsic_calibration=intrinsic_calibration,
             adjusting_required=adjusting_required,
         )
-
-    def _save_calibration(self, intrinsic_calibration: Dict) -> None:
-        video_filename = self.filepath.name
-        filename = f'{video_filename[:video_filename.rfind(".")]}_intrinsic_calibration_results.p'
-        with open(self.calibration_dir.joinpath(filename), "wb") as io:
-            pickle.dump(intrinsic_calibration, io)
 
     def _is_adjusting_of_intrinsic_calibration_required(
         self, unadjusted_intrinsic_calibration: Dict

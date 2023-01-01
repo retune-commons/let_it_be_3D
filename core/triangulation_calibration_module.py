@@ -22,6 +22,7 @@ from .utils import convert_to_path, create_calibration_key
 
 
 def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int) -> None:
+    # makes no sense since only the beginning, not the end of the videos is synchronized
     synch_framenum_median = np.median(
         [
             video_metadata.framenum_synchronized
@@ -194,9 +195,7 @@ class Calibration:
         )
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
-        exclude_by_framenum(
-            metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps
-        )
+        #exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def run_calibration(
         self,
@@ -242,14 +241,14 @@ class Calibration:
         subgroup.target_fps = self.target_fps
         subgroup.calibration_index = self.calibration_index
 
-        subgroup.metadata_from_videos = []
-        subgroup.camera_objects = []
+        subgroup.metadata_from_videos = {}
+        subgroup.camera_objects = {}
         subgroup.synchronized_charuco_videofiles = {}
         for cam in cam_ids:
             if cam in self.metadata_from_videos.keys():
                 if self.metadata_from_videos[cam].exclusion_state == "valid":
-                    subgroup.metadata_from_videos.append(self.metadata_from_videos[cam])
-                    subgroup.camera_objects.append(self.camera_objects[cam])
+                    subgroup.metadata_from_videos[cam] = self.metadata_from_videos[cam]
+                    subgroup.camera_objects[cam] = self.camera_objects[cam]
                     subgroup.synchronized_charuco_videofiles[
                         cam
                     ] = self.synchronized_charuco_videofiles[cam]
@@ -604,9 +603,7 @@ class Triangulation_Recordings(Triangulation):
                 for video_interface in self.recording_interfaces
             }
 
-        exclude_by_framenum(
-            metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps
-        )
+        #exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def create_csv_filepath(self) -> None:
         filepath_out = self.output_directory.joinpath(

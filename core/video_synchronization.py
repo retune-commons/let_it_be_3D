@@ -759,12 +759,6 @@ class RecordingVideoSynchronizer(Synchronizer):
         output_filepath = self._create_h5_filepath()
 
         if not test_mode and not output_filepath.exists():
-            try:
-                output_filepath.joinpath(".h5").unlink()
-                output_filepath.joinpath("includingmetadata.pickle").unlink()
-                output_filepath.joinpath("filtered.h5").unlink()
-            except:
-                pass
             config_filepath = self.video_metadata.processing_filepath
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
@@ -772,12 +766,11 @@ class RecordingVideoSynchronizer(Synchronizer):
                 marker_detection_directory=config_filepath,
             )
             h5_file = dlc_interface.analyze_objects(filtering=True)
-            output_filepath = self.output_directory.joinpath( +
+            created_filepath = self.output_directory.joinpath(
                 video_filepath.stem + h5_file
             )
-            output_filepath.joinpath("includingmetadata.pickle").unlink()
-            output_filepath.joinpath(".h5").unlink()
-            output_filepath.joinpath("filtered.h5").rename(output_filepath)
+            created_filepath.joinpath(".h5").rename(output_filepath.joinpath(".h5"))
+            created_filepath.joinpath("filtered.h5").rename(output_filepath.joinpath("filtered.h5"))
         return output_filepath
 
     def _run_manual_marker_detection(
@@ -796,13 +789,13 @@ class RecordingVideoSynchronizer(Synchronizer):
                     output_directory=self.output_directory,
                     marker_detection_directory=config_filepath,
                 )
-                manual_interface.analyze_objects(filepath=output_filepath)
+                manual_interface.analyze_objects(filepath=output_filepath.joinpath(".h5"))
 
         return output_filepath
 
     def _create_h5_filepath(self) -> Path:
         h5_filepath = self.output_directory.joinpath(
-            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
+            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}"
         )
         return h5_filepath
 
