@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 import random
+import multiprocessing as mp
+import time
 
 from tqdm.auto import tqdm as TQDM
 from pathlib import Path
@@ -587,7 +589,6 @@ class Synchronizer(ABC):
                 filepaths_all_video_parts = (
                     self._initiate_iterative_writing_of_individual_video_parts(
                         frame_idxs_to_sample=sampling_frame_idxs_per_part,
-                        target_fps=target_fps,
                     )
                 )
                 filepath_downsampled_video = (
@@ -651,18 +652,24 @@ class Synchronizer(ABC):
         return frame_idxs_to_sample
 
     def _initiate_iterative_writing_of_individual_video_parts(
-        self, frame_idxs_to_sample: List[List[int]], target_fps: int
-    ) -> List[Path]:
-        filepaths_to_all_video_parts = []
-        for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_to_sample):
-            part_id = str(idx).zfill(3)
-            filepath_video_part = self._write_video_to_disk(
-                idxs_of_frames_to_sample=idxs_of_frames_to_sample,
-                target_fps=target_fps,
-                part_id=part_id,
-            )
-            filepaths_to_all_video_parts.append(filepath_video_part)
+        self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
+        
+        num_processes = mp.cpu_count()
+        with mp.Pool(num_processes) as p:
+            filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+
         return filepaths_to_all_video_parts
+    
+    def _multiprocessing_function(self, idx_and_idxs_of_frames_to_sample: Tuple)->None:
+        idx = idx_and_idxs_of_frames_to_sample[0]
+        idxs_of_frames_to_sample = idx_and_idxs_of_frames_to_sample[1]
+        part_id = str(idx).zfill(3)
+        filepath_video_part = self._write_video_to_disk(
+            idxs_of_frames_to_sample=idxs_of_frames_to_sample,
+            target_fps=self.target_fps,
+            part_id=part_id,
+        )
+        return filepath_video_part
 
     def _write_video_to_disk(
         self,
