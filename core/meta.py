@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 from pathlib import Path
+import time
 
 import yaml
 from tkinter import Tk
@@ -144,9 +145,11 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 2
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def synchronize_recordings(self, test_mode: bool = False) -> None:
+    def synchronize_recordings(self, verbose: bool = False, test_mode: bool = False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
+                if verbose:
+                    start_time_recording = time.time()
                 self.objects["triangulation_recordings_objects"][
                     recording
                 ].run_synchronization(test_mode=test_mode)
@@ -172,6 +175,11 @@ class meta_interface(ABC):
                         .metadata_from_videos[video]
                         .framenum_synchronized
                     )
+                if verbose:
+                    end_time_recording = time.time()
+                    duration = start_time_recording - end_time_recording
+                    print(f"The analysis of this recording {recording} took {duration}.\n")
+                    
         self.meta["meta_step"] = 3
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
