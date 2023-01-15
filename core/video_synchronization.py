@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 import random
 import multiprocessing as mp
-import time
 
 from tqdm.auto import tqdm as TQDM
 from pathlib import Path
@@ -139,8 +138,18 @@ class Synchronizer(ABC):
         i = 0
         while True:
             if i == 3:
+                """
                 self.video_metadata.led_extraction_type = "manual"
                 led_center_coordinates = self._get_LED_center_coordinates()
+                """
+                print(
+                    "Could not synchronize the video. \n"
+                    "Make sure, that you chose the right synchronization pattern, \n"
+                    "that the LED is visible during the pattern\n"
+                    "and that you chose a proper alignment threshold!"
+                )
+                self.video_metadata.exclusion_state = "exclude"
+                return None, None
             elif i < 3:
                 led_center_coordinates = self._get_LED_center_coordinates()
             else:
