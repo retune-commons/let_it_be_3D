@@ -86,7 +86,7 @@ class meta_interface(ABC):
                 recording_day["recording_directories"]
             )
         self.meta["meta_step"] = 1
-        self.export_meta_to_yaml(self.standard_yaml_filepath)
+        self.export_meta_to_yaml(filepath = self.standard_yaml_filepath)
 
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
         file = convert_to_path(file)
