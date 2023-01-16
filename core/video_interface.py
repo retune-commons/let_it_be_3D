@@ -6,7 +6,7 @@ from pathlib import Path
 import pickle
 import imageio.v3 as iio
 import numpy as np
-import aniposelib as ap_lib
+#import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 
@@ -42,7 +42,7 @@ class VideoInterface:
             synchronize_only=synchronize_only, test_mode=test_mode
         )
 
-    def export_for_aniposelib(self) -> Union[ap_lib.cameras.Camera, Path]:
+    def export_for_aniposelib(self) -> Union:
         if not self.video_metadata.charuco_video:
             return self.marker_detection_filepath
         else:
@@ -51,7 +51,7 @@ class VideoInterface:
     def inspect_intrinsic_calibration(self) -> None:
         self.plot_camera_intrinsics.plot(plot=True)
 
-    def _export_as_aniposelib_Camera_object(self) -> ap_lib.cameras.Camera:
+    def _export_as_aniposelib_Camera_object(self):
         if self.video_metadata.fisheye:
             camera = ap_lib.cameras.FisheyeCamera(
                 name=self.video_metadata.cam_id,

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 import random
 import multiprocessing as mp
+import time
 
 from tqdm.auto import tqdm as TQDM
 from pathlib import Path
@@ -664,9 +665,12 @@ class Synchronizer(ABC):
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
         num_processes = mp.cpu_count()
+        if num_processes > 16:
+            num_processes = 16
+        #limit CPU
         with mp.Pool(num_processes) as p:
             filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
-
+        
         return filepaths_to_all_video_parts
     
     def _multiprocessing_function(self, idx_and_idxs_of_frames_to_sample: Tuple)->None:
@@ -724,8 +728,9 @@ class Synchronizer(ABC):
         self, filepaths_of_video_parts: List[Path]
     ) -> Path:
         video_part_streams = [
-            ffmpeg.input(filepath) for filepath in filepaths_of_video_parts
+            ffmpeg.input(str(filepath)) for filepath in filepaths_of_video_parts
         ]
+        filepath_concatenated_video = self._construct_video_filepath(part_id=None)
         if len(video_part_streams) >= 2:
             concatenated_video = ffmpeg.concat(
                 video_part_streams[0], video_part_streams[1]
@@ -733,10 +738,12 @@ class Synchronizer(ABC):
             if len(video_part_streams) >= 3:
                 for part_stream in video_part_streams[2:]:
                     concatenated_video = ffmpeg.concat(concatenated_video, part_stream)
-        filepath_concatenated_video = self._construct_video_filepath(part_id=None)
-        output_stream = ffmpeg.output(
-            concatenated_video, filename=filepath_concatenated_video
-        )
+            output_stream = ffmpeg.output(
+                concatenated_video, filename=str(filepath_concatenated_video)
+            )
+        else:
+            output_stream = ffmpeg.output(
+                video_part_streams[0], filename=str(filepath_concatenated_video))
         output_stream.run(overwrite_output=True, quiet=True)
         return filepath_concatenated_video
 
@@ -778,15 +785,23 @@ class RecordingVideoSynchronizer(Synchronizer):
             config_filepath = self.video_metadata.processing_filepath
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
-                output_directory=self.output_directory.joinpath,
+                output_directory=self.output_directory,
                 marker_detection_directory=config_filepath,
             )
             h5_file = dlc_interface.analyze_objects(filtering=True)
             created_filepath = self.output_directory.joinpath(
                 video_filepath.stem + h5_file
             )
-            created_filepath.joinpath(".h5").rename(output_filepath.joinpath(".h5"))
-            created_filepath.joinpath("filtered.h5").rename(output_filepath.joinpath("filtered.h5"))
+            
+            try:
+                Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
+            except:
+                pass
+            try:
+                Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
+            except:
+                pass
+            
         return output_filepath
 
     def _run_manual_marker_detection(
@@ -805,7 +820,7 @@ class RecordingVideoSynchronizer(Synchronizer):
                     output_directory=self.output_directory,
                     marker_detection_directory=config_filepath,
                 )
-                manual_interface.analyze_objects(filepath=output_filepath.joinpath(".h5"))
+                manual_interface.analyze_objects(filepath= str(output_filepath) + ".h5")
 
         return output_filepath
 

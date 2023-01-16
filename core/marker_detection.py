@@ -49,7 +49,7 @@ class DeeplabcutInterface(MarkerDetection):
             )
             if filtering:
                 dlc.post_processing.filtering.filterpredictions(
-                    config=str(self.marker_detection_directory), video=str(self.object_to_analyse)
+                    config=str(self.marker_detection_directory), video=str(self.object_to_analyse), save_as_csv=False
                 )
             
         #unmute 
