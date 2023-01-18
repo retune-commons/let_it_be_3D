@@ -597,7 +597,7 @@ class Synchronizer(ABC):
         )
         sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
             idxs_of_frames_to_sample=frame_idxs_to_sample,
-            max_frames_to_write=self.video_metadata.max_frames_to_write,
+            max_ram_digestible_frames=self.video_metadata.max_ram_digestible_frames,
         )
         if len(frame_idxs_to_sample) > 1:
             filepaths_all_video_parts = (
@@ -654,24 +654,24 @@ class Synchronizer(ABC):
         return list(adjusted_frame_idxs)
 
     def _split_into_ram_digestable_parts(
-        self, idxs_of_frames_to_sample: List[int], max_frames_to_write: int
+        self, idxs_of_frames_to_sample: List[int], max_ram_digestible_frames: int
     ) -> List[List[int]]:
         frame_idxs_to_sample = []
-        while len(idxs_of_frames_to_sample) > max_frames_to_write:
-            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_frames_to_write])
-            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_frames_to_write:]
+        while len(idxs_of_frames_to_sample) > max_ram_digestible_frames:
+            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_ram_digestible_frames])
+            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_ram_digestible_frames:]
         frame_idxs_to_sample.append(idxs_of_frames_to_sample)
         return frame_idxs_to_sample
 
     def _initiate_iterative_writing_of_individual_video_parts(
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
-        multiprocessing = False # implement in yaml file! 
-        
-        if multiprocessing:
-            num_processes = mp.cpu_count()
-            num_processes -= 1
-            # implement limit in yaml file!
+        if self.video_metadata.max_cpu_cores_to_pool > 1:
+            available_cpus = mp.cpu_count()
+            if available_cpus > self.video_metadata.max_cpu_cores_to_pool:
+                num_processes = self.video_metadata.max_cpu_cores_to_pool
+            else:
+                num_processes = available_cpus
             with mp.Pool(num_processes) as p:
                 filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
 

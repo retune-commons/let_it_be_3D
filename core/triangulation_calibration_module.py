@@ -3,7 +3,7 @@ import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-#import aniposelib as ap_lib
+import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
@@ -190,12 +190,13 @@ class Calibration:
                 led_timeseries_crossvalidation[video_interface.video_metadata.cam_id] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
             except:
                 pass
-        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-            template=template,
-            led_timeseries=led_timeseries_crossvalidation,
-            metadata={"recording_date": self.recording_date, "charuco_video": True},
-            output_directory=self.output_directory,
-        )
+        if len(led_timeseries_crossvalidation.keys()) > 0:
+            self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
+                template=template,
+                led_timeseries=led_timeseries_crossvalidation,
+                metadata={"recording_date": self.recording_date, "charuco_video": True},
+                output_directory=self.output_directory,
+            )
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
         #exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
@@ -311,9 +312,10 @@ class Calibration:
             file
             for file in calibration_directory.iterdir()
             if ("Charuco" in file.name or "charuco" in file.name)
-            and file.name.endswith(".mp4")
-            and "synchronized" not in file.name
+            and (file.name.endswith(".mp4") or file.name.endswith(".mov"))
+            and ("synchronized" not in file.name and "Front" not in file.name)
         ]
+        # add possibility to exclude filenames by flags in meta (and remove "Front")
         charuco_videofiles.append(top_cam_file)
 
         self.charuco_interfaces = {}
@@ -624,7 +626,8 @@ class Triangulation_Recordings(Triangulation):
         recording_videofiles = [
             file
             for file in recording_directory.iterdir()
-            if file.name.endswith(".mp4") and "synchronized" not in file.name and "Front" not in file.name
+            if (file.name.endswith(".mp4") or file.name.endswith(".mov"))
+            and ("synchronized" not in file.name and "Front" not in file.name)
         ]
         avi_files = [
             file for file in recording_directory.iterdir() if file.name.endswith(".AVI")

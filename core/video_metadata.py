@@ -6,7 +6,7 @@ import datetime
 import pickle
 import imageio as iio
 import numpy as np
-#import aniposelib as ap_lib
+import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 import yaml
@@ -61,6 +61,7 @@ class VideoMetadata:
         if (
             (
             video_filepath.suffix == ".mp4"
+            or video_filepath.suffix == ".mov"
             or video_filepath.suffix == ".AVI"
             or video_filepath.suffix == ".avi"
             or video_filepath.suffix == ".jpg"
@@ -107,7 +108,8 @@ class VideoMetadata:
             "led_extraction_type",
             "led_extraction_filepath",
             "max_calibration_frames",
-            "max_frames_to_write",
+            "max_cpu_cores_to_pool",
+            "max_ram_digestible_frames",
             "use_gpu",
             "load_calibration",
         ]:
@@ -132,7 +134,8 @@ class VideoMetadata:
                     "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
                 )
         self.max_calibration_frames = project_config["max_calibration_frames"]
-        self.max_frames_to_write = project_config["max_frames_to_write"]
+        self.max_ram_digestible_frames = project_config["max_ram_digestible_frames"]
+        self.max_cpu_cores_to_pool = project_config["max_cpu_cores_to_pool"]
         self.use_gpu = project_config["use_gpu"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
