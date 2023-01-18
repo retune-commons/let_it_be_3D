@@ -172,8 +172,8 @@ class Synchronizer(ABC):
                 remaining_offset,
                 alignment_error,
             ) = self._find_best_match_of_template(
-                template=self.template_blinking_motif, start_time=0, end_time=60_000
-            )  # ToDo - make start & end time adaptable?
+                template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
+            )
             if alignment_error < self.alignment_threshold:
                 break
             print("repeating synchronization due to bad alignment!")
@@ -587,35 +587,36 @@ class Synchronizer(ABC):
         target_fps: int = 30,
         test_mode: bool = False,
     ) -> Path:
-        if not test_mode:
-            frame_idxs_to_sample = self._get_sampling_frame_idxs(
-                start_idx=start_idx, offset=offset, target_fps=target_fps
-            )
-            sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
-                idxs_of_frames_to_sample=frame_idxs_to_sample,
-                max_frames_to_write=self.video_metadata.max_frames_to_write,
-            )
-            if len(frame_idxs_to_sample) > 1:
-                filepaths_all_video_parts = (
-                    self._initiate_iterative_writing_of_individual_video_parts(
-                        frame_idxs_to_sample=sampling_frame_idxs_per_part,
-                    )
+        if test_mode:
+            filepath_downsampled_video = self._construct_video_filepath()
+            if filepath_downsampled_video.exists():
+                return filepath_downsampled_video
+        frame_idxs_to_sample = self._get_sampling_frame_idxs(
+            start_idx=start_idx, offset=offset, target_fps=target_fps
+        )
+        sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
+            idxs_of_frames_to_sample=frame_idxs_to_sample,
+            max_frames_to_write=self.video_metadata.max_frames_to_write,
+        )
+        if len(frame_idxs_to_sample) > 1:
+            filepaths_all_video_parts = (
+                self._initiate_iterative_writing_of_individual_video_parts(
+                    frame_idxs_to_sample=sampling_frame_idxs_per_part,
                 )
-                filepath_downsampled_video = (
-                    self._concatenate_individual_video_parts_on_disk(
-                        filepaths_of_video_parts=filepaths_all_video_parts
-                    )
-                )
-                self._delete_individual_video_parts(
+            )
+            filepath_downsampled_video = (
+                self._concatenate_individual_video_parts_on_disk(
                     filepaths_of_video_parts=filepaths_all_video_parts
                 )
-            else:
-                filepath_downsampled_video = self._write_video_to_disk(
-                    idxs_of_frames_to_sample=frame_idxs_to_sample[0],
-                    target_fps=target_fps,
-                )
+            )
+            self._delete_individual_video_parts(
+                filepaths_of_video_parts=filepaths_all_video_parts
+            )
         else:
-            filepath_downsampled_video = self._construct_video_filepath()
+            filepath_downsampled_video = self._write_video_to_disk(
+                idxs_of_frames_to_sample=frame_idxs_to_sample[0],
+                target_fps=target_fps,
+            )
         return filepath_downsampled_video
 
     def _get_sampling_frame_idxs(
@@ -665,9 +666,7 @@ class Synchronizer(ABC):
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
         num_processes = mp.cpu_count()
-        if num_processes > 32:
-            num_processes = 32
-        #limit CPU
+        #Todo: limit CPU!
         with mp.Pool(num_processes) as p:
             filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
         
@@ -781,27 +780,29 @@ class RecordingVideoSynchronizer(Synchronizer):
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if not test_mode and not output_filepath.exists():
-            config_filepath = self.video_metadata.processing_filepath
-            dlc_interface = DeeplabcutInterface(
-                object_to_analyse=str(video_filepath),
-                output_directory=self.output_directory,
-                marker_detection_directory=config_filepath,
-            )
-            h5_file = dlc_interface.analyze_objects(filtering=True)
-            created_filepath = self.output_directory.joinpath(
-                video_filepath.stem + h5_file
-            )
+        if test_mode and output_filepath.exists():
+            return output_filepath
             
-            try:
-                Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
-            except:
-                pass
-            try:
-                Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
-            except:
-                pass
-            
+        config_filepath = self.video_metadata.processing_filepath
+        dlc_interface = DeeplabcutInterface(
+            object_to_analyse=str(video_filepath),
+            output_directory=self.output_directory,
+            marker_detection_directory=config_filepath,
+        )
+        h5_file = dlc_interface.analyze_objects(filtering=True)
+        created_filepath = self.output_directory.joinpath(
+            video_filepath.stem + h5_file
+        )
+
+        try:
+            Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
+        except:
+            pass
+        try:
+            Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
+        except:
+            pass
+
         return output_filepath
 
     def _run_manual_marker_detection(

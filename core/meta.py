@@ -19,7 +19,7 @@ from .video_metadata import VideoMetadata
 
 class meta_interface(ABC):
     def __init__(
-        self, project_config_filepath: Path, project_name: Optional[str] = None
+        self, project_config_filepath: Path, project_name: Optional[str] = None, overwrite: bool=False
     ) -> None:
         self.project_config_filepath = convert_to_path(project_config_filepath)
         if project_name == None:
@@ -28,6 +28,8 @@ class meta_interface(ABC):
         self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(
             self.project_name + ".yaml"
         )
+        if self.standard_yaml_filepath.exists() and overwrite == False:
+            self.standard_yaml_filepath = Path(str(self.standard_yaml_filepath)[:-5] + "_01.yaml")
         if not self.project_config_filepath.exists():
             raise FileNotFoundError("The file doesn't exist. Check your path!")
         self._read_project_config()
