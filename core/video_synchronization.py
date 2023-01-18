@@ -666,8 +666,7 @@ class Synchronizer(ABC):
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
         num_processes = mp.cpu_count()
-        num_processes = 22
-        #limit CPU
+        #Todo: limit CPU!
         with mp.Pool(num_processes) as p:
             filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
         
