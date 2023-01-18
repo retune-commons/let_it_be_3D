@@ -6,7 +6,7 @@ import datetime
 import pickle
 import imageio as iio
 import numpy as np
-import aniposelib as ap_lib
+#import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 import yaml
@@ -150,7 +150,7 @@ class VideoMetadata:
         self.calibration_index = recording_config["calibration_index"]
         if self.recording_date != recording_config["recording_date"]:
             raise ValueError(
-                f"The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
+                f"The date of the recording_config_file {recording_config_filepath} and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
             )
         metadata_dict = recording_config[self.cam_id]
 
@@ -194,12 +194,15 @@ class VideoMetadata:
     def _extract_filepath_metadata(self, filepath_name: str) -> None:
         self.charuco_video = False
         if filepath_name[-4:] == ".AVI":
-            filepath_name = filepath_name.replace(
-                filepath_name[
-                    filepath_name.index("00") : filepath_name.index("00") + 3
-                ],
-                "",
-            )
+            try:
+                filepath_name = filepath_name.replace(
+                    filepath_name[
+                        filepath_name.index("00") : filepath_name.index("00") + 3
+                    ],
+                    "",
+                )
+            except:
+                pass
             self.cam_id = "Top"
 
         if "Charuco" in filepath_name or "charuco" in filepath_name:
