@@ -174,10 +174,11 @@ class Synchronizer(ABC):
             ) = self._find_best_match_of_template(
                 template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
             )
+            # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input), currently continue anyway
             if alignment_error < self.alignment_threshold:
-                break
-            print("repeating synchronization due to bad alignment!")
-            i += 1
+                print("possibly bad synchronization!")
+            break # in if loop
+            # i += 1
 
         self.led_detection = LED_Marker_Plot(
             image=iio.v3.imread(self.video_metadata.filepath, index=0),
@@ -665,11 +666,26 @@ class Synchronizer(ABC):
     def _initiate_iterative_writing_of_individual_video_parts(
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
-        num_processes = mp.cpu_count()
-        #Todo: limit CPU!
-        with mp.Pool(num_processes) as p:
-            filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+        multiprocessing = False # implement in yaml file! 
         
+        if multiprocessing:
+            num_processes = mp.cpu_count()
+            num_processes -= 1
+            # implement limit in yaml file!
+            with mp.Pool(num_processes) as p:
+                filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+
+        else:
+            filepaths_to_all_video_parts = []
+            for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_to_sample):
+                part_id = str(idx).zfill(3)
+                filepath_video_part = self._write_video_to_disk(
+                    idxs_of_frames_to_sample=idxs_of_frames_to_sample,
+                    target_fps=self.target_fps,
+                    part_id=part_id,
+                )
+                filepaths_to_all_video_parts.append(filepath_video_part)
+
         return filepaths_to_all_video_parts
     
     def _multiprocessing_function(self, idx_and_idxs_of_frames_to_sample: Tuple)->None:
