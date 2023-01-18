@@ -184,12 +184,15 @@ class Calibration:
         ][
             0
         ]
+        led_timeseries_crossvalidation = {}
+        for video_interface in self.charuco_interfaces.values():
+            try:
+                led_timeseries_crossvalidation[video_interface.video_metadata.cam_id] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
+            except:
+                pass
         self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
             template=template,
-            led_timeseries={
-                video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                for video_interface in self.charuco_interfaces.values()
-            },
+            led_timeseries=led_timeseries_crossvalidation,
             metadata={"recording_date": self.recording_date, "charuco_video": True},
             output_directory=self.output_directory,
         )
