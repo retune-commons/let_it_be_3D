@@ -49,7 +49,7 @@ class VideoMetadata:
         try:
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
         except:
-            pass
+            self.framenum = 0
             
 
     def _check_filepaths(

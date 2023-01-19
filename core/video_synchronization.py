@@ -175,9 +175,9 @@ class Synchronizer(ABC):
                 template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
             )
             # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input), currently continue anyway
-            if alignment_error < self.alignment_threshold:
+            if alignment_error > self.alignment_threshold:
                 print("possibly bad synchronization!")
-            break # in if loop
+            break
             # i += 1
 
         self.led_detection = LED_Marker_Plot(
@@ -252,10 +252,13 @@ class Synchronizer(ABC):
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
-
+            
+            num_frames_to_pick = 100
+            if num_frames_to_pick > self.video_metadata.framenum:
+                num_frames_to_pick = int(self.video_metadata.framenum/2)
             sample_frame_idxs = random.sample(
-                range(iio.v2.get_reader(self.video_metadata.filepath).count_frames()),
-                100,
+                range(self.video_metadata.framenum),
+                num_frames_to_pick,
             )
 
             selected_frames = []
