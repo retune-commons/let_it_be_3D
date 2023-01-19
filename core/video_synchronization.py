@@ -138,7 +138,7 @@ class Synchronizer(ABC):
 
         synchronized_video_filepath = self._construct_video_filepath()
         
-        if not test_mode:
+        if (not test_mode) or (test_mode and not synchronized_video_filepath.exists()):
             i = 0
             while True:
                 if i == 3:
@@ -197,67 +197,8 @@ class Synchronizer(ABC):
                 )
             )
         else:
-            if not synchronized_video_filepath.exists():
-                i = 0
-                while True:
-                    if i == 3:
-                        """
-                        self.video_metadata.led_extraction_type = "manual"
-                        led_center_coordinates = self._get_LED_center_coordinates()
-                        """
-                        print(
-                            "Could not synchronize the video. \n"
-                            "Make sure, that you chose the right synchronization pattern, \n"
-                            "that the LED is visible during the pattern\n"
-                            "and that you chose a proper alignment threshold!"
-                        )
-                        self.video_metadata.exclusion_state = "exclude"
-                        return None, None
-                    elif i < 3:
-                        led_center_coordinates = self._get_LED_center_coordinates()
-                    else:
-                        print(
-                            "Could not synchronize the video. \n"
-                            "Make sure, that you chose the right synchronization pattern, \n"
-                            "that the LED is visible during the pattern\n"
-                            "and that you chose a proper alignment threshold!"
-                        )
-                        self.video_metadata.exclusion_state = "exclude"
-                        return None, None
-
-                    self.led_timeseries = self._extract_led_pixel_intensities(
-                        led_center_coords=led_center_coordinates
-                    )
-
-                    (
-                        offset_adjusted_start_idx,
-                        remaining_offset,
-                        alignment_error,
-                    ) = self._find_best_match_of_template(
-                        template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
-                    )
-                    # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
-                    if alignment_error > self.alignment_threshold:
-                        print("possibly bad synchronization!")
-                    break
-                    # i += 1
-
-                self.led_detection = LED_Marker_Plot(
-                    image=iio.v3.imread(self.video_metadata.filepath, index=0),
-                    led_center_coordinates=led_center_coordinates,
-                    box_size=self.box_size,
-                    video_metadata=self.video_metadata,
-                    output_directory=self.output_directory,
-                )
-
-                self.led_timeseries_for_cross_video_validation = (
-                    self._adjust_led_timeseries_for_cross_validation(
-                        start_idx=offset_adjusted_start_idx, offset=remaining_offset
-                    )
-                )
-            else:
-                offset_adjusted_start_idx = None
-                remaining_offset = None
+            offset_adjusted_start_idx = None
+            remaining_offset = None
             
         (
             marker_detection_filepath,
