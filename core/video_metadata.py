@@ -49,7 +49,7 @@ class VideoMetadata:
         try:
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
         except:
-            pass
+            self.framenum = 0
             
 
     def _check_filepaths(
@@ -61,6 +61,7 @@ class VideoMetadata:
         if (
             (
             video_filepath.suffix == ".mp4"
+            or video_filepath.suffix == ".mov"
             or video_filepath.suffix == ".AVI"
             or video_filepath.suffix == ".avi"
             or video_filepath.suffix == ".jpg"
@@ -107,7 +108,8 @@ class VideoMetadata:
             "led_extraction_type",
             "led_extraction_filepath",
             "max_calibration_frames",
-            "max_frames_to_write",
+            "max_cpu_cores_to_pool",
+            "max_ram_digestible_frames",
             "use_gpu",
             "load_calibration",
         ]:
@@ -132,7 +134,8 @@ class VideoMetadata:
                     "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
                 )
         self.max_calibration_frames = project_config["max_calibration_frames"]
-        self.max_frames_to_write = project_config["max_frames_to_write"]
+        self.max_ram_digestible_frames = project_config["max_ram_digestible_frames"]
+        self.max_cpu_cores_to_pool = project_config["max_cpu_cores_to_pool"]
         self.use_gpu = project_config["use_gpu"]
 
         self._extract_filepath_metadata(filepath_name=video_filepath.name)
@@ -150,7 +153,7 @@ class VideoMetadata:
         self.calibration_index = recording_config["calibration_index"]
         if self.recording_date != recording_config["recording_date"]:
             raise ValueError(
-                f"The date of the recording_config_file {recording_config_filepath} and the provided video {self.video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
+                f"The date of the recording_config_file {recording_config_filepath} and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
             )
         metadata_dict = recording_config[self.cam_id]
 
@@ -194,12 +197,15 @@ class VideoMetadata:
     def _extract_filepath_metadata(self, filepath_name: str) -> None:
         self.charuco_video = False
         if filepath_name[-4:] == ".AVI":
-            filepath_name = filepath_name.replace(
-                filepath_name[
-                    filepath_name.index("00") : filepath_name.index("00") + 3
-                ],
-                "",
-            )
+            try:
+                filepath_name = filepath_name.replace(
+                    filepath_name[
+                        filepath_name.index("00") : filepath_name.index("00") + 3
+                    ],
+                    "",
+                )
+            except:
+                pass
             self.cam_id = "Top"
 
         if "Charuco" in filepath_name or "charuco" in filepath_name:

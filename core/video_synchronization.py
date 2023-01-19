@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 import random
 import multiprocessing as mp
+import time
 
 from tqdm.auto import tqdm as TQDM
 from pathlib import Path
@@ -135,63 +136,129 @@ class Synchronizer(ABC):
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
 
-        i = 0
-        while True:
-            if i == 3:
-                """
-                self.video_metadata.led_extraction_type = "manual"
-                led_center_coordinates = self._get_LED_center_coordinates()
-                """
-                print(
-                    "Could not synchronize the video. \n"
-                    "Make sure, that you chose the right synchronization pattern, \n"
-                    "that the LED is visible during the pattern\n"
-                    "and that you chose a proper alignment threshold!"
-                )
-                self.video_metadata.exclusion_state = "exclude"
-                return None, None
-            elif i < 3:
-                led_center_coordinates = self._get_LED_center_coordinates()
-            else:
-                print(
-                    "Could not synchronize the video. \n"
-                    "Make sure, that you chose the right synchronization pattern, \n"
-                    "that the LED is visible during the pattern\n"
-                    "and that you chose a proper alignment threshold!"
-                )
-                self.video_metadata.exclusion_state = "exclude"
-                return None, None
+        synchronized_video_filepath = self._construct_video_filepath()
+        
+        if not test_mode:
+            i = 0
+            while True:
+                if i == 3:
+                    """
+                    self.video_metadata.led_extraction_type = "manual"
+                    led_center_coordinates = self._get_LED_center_coordinates()
+                    """
+                    print(
+                        "Could not synchronize the video. \n"
+                        "Make sure, that you chose the right synchronization pattern, \n"
+                        "that the LED is visible during the pattern\n"
+                        "and that you chose a proper alignment threshold!"
+                    )
+                    self.video_metadata.exclusion_state = "exclude"
+                    return None, None
+                elif i < 3:
+                    led_center_coordinates = self._get_LED_center_coordinates()
+                else:
+                    print(
+                        "Could not synchronize the video. \n"
+                        "Make sure, that you chose the right synchronization pattern, \n"
+                        "that the LED is visible during the pattern\n"
+                        "and that you chose a proper alignment threshold!"
+                    )
+                    self.video_metadata.exclusion_state = "exclude"
+                    return None, None
 
-            self.led_timeseries = self._extract_led_pixel_intensities(
-                led_center_coords=led_center_coordinates
-            )
+                self.led_timeseries = self._extract_led_pixel_intensities(
+                    led_center_coords=led_center_coordinates
+                )
 
-            (
-                offset_adjusted_start_idx,
-                remaining_offset,
-                alignment_error,
-            ) = self._find_best_match_of_template(
-                template=self.template_blinking_motif, start_time=0, end_time=60_000
-            )  # ToDo - make start & end time adaptable?
-            if alignment_error < self.alignment_threshold:
+                (
+                    offset_adjusted_start_idx,
+                    remaining_offset,
+                    alignment_error,
+                ) = self._find_best_match_of_template(
+                    template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
+                )
+                # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
+                if alignment_error > self.alignment_threshold:
+                    print("possibly bad synchronization!")
                 break
-            print("repeating synchronization due to bad alignment!")
-            i += 1
+                # i += 1
 
-        self.led_detection = LED_Marker_Plot(
-            image=iio.v3.imread(self.video_metadata.filepath, index=0),
-            led_center_coordinates=led_center_coordinates,
-            box_size=self.box_size,
-            video_metadata=self.video_metadata,
-            output_directory=self.output_directory,
-        )
-
-        self.led_timeseries_for_cross_video_validation = (
-            self._adjust_led_timeseries_for_cross_validation(
-                start_idx=offset_adjusted_start_idx, offset=remaining_offset
+            self.led_detection = LED_Marker_Plot(
+                image=iio.v3.imread(self.video_metadata.filepath, index=0),
+                led_center_coordinates=led_center_coordinates,
+                box_size=self.box_size,
+                video_metadata=self.video_metadata,
+                output_directory=self.output_directory,
             )
-        )
 
+            self.led_timeseries_for_cross_video_validation = (
+                self._adjust_led_timeseries_for_cross_validation(
+                    start_idx=offset_adjusted_start_idx, offset=remaining_offset
+                )
+            )
+        else:
+            if not synchronized_video_filepath.exists():
+                i = 0
+                while True:
+                    if i == 3:
+                        """
+                        self.video_metadata.led_extraction_type = "manual"
+                        led_center_coordinates = self._get_LED_center_coordinates()
+                        """
+                        print(
+                            "Could not synchronize the video. \n"
+                            "Make sure, that you chose the right synchronization pattern, \n"
+                            "that the LED is visible during the pattern\n"
+                            "and that you chose a proper alignment threshold!"
+                        )
+                        self.video_metadata.exclusion_state = "exclude"
+                        return None, None
+                    elif i < 3:
+                        led_center_coordinates = self._get_LED_center_coordinates()
+                    else:
+                        print(
+                            "Could not synchronize the video. \n"
+                            "Make sure, that you chose the right synchronization pattern, \n"
+                            "that the LED is visible during the pattern\n"
+                            "and that you chose a proper alignment threshold!"
+                        )
+                        self.video_metadata.exclusion_state = "exclude"
+                        return None, None
+
+                    self.led_timeseries = self._extract_led_pixel_intensities(
+                        led_center_coords=led_center_coordinates
+                    )
+
+                    (
+                        offset_adjusted_start_idx,
+                        remaining_offset,
+                        alignment_error,
+                    ) = self._find_best_match_of_template(
+                        template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
+                    )
+                    # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
+                    if alignment_error > self.alignment_threshold:
+                        print("possibly bad synchronization!")
+                    break
+                    # i += 1
+
+                self.led_detection = LED_Marker_Plot(
+                    image=iio.v3.imread(self.video_metadata.filepath, index=0),
+                    led_center_coordinates=led_center_coordinates,
+                    box_size=self.box_size,
+                    video_metadata=self.video_metadata,
+                    output_directory=self.output_directory,
+                )
+
+                self.led_timeseries_for_cross_video_validation = (
+                    self._adjust_led_timeseries_for_cross_validation(
+                        start_idx=offset_adjusted_start_idx, offset=remaining_offset
+                    )
+                )
+            else:
+                offset_adjusted_start_idx = None
+                remaining_offset = None
+            
         (
             marker_detection_filepath,
             synchronized_video_filepath,
@@ -250,10 +317,13 @@ class Synchronizer(ABC):
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
-
+            
+            num_frames_to_pick = 100
+            if num_frames_to_pick > self.video_metadata.framenum:
+                num_frames_to_pick = int(self.video_metadata.framenum/2)
             sample_frame_idxs = random.sample(
-                range(iio.v2.get_reader(self.video_metadata.filepath).count_frames()),
-                100,
+                range(self.video_metadata.framenum),
+                num_frames_to_pick,
             )
 
             selected_frames = []
@@ -464,6 +534,7 @@ class Synchronizer(ABC):
     def _run_rapid_aligner(self, query: np.ndarray, subject: np.ndarray) -> np.ndarray:
         import sys
 
+        # Todo: implement in project_config.yaml and video_metadata objects
         sys.path.append("/home/ds/GitHub_repos/rapidAligner/")
         import cupy as cp
         import rapidAligner as ra
@@ -586,35 +657,36 @@ class Synchronizer(ABC):
         target_fps: int = 30,
         test_mode: bool = False,
     ) -> Path:
-        if not test_mode:
-            frame_idxs_to_sample = self._get_sampling_frame_idxs(
-                start_idx=start_idx, offset=offset, target_fps=target_fps
-            )
-            sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
-                idxs_of_frames_to_sample=frame_idxs_to_sample,
-                max_frames_to_write=self.video_metadata.max_frames_to_write,
-            )
-            if len(frame_idxs_to_sample) > 1:
-                filepaths_all_video_parts = (
-                    self._initiate_iterative_writing_of_individual_video_parts(
-                        frame_idxs_to_sample=sampling_frame_idxs_per_part,
-                    )
+        if test_mode:
+            filepath_downsampled_video = self._construct_video_filepath()
+            if filepath_downsampled_video.exists():
+                return filepath_downsampled_video
+        frame_idxs_to_sample = self._get_sampling_frame_idxs(
+            start_idx=start_idx, offset=offset, target_fps=target_fps
+        )
+        sampling_frame_idxs_per_part = self._split_into_ram_digestable_parts(
+            idxs_of_frames_to_sample=frame_idxs_to_sample,
+            max_ram_digestible_frames=self.video_metadata.max_ram_digestible_frames,
+        )
+        if len(frame_idxs_to_sample) > 1:
+            filepaths_all_video_parts = (
+                self._initiate_iterative_writing_of_individual_video_parts(
+                    frame_idxs_to_sample=sampling_frame_idxs_per_part,
                 )
-                filepath_downsampled_video = (
-                    self._concatenate_individual_video_parts_on_disk(
-                        filepaths_of_video_parts=filepaths_all_video_parts
-                    )
-                )
-                self._delete_individual_video_parts(
+            )
+            filepath_downsampled_video = (
+                self._concatenate_individual_video_parts_on_disk(
                     filepaths_of_video_parts=filepaths_all_video_parts
                 )
-            else:
-                filepath_downsampled_video = self._write_video_to_disk(
-                    idxs_of_frames_to_sample=frame_idxs_to_sample[0],
-                    target_fps=target_fps,
-                )
+            )
+            self._delete_individual_video_parts(
+                filepaths_of_video_parts=filepaths_all_video_parts
+            )
         else:
-            filepath_downsampled_video = self._construct_video_filepath()
+            filepath_downsampled_video = self._write_video_to_disk(
+                idxs_of_frames_to_sample=frame_idxs_to_sample[0],
+                target_fps=target_fps,
+            )
         return filepath_downsampled_video
 
     def _get_sampling_frame_idxs(
@@ -651,21 +723,37 @@ class Synchronizer(ABC):
         return list(adjusted_frame_idxs)
 
     def _split_into_ram_digestable_parts(
-        self, idxs_of_frames_to_sample: List[int], max_frames_to_write: int
+        self, idxs_of_frames_to_sample: List[int], max_ram_digestible_frames: int
     ) -> List[List[int]]:
         frame_idxs_to_sample = []
-        while len(idxs_of_frames_to_sample) > max_frames_to_write:
-            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_frames_to_write])
-            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_frames_to_write:]
+        while len(idxs_of_frames_to_sample) > max_ram_digestible_frames:
+            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_ram_digestible_frames])
+            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_ram_digestible_frames:]
         frame_idxs_to_sample.append(idxs_of_frames_to_sample)
         return frame_idxs_to_sample
 
     def _initiate_iterative_writing_of_individual_video_parts(
         self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
         
-        num_processes = mp.cpu_count()
-        with mp.Pool(num_processes) as p:
-            filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+        if self.video_metadata.max_cpu_cores_to_pool > 1:
+            available_cpus = mp.cpu_count()
+            if available_cpus > self.video_metadata.max_cpu_cores_to_pool:
+                num_processes = self.video_metadata.max_cpu_cores_to_pool
+            else:
+                num_processes = available_cpus
+            with mp.Pool(num_processes) as p:
+                filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+
+        else:
+            filepaths_to_all_video_parts = []
+            for idx, idxs_of_frames_to_sample in enumerate(frame_idxs_to_sample):
+                part_id = str(idx).zfill(3)
+                filepath_video_part = self._write_video_to_disk(
+                    idxs_of_frames_to_sample=idxs_of_frames_to_sample,
+                    target_fps=self.target_fps,
+                    part_id=part_id,
+                )
+                filepaths_to_all_video_parts.append(filepath_video_part)
 
         return filepaths_to_all_video_parts
     
@@ -724,8 +812,9 @@ class Synchronizer(ABC):
         self, filepaths_of_video_parts: List[Path]
     ) -> Path:
         video_part_streams = [
-            ffmpeg.input(filepath) for filepath in filepaths_of_video_parts
+            ffmpeg.input(str(filepath)) for filepath in filepaths_of_video_parts
         ]
+        filepath_concatenated_video = self._construct_video_filepath(part_id=None)
         if len(video_part_streams) >= 2:
             concatenated_video = ffmpeg.concat(
                 video_part_streams[0], video_part_streams[1]
@@ -733,10 +822,12 @@ class Synchronizer(ABC):
             if len(video_part_streams) >= 3:
                 for part_stream in video_part_streams[2:]:
                     concatenated_video = ffmpeg.concat(concatenated_video, part_stream)
-        filepath_concatenated_video = self._construct_video_filepath(part_id=None)
-        output_stream = ffmpeg.output(
-            concatenated_video, filename=filepath_concatenated_video
-        )
+            output_stream = ffmpeg.output(
+                concatenated_video, filename=str(filepath_concatenated_video)
+            )
+        else:
+            output_stream = ffmpeg.output(
+                video_part_streams[0], filename=str(filepath_concatenated_video))
         output_stream.run(overwrite_output=True, quiet=True)
         return filepath_concatenated_video
 
@@ -774,19 +865,29 @@ class RecordingVideoSynchronizer(Synchronizer):
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if not test_mode and not output_filepath.exists():
-            config_filepath = self.video_metadata.processing_filepath
-            dlc_interface = DeeplabcutInterface(
-                object_to_analyse=str(video_filepath),
-                output_directory=self.output_directory.joinpath,
-                marker_detection_directory=config_filepath,
-            )
-            h5_file = dlc_interface.analyze_objects(filtering=True)
-            created_filepath = self.output_directory.joinpath(
-                video_filepath.stem + h5_file
-            )
-            created_filepath.joinpath(".h5").rename(output_filepath.joinpath(".h5"))
-            created_filepath.joinpath("filtered.h5").rename(output_filepath.joinpath("filtered.h5"))
+        if test_mode and output_filepath.exists():
+            return output_filepath
+            
+        config_filepath = self.video_metadata.processing_filepath
+        dlc_interface = DeeplabcutInterface(
+            object_to_analyse=str(video_filepath),
+            output_directory=self.output_directory,
+            marker_detection_directory=config_filepath,
+        )
+        h5_file = dlc_interface.analyze_objects(filtering=True)
+        created_filepath = self.output_directory.joinpath(
+            video_filepath.stem + h5_file
+        )
+
+        try:
+            Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
+        except:
+            pass
+        try:
+            Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
+        except:
+            pass
+
         return output_filepath
 
     def _run_manual_marker_detection(
@@ -805,7 +906,7 @@ class RecordingVideoSynchronizer(Synchronizer):
                     output_directory=self.output_directory,
                     marker_detection_directory=config_filepath,
                 )
-                manual_interface.analyze_objects(filepath=output_filepath.joinpath(".h5"))
+                manual_interface.analyze_objects(filepath= str(output_filepath) + ".h5")
 
         return output_filepath
 
