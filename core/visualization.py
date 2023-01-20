@@ -69,12 +69,7 @@ class Visualization:
         for bodypart in self.bodyparts:
             if bodypart not in set(
                 [
-                    "LED5",
-                    "MazeCornerOpenRight",
-                    "MazeCornerOpenLeft",
-                    "MazeCornerClosedRight",
-                    "MazeCornerClosedLeft",
-                ]
+                    "LED5"]
             ):
                 if not math.isnan(self.df.loc[frame_idx, f"{bodypart}_x"]):
                     ax.text(

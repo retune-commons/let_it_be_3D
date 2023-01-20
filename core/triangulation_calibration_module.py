@@ -300,14 +300,7 @@ class Calibration:
         project_config_filepath: Path,
         recording_config_filepath: Path,
     ) -> None:
-        avi_files = [
-            file
-            for file in calibration_directory.iterdir()
-            if ("Charuco" in file.name or "charuco" in file.name)
-            and file.name.endswith(".AVI")
-        ]
-        avi_files.sort()
-        top_cam_file = avi_files[-1]  # hard coded!
+        
         charuco_videofiles = [
             file
             for file in calibration_directory.iterdir()
@@ -316,7 +309,22 @@ class Calibration:
             and ("synchronized" not in file.name and "Front" not in file.name)
         ]
         # add possibility to exclude filenames by flags in meta (and remove "Front")
-        charuco_videofiles.append(top_cam_file)
+        
+        avi_files = [
+            file
+            for file in calibration_directory.iterdir()
+            if ("Charuco" in file.name or "charuco" in file.name)
+            and file.name.endswith(".AVI")
+        ]
+        avi_files.sort()
+        top_cam_file = avi_files[-1]  # hard coded!
+        
+        try:
+            top_cam_file = avi_files[-1]
+            charuco_videofiles.append(top_cam_file)
+        except:
+            pass
+        
 
         self.charuco_interfaces = {}
         self.metadata_from_videos = {}
@@ -584,21 +592,26 @@ class Triangulation_Recordings(Triangulation):
         ][
             0
         ]
-        self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
-            template=template,
-            led_timeseries={
-                video_interface.video_metadata.cam_id: video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                for video_interface in self.recording_interfaces.values()
-            },
-            metadata={
+
+        led_timeseries_crossvalidation = {}
+        for video_interface in self.recording_interfaces.values():
+            try:
+                led_timeseries_crossvalidation[video_interface.video_metadata.cam_id] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
+            except:
+                pass
+        if len(led_timeseries_crossvalidation.keys()) > 0:
+            self.synchronization_crossvalidation = Alignment_Plot_Crossvalidation(
+                template=template,
+                led_timeseries=led_timeseries_crossvalidation,
+                metadata={
                 "mouse_id": self.mouse_id,
                 "recording_date": self.recording_date,
                 "paradigm": self.paradigm,
                 "charuco_video": False,
             },
-            output_directory=self.output_directory,
-        )
-
+                output_directory=self.output_directory,
+            )
+        
         if not synchronize_only:
             self.csv_output_filepath = self.create_csv_filepath()
             self.triangulation_dlc_cams_filepaths = {
@@ -788,13 +801,6 @@ class Triangulation_Positions(Triangulation):
         recording_config_filepath: Path,
         calibration_directory: Path,
     ) -> None:
-        avi_files = [
-            file
-            for file in positions_directory.iterdir()
-            if file.name.endswith(".AVI") and ("Positions" in file.name or "positions" in file.name)
-        ]
-        avi_files.sort()
-        top_cam_file = avi_files[-1]  # hardcoded
         position_files = [
             file
             for file in positions_directory.iterdir()
@@ -806,7 +812,18 @@ class Triangulation_Positions(Triangulation):
             )
             and "Positions" in file.name
         ]
-        position_files.append(top_cam_file)
+        
+        avi_files = [
+                file
+                for file in positions_directory.iterdir()
+                if file.name.endswith(".AVI") and ("Positions" in file.name or "positions" in file.name)
+            ]
+        try:
+            avi_files.sort()
+            top_cam_file = avi_files[-1]  # hardcoded
+            position_files.append(top_cam_file)
+        except:
+            pass
 
         self.metadata_from_videos = {}
         for filepath in position_files:

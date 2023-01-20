@@ -137,7 +137,6 @@ class Synchronizer(ABC):
         )
 
         synchronized_video_filepath = self._construct_video_filepath()
-        
         if (not test_mode) or (test_mode and not synchronized_video_filepath.exists()):
             i = 0
             while True:
@@ -806,30 +805,28 @@ class RecordingVideoSynchronizer(Synchronizer):
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if test_mode and output_filepath.exists():
-            return output_filepath
-            
-        config_filepath = self.video_metadata.processing_filepath
-        dlc_interface = DeeplabcutInterface(
-            object_to_analyse=str(video_filepath),
-            output_directory=self.output_directory,
-            marker_detection_directory=config_filepath,
-        )
-        h5_file = dlc_interface.analyze_objects(filtering=True)
-        created_filepath = self.output_directory.joinpath(
-            video_filepath.stem + h5_file
-        )
+        if not test_mode and  not output_filepath.exists():
+            config_filepath = self.video_metadata.processing_filepath
+            dlc_interface = DeeplabcutInterface(
+                object_to_analyse=str(video_filepath),
+                output_directory=self.output_directory,
+                marker_detection_directory=config_filepath,
+            )
+            h5_file = dlc_interface.analyze_objects(filtering=True)
+            created_filepath = self.output_directory.joinpath(
+                video_filepath.stem + h5_file
+            )
 
-        try:
-            Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
-        except:
-            pass
-        try:
-            Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
-        except:
-            pass
+            try:
+                Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
+            except:
+                pass
+            try:
+                Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
+            except:
+                pass
 
-        return output_filepath
+        return Path(str(output_filepath) + ".h5")
 
     def _run_manual_marker_detection(
         self, video_filepath: Path, test_mode: bool = False
