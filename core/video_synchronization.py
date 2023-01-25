@@ -174,7 +174,7 @@ class Synchronizer(ABC):
                     remaining_offset,
                     alignment_error,
                 ) = self._find_best_match_of_template(
-                    template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
+                    template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.4
                 )
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
