@@ -72,6 +72,9 @@ class meta_interface(ABC):
                 "calibration_directory": str(filepath_to_recording_config.parent),
                 "calibration_index": calibration_index,
             }
+        else:
+            pass
+            # print("no recordings were added for f{filepath_to_recording_config}")
 
     def initialize_meta_config(self) -> None:
         for recording_day in self.meta["recording_days"].values():
