@@ -176,6 +176,7 @@ class Synchronizer(ABC):
                 ) = self._find_best_match_of_template(
                     template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.4
                 )
+                #finds match in the first 40% of the video
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
                     print("possibly bad synchronization!")
