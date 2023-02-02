@@ -283,17 +283,18 @@ class Calibration:
         self.camera_group.dump(self.calibration_output_filepath)
         
     def calibrate_optimal(self,
-                         triangulation_positions: Triangulation_Positions,
+                         triangulation_positions: 'Triangulation_Positions',
                          max_iters: int=10,
                          p_threshold: float=0.1,
                          angle_threshold: int=5,
+                         verbose: bool=True
                          ):
         """ finds optimal calibration through repeated optimisations of anipose """
         report = pd.DataFrame()
         calibration_found = False 
 
         for cal in range(max_iters):
-            self.run_calibration()
+            self.run_calibration(verbose=verbose)
             # change/return toml filename? or delete toml if threshold not reached? currently overwritten
 
             self._fake_missing_position_files(triangulation_positions)
@@ -335,7 +336,7 @@ class Calibration:
         # instead of return save report as calibration log
         return report
     
-    def _fake_missing_position_files(self, triangulation_positions: Triangulation_Positions)->None:
+    def _fake_missing_position_files(self, triangulation_positions: 'Triangulation_Positions')->None:
         cams_in_calibration = [ap_cam.name for ap_cam in self.camera_objects]
         for cam in cams_in_calibration:
             try:
@@ -371,6 +372,12 @@ class Triangulation(ABC):
         self.calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self._load_calibration(filepath=self.calibration_toml_filepath)
         self._validate_unique_cam_ids(adapt_to_calibration=adapt_to_calibration)
+        
+        # cams in loaded calibration
+        # fake missing files as parent class method instead of calling in calibrate_optimal
+        # validate test position marker ids in parent class
+        # make functions applyable to recording trinagulations
+        
         self._preprocess_dlc_predictions_for_anipose()
         p3ds_flat = self.camera_group.triangulate(
             self.anipose_io["points_flat"], progress=True
@@ -785,7 +792,7 @@ class Triangulation_Positions(Triangulation):
                 "Please check the files and rename them properly!"
             )
 
-    def _validate_unique_cam_ids(self):
+    def _validate_unique_cam_ids(self, adapt_to_calibration: bool=False):
         cameras = [camera.name for camera in self.camera_group.cameras]
         # possibility to create empty .h5 for missing recordings?
         if self.cameras.sort() != cameras.sort():
@@ -852,7 +859,10 @@ class Triangulation_Positions(Triangulation):
         test_position_markers_df.to_hdf(test_position_markers_df_filepath, 'Positions', mode = 'w')
 
     def _add_missing_marker_ids_to_prediction(self, missing_marker_ids: List[str], df: pd.DataFrame) -> None:
-        scorer = list(df.columns)[0][0]
+        try:
+            scorer = list(df.columns)[0][0]
+        except IndexError:
+            scorer = 'zero_likelihood_fake_markers'
         for marker_id in missing_marker_ids:
             for key in ['x', 'y', 'likelihood']:
                 df[(scorer, marker_id, key)] = 0
