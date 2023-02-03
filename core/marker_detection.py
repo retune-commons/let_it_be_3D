@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path
+from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path, read_config
 
 
 class MarkerDetection(ABC):
@@ -72,8 +72,8 @@ class ManualAnnotation(MarkerDetection):
         only_first_frame: bool = False,
     ) -> Path:
         if labels == None:
-            with open(self.marker_detection_directory, "r") as ymlfile:
-                list_of_labels = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+            ground_truth_config = read_config(self.marker_detection_directory)
+            list_of_labels = ground_truth_config['unique_ids']
         else:
             list_of_labels = labels
 

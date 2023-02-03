@@ -188,7 +188,7 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 3
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def create_calibrations(self) -> None:
+    def create_calibrations(self, ground_truth_config_filepath: Path) -> None:
         self.objects["calibration_objects"] = {}
         self.objects["position_objects"] = {}
         self.necessary_calibrations = {}
@@ -234,6 +234,7 @@ class meta_interface(ABC):
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
+                ground_truth_config_filepath = ground_truth_config_filepath
             )
             self.objects["position_objects"][all_cams_key] = positions_object
             for video in positions_object.metadata_from_videos.values():
@@ -276,24 +277,34 @@ class meta_interface(ABC):
                     calibration["key"]
                 ].get_marker_predictions()
                 for video in recording_day["calibrations"]["videos"]:
-                    recording_day["calibrations"]["videos"][video][
-                        "positions_marker_detection_filepath"
-                    ] = str(
-                        self.objects["position_objects"][
-                            calibration["key"]
-                        ].triangulation_dlc_cams_filepaths[video]
-                    )
+                    try:
+                        recording_day["calibrations"]["videos"][video][
+                            "positions_marker_detection_filepath"
+                        ] = str(
+                            self.objects["position_objects"][
+                                calibration["key"]
+                            ].triangulation_dlc_cams_filepaths[video]
+                        )
+                    except:
+                        recording_day["calibrations"]["videos"][video][
+                            "positions_marker_detection_filepath"
+                        ] = None
         self.meta["meta_step"] = 5
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def calibrate(self, verbose: bool = False) -> None:
+    def calibrate(self, calibrate_optimal: bool = True, verbose: bool = False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for calibration in recording_day["calibrations"][
                 "calibration_keys"
             ].values():
-                self.objects["calibration_objects"][calibration["key"]].run_calibration(
-                    verbose=verbose
-                )
+                if calibrate_optimal:
+                    self.objects["calibration_objects"][calibration["key"]].calibrate_optimal(
+                        verbose=verbose
+                    )
+                else:
+                    self.objects["calibration_objects"][calibration["key"]].run_calibration(
+                        verbose=verbose
+                    )
                 calibration["toml_filepath"] = str(
                     self.objects["calibration_objects"][
                         calibration["key"]
