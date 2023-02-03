@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import io
 import warnings
+import tensorflow.compat.v1 as tf
 
 import yaml
 import imageio.v3 as iio
@@ -32,9 +33,14 @@ class MarkerDetection(ABC):
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(self, filtering: bool = False):
+    def analyze_objects(self, filtering: bool = False, per_process_gpu_memory_fraction: float = 1.):
+        
+        
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         
         #mute deeplabcut
+        old_stdout = sys.stdout
         text_trap = io.StringIO()
         sys.stdout = text_trap
         with warnings.catch_warnings():
@@ -53,7 +59,7 @@ class DeeplabcutInterface(MarkerDetection):
                 )
             
         #unmute 
-        sys.stdout = sys.__stdout__
+        sys.stdout = old_stdout
 
         return filename
 
