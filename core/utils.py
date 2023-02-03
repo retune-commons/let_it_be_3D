@@ -82,7 +82,7 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
     multi_index_column_names = [[], [], []]
     for marker_id in markers:
         for column_name in ("x", "y", "likelihood"):
-            multi_index_column_names[0].append("manually_annotated_marker_positions")
+            multi_index_column_names[0].append("annotated_marker_positions")
             multi_index_column_names[1].append(marker_id)
             multi_index_column_names[2].append(column_name)
     return pd.MultiIndex.from_arrays(

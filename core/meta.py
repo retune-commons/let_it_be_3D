@@ -78,11 +78,12 @@ class meta_interface(ABC):
                     file.name[: len(recording_day["recording_date"])]
                     == recording_day["recording_date"]
                     and file.name[-3:] in self.paradigms
-                ):  # hardcoded length of paradigm
+                ):  # hardcoded length of paradigm and file structure
                     recording_day["recording_directories"].append(str(file))
             recording_day["num_recordings"] = len(
                 recording_day["recording_directories"]
             )
+            print(f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!")
         self.meta["meta_step"] = 1
         self.export_meta_to_yaml(filepath = self.standard_yaml_filepath)
 
@@ -388,17 +389,6 @@ class meta_interface(ABC):
                     all_calibrations_key
                 ]
 
-                if not calibration_key == all_calibrations_key:
-                    calibration_object = full_calibrations.create_subgroup(
-                        cam_ids=videos
-                    )
-                    self.objects["calibration_objects"][
-                        calibration_key
-                    ] = calibration_object
-                    recording_day["calibrations"]["calibration_keys"][
-                        calibration_key
-                    ] = {"key": calibration_key}
-
                 for calibration in recording_day["calibrations"][
                     "calibration_keys"
                 ].values():
@@ -415,35 +405,41 @@ class meta_interface(ABC):
             yaml.dump(self.meta, file)
 
     def _read_project_config(self) -> None:
-        with open(self.project_config_filepath, "r") as ymlfile:
-            project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+        if self.project_config_filepath.exists():
+            with open(self.project_config_filepath, "r") as ymlfile:
+                project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
-        for key in [
-            "paradigms",
-        ]:
-            try:
-                project_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
-                )
-        self.paradigms = project_config["paradigms"]
+            for key in [
+                "paradigms",
+            ]:
+                try:
+                    project_config[key]
+                except KeyError:
+                    raise KeyError(
+                        f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
+                    )
+            self.paradigms = project_config["paradigms"]
+        else:
+            raise FileNotFoundError(f"There is no project_config_file at {self.project_config_filepath}!")
 
     def _read_recording_config(self, recording_config_filepath: Path) -> str:
-        with open(recording_config_filepath, "r") as ymlfile:
-            recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+        if recording_config_filepath.exists():
+            with open(recording_config_filepath, "r") as ymlfile:
+                recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
-        for key in ["recording_date"]:
-            try:
-                recording_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
-                )
-        self.recording_dates.append(recording_config["recording_date"])
-        return str(recording_config["recording_date"]), str(
-            recording_config["calibration_index"]
-        )
+            for key in ["recording_date"]:
+                try:
+                    recording_config[key]
+                except KeyError:
+                    raise KeyError(
+                        f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
+                    )
+            self.recording_dates.append(recording_config["recording_date"])
+            return str(recording_config["recording_date"]), str(
+                recording_config["calibration_index"]
+            )
+        else:
+            raise FileNotFoundError(f"There is no recording_config_file at {recording_config_filepath}!")
 
     def _create_video_dict(
         self, video: VideoMetadata, intrinsics: bool = False
