@@ -3,7 +3,7 @@ import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-#import aniposelib as ap_lib
+import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
