@@ -6,7 +6,7 @@ import datetime
 import pickle
 import imageio as iio
 import numpy as np
-#import aniposelib as ap_lib
+import aniposelib as ap_lib
 import cv2
 import matplotlib.pyplot as plt
 import yaml
