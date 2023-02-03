@@ -2,6 +2,8 @@ from typing import List, Tuple, Dict, Union, Optional
 import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
+import itertools as it
+import math
 
 import aniposelib as ap_lib
 import cv2
@@ -18,7 +20,7 @@ from .video_synchronization import (
 )
 from .plotting import Alignment_Plot_Crossvalidation
 from .marker_detection import ManualAnnotation
-from .utils import convert_to_path, create_calibration_key, read_config
+from .utils import convert_to_path, create_calibration_key, read_config, get_multi_index
 
 
 def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int) -> None:
@@ -40,8 +42,7 @@ class Calibration:
         calibration_directory: Path,
         project_config_filepath: Path,
         recording_config_filepath: Path,
-        output_directory: Optional[Path] = None,
-        subgroup: bool = False,
+        output_directory: Optional[Path] = None
     ) -> None:
 
         self.calibration_directory = convert_to_path(calibration_directory)
@@ -50,12 +51,11 @@ class Calibration:
         output_directory = convert_to_path(output_directory)
         self._check_output_directory(output_directory=output_directory)
 
-        if not subgroup:
-            self._create_video_objects(
-                calibration_directory=self.calibration_directory,
-                project_config_filepath=self.project_config_filepath,
-                recording_config_filepath=self.recording_config_filepath,
-            )
+        self._create_video_objects(
+            calibration_directory=self.calibration_directory,
+            project_config_filepath=self.project_config_filepath,
+            recording_config_filepath=self.recording_config_filepath,
+        )
 
     def run_synchronization(self, test_mode: bool = False) -> None:
         self.synchronized_charuco_videofiles = {}
@@ -132,34 +132,6 @@ class Calibration:
             verbose=verbose,
         )
         self._save_calibration()
-
-    def create_subgroup(self, cam_ids: List[str]) -> None:
-        subgroup = Calibration(
-            calibration_directory=self.calibration_directory,
-            project_config_filepath=self.project_config_filepath,
-            recording_config_filepath=self.recording_config_filepath,
-            output_directory=self.output_directory,
-            subgroup=True,
-        )
-
-        subgroup.recording_date = self.recording_date
-        subgroup.target_fps = self.target_fps
-        subgroup.calibration_index = self.calibration_index
-
-        subgroup.metadata_from_videos = {}
-        subgroup.camera_objects = {}
-        subgroup.synchronized_charuco_videofiles = {}
-        for cam in cam_ids:
-            if cam in self.metadata_from_videos.keys():
-                if self.metadata_from_videos[cam].exclusion_state == "valid":
-                    subgroup.metadata_from_videos[cam] = self.metadata_from_videos[cam]
-                    subgroup.camera_objects[cam] = self.camera_objects[cam]
-                    subgroup.synchronized_charuco_videofiles[
-                        cam
-                    ] = self.synchronized_charuco_videofiles[cam]
-
-        subgroup.initialize_camera_group()
-        return subgroup
 
     def initialize_camera_group(self) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
@@ -283,25 +255,26 @@ class Calibration:
         self.camera_group.dump(self.calibration_output_filepath)
         
     def calibrate_optimal(self,
-                         triangulation_positions: Triangulation_Positions,
-                         max_iters: int=10,
+                         triangulation_positions: 'Triangulation_Positions',
+                         max_iters: int=1,
                          p_threshold: float=0.1,
                          angle_threshold: int=5,
+                         verbose: bool=True
                          ):
         """ finds optimal calibration through repeated optimisations of anipose """
         report = pd.DataFrame()
         calibration_found = False 
 
         for cal in range(max_iters):
-            self.run_calibration()
+            self.run_calibration(verbose=verbose)
             # change/return toml filename? or delete toml if threshold not reached? currently overwritten
 
-            self._fake_missing_position_files(triangulation_positions)
             triangulation_positions.run_triangulation(calibration_toml_filepath = self.calibration_output_filepath)
             
             triangulation_positions.evaluate_triangulation_of_test_position_markers()
             calibration_errors = triangulation_positions.anipose_io['distance_errors_in_cm']
             calibration_angles_errors = triangulation_positions.anipose_io['angles_error_screws_plan']
+            reprojerr_nonan = triangulation_positions.anipose_io["reproj_nonan"].mean()
 
             for reference in calibration_errors.keys():
                 all_percentage_errors = [percentage_error for marker_id_a, marker_id_b, distance_error, percentage_error in calibration_errors[reference]['individual_errors']]
@@ -313,39 +286,24 @@ class Calibration:
             mean_angle_err = np.asarray(all_angle_errors).mean()
 
             # pritn output necessary if we have the report log?
-            print("Calibration {}".format(calibration_file) +
+            print(f"Calibration {cal}" +
                   "\n mean percentage error: "+ str(mean_dist_err_percentage) + 
                   "\n mean angle error: "+ str(mean_angle_err) )        
 
-            report.loc[calibration_file, 'mean_distance_error_percentage'] = mean_dist_err_percentage
-            report.loc[calibration_file, 'mean_angle_error'] = mean_angle_err
-
+            report.loc[cal, 'mean_distance_error_percentage'] = mean_dist_err_percentage
+            report.loc[cal, 'mean_angle_error'] = mean_angle_err
+            report.loc[cal, 'reprojerror'] = reprojerr_nonan
 
             if mean_dist_err_percentage < p_threshold and mean_angle_err < angle_threshold:
                 calibration_found = True
-                print("Good Calibration reached: \n" +
-                     "Calibration {}".format(calibration_file) +
-                          "\n mean percentage error: "+ str(mean_dist_err_percentage) + 
-                          "\n mean angle error: "+ str(mean_angle_err))
+                print("Good Calibration reached!")
                 break
 
         if not calibration_found:
             print('No optimal calibration found with given thresholds')
-
-        # instead of return save report as calibration log
-        return report
-    
-    def _fake_missing_position_files(self, triangulation_positions: Triangulation_Positions)->None:
-        cams_in_calibration = [ap_cam.name for ap_cam in self.camera_objects]
-        for cam in cams_in_calibration:
-            try:
-                triangulation_positions.triangulation_dlc_cams_filepaths[cam]
-            except KeyError:
-                h5_output_filepath = triangulation_positions.output_directory.joinpath(f"Positions_{self.recording_date}_{cam}.h5")
-                df = pd.DataFrame()
-                df.to_hdf(h5_output_filepath, 'Positions')
-                triangulation_positions.validate_test_position_marker_ids(test_position_markers_df_filepath = h5_output_filepath)
-                triangulation_positions.triangulation_dlc_cams_filepaths[cam] = h5_output_filepath
+        
+        report_filepath = self.output_directory.joinpath(f"{self.recording_date}_calibration_report.csv")
+        report.to_csv(report_filepath, index = False)
 
 
 class Triangulation(ABC):
@@ -371,6 +329,15 @@ class Triangulation(ABC):
         self.calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self._load_calibration(filepath=self.calibration_toml_filepath)
         self._validate_unique_cam_ids(adapt_to_calibration=adapt_to_calibration)
+        
+        framenums = []
+        for path in self.triangulation_dlc_cams_filepaths.values():
+            framenums.append(pd.read_hdf(path).shape[0])
+        framenum = min(framenums)
+        cams_in_calibration = self.camera_group.get_names()
+        markers = self.markers
+        self._fake_missing_files(cams_in_calibration=cams_in_calibration, framenum = framenum, markers = markers)
+        
         self._preprocess_dlc_predictions_for_anipose()
         p3ds_flat = self.camera_group.triangulate(
             self.anipose_io["points_flat"], progress=True
@@ -380,6 +347,57 @@ class Triangulation(ABC):
         )
         self._get_dataframe_of_triangulated_points()
         self._save_dataframe_as_csv()
+        
+    def _fake_missing_files(self, cams_in_calibration: List[str], framenum: int, markers: List[str])->None:
+        for cam in cams_in_calibration:
+            try:
+                self.triangulation_dlc_cams_filepaths[cam]
+            except KeyError:
+                h5_output_filepath = self.output_directory.joinpath(f"Positions_{self.recording_date}_{cam}.h5")
+                df = pd.DataFrame(data = {}, columns = get_multi_index(markers), dtype = int)
+                for i in range(framenum):
+                    df.loc[i, :] = 0
+                df.to_hdf(h5_output_filepath, 'Positions')
+                self._validate_test_position_marker_ids(test_position_markers_df_filepath = h5_output_filepath, framenum=framenum)
+                self.triangulation_dlc_cams_filepaths[cam] = h5_output_filepath
+                
+    def _validate_test_position_marker_ids(self, test_position_markers_df_filepath: Path, framenum: int, add_missing_marker_ids_with_0_likelihood: bool = True) -> None:
+        defined_marker_ids = self.markers
+        test_position_markers_df = pd.read_hdf(test_position_markers_df_filepath)
+        
+        prediction_marker_ids = list(
+            set([marker_id for scorer, marker_id, key in test_position_markers_df.columns]))
+        
+        marker_ids_not_in_ground_truth = self._find_non_matching_marker_ids(prediction_marker_ids,
+                                                                            defined_marker_ids)
+        marker_ids_not_in_prediction = self._find_non_matching_marker_ids(defined_marker_ids,
+                                                                          prediction_marker_ids)
+        if add_missing_marker_ids_with_0_likelihood & (len(marker_ids_not_in_prediction) > 0):
+            self._add_missing_marker_ids_to_prediction(missing_marker_ids=marker_ids_not_in_prediction, df = test_position_markers_df, framenum = framenum)
+            print('The following marker_ids were missing and added to the dataframe with a '
+                  f'likelihood of 0: {marker_ids_not_in_prediction}.')
+        if len(marker_ids_not_in_ground_truth) > 0:
+            self._remove_marker_ids_not_in_ground_truth(marker_ids_to_remove=marker_ids_not_in_ground_truth, df = test_position_markers_df)
+            print('The following marker_ids were deleted from the dataframe, since they were '
+                  f'not present in the ground truth: {marker_ids_not_in_ground_truth}.')
+        test_position_markers_df.to_hdf(test_position_markers_df_filepath, 'Positions', mode = 'w')
+
+    def _add_missing_marker_ids_to_prediction(self, missing_marker_ids: List[str], df: pd.DataFrame, framenum: int=1) -> None:
+        try:
+            scorer = list(df.columns)[0][0]
+        except IndexError:
+            scorer = 'zero_likelihood_fake_markers'
+        for marker_id in missing_marker_ids:
+            for key in ['x', 'y', 'likelihood']:
+                for i in range(framenum):
+                    df.loc[i, (scorer, marker_id, key)] = 0
+
+    def _find_non_matching_marker_ids(self, marker_ids_to_match: List[str], template_marker_ids: List[str]) -> List:
+        return [marker_id for marker_id in marker_ids_to_match if marker_id not in template_marker_ids]
+
+    def _remove_marker_ids_not_in_ground_truth(self, marker_ids_to_remove: List[str], df: pd.DataFrame) -> None:
+        columns_to_remove = [column_name for column_name in df.columns if column_name[1] in marker_ids_to_remove]
+        df.drop(columns=columns_to_remove, inplace=True) 
 
     def _check_output_directory(self, output_directory: Path) -> None:
         if output_directory != None:
@@ -450,12 +468,13 @@ class Triangulation(ABC):
             p3ds_flat, self.anipose_io["points_flat"], mean=True
         )
         self.p3ds = p3ds_flat.reshape(
-            self.anipose_io["n_points"], self.anipose_io["n_joints"], 3
-        )
+            self.anipose_io["n_points"], self.anipose_io["n_joints"], 3)
+        self.anipose_io['p3ds'] = self.p3ds
         self.reprojerr = self.reprojerr_flat.reshape(
             self.anipose_io["n_points"], self.anipose_io["n_joints"]
         )
         self.reprojerr_nonan = self.reprojerr[np.logical_not(np.isnan(self.reprojerr))]
+        self.anipose_io["reproj_nonan"] = self.reprojerr_nonan
 
     def _get_dataframe_of_triangulated_points(self) -> None:
         all_points_raw = self.anipose_io["points"]
@@ -489,6 +508,7 @@ class Triangulation(ABC):
             df["center_{}".format(i)] = center[i]
         df["fnum"] = np.arange(n_frames)
         self.df = df
+        self.anipose_io['df_xyz'] = df
 
     def _save_dataframe_as_csv(self) -> None:
         if self.csv_output_filepath.exists():
@@ -587,7 +607,11 @@ class Triangulation_Recordings(Triangulation):
                 ].export_for_aniposelib()
                 for video_interface in self.recording_interfaces
             }
-
+        
+        try:
+            self.markers = list(pd.read_hdf(list(self.triangulation_dlc_cams_filepaths.values())[0]).columns.levels[1])
+        except IndexError: 
+            pass
         #exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def create_csv_filepath(self) -> None:
@@ -694,7 +718,7 @@ class Triangulation_Recordings(Triangulation):
 
             for camera in self.cameras:
                 if camera not in filepath_keys:
-                    raise ValueError(f"Missing filepath for {camera}!")
+                    raise ValueError(f"Missing filepath for {camera}!")       
 
 
 class Triangulation_Positions(Triangulation):
@@ -725,6 +749,7 @@ class Triangulation_Positions(Triangulation):
         self.csv_output_filepath = self.output_directory.joinpath(
             f"Positions_{self.recording_date}.csv"
         )
+        self.markers = self.test_positions_gt['unique_ids']
 
     def _create_video_objects(
         self,
@@ -785,7 +810,7 @@ class Triangulation_Positions(Triangulation):
                 "Please check the files and rename them properly!"
             )
 
-    def _validate_unique_cam_ids(self):
+    def _validate_unique_cam_ids(self, adapt_to_calibration: bool=False):
         cameras = [camera.name for camera in self.camera_group.cameras]
         # possibility to create empty .h5 for missing recordings?
         if self.cameras.sort() != cameras.sort():
@@ -825,44 +850,7 @@ class Triangulation_Positions(Triangulation):
                 print(
                     "Template Matching is not yet implemented for Marker Detection in Positions!"
                 )
-            # ToDo: implement DLC!
-            self.validate_test_position_marker_ids(test_position_markers_df_filepath = h5_output_filepath)
-            
-    def validate_test_position_marker_ids(self,
-                                          test_position_markers_df_filepath: Path,
-                                          add_missing_marker_ids_with_0_likelihood: bool = True) -> None:
-        ground_truth_marker_ids = self.test_positions_gt['unique_ids']
-        test_position_markers_df = pd.read_hdf(test_position_markers_df_filepath)
-        
-        prediction_marker_ids = list(
-            set([marker_id for scorer, marker_id, key in test_position_markers_df.columns]))
-        
-        marker_ids_not_in_ground_truth = self._find_non_matching_marker_ids(prediction_marker_ids,
-                                                                            ground_truth_marker_ids)
-        marker_ids_not_in_prediction = self._find_non_matching_marker_ids(ground_truth_marker_ids,
-                                                                          prediction_marker_ids)
-        if add_missing_marker_ids_with_0_likelihood & (len(marker_ids_not_in_prediction) > 0):
-            self._add_missing_marker_ids_to_prediction(missing_marker_ids=marker_ids_not_in_prediction, df = test_position_markers_df)
-            print('The following marker_ids were missing and added to the dataframe with a '
-                  f'likelihood of 0: {marker_ids_not_in_prediction}.')
-        if len(marker_ids_not_in_ground_truth) > 0:
-            self._remove_marker_ids_not_in_ground_truth(marker_ids_to_remove=marker_ids_not_in_ground_truth, df = test_position_markers_df)
-            print('The following marker_ids were deleted from the dataframe, since they were '
-                  f'not present in the ground truth: {marker_ids_not_in_ground_truth}.')
-        test_position_markers_df.to_hdf(test_position_markers_df_filepath, 'Positions', mode = 'w')
-
-    def _add_missing_marker_ids_to_prediction(self, missing_marker_ids: List[str], df: pd.DataFrame) -> None:
-        scorer = list(df.columns)[0][0]
-        for marker_id in missing_marker_ids:
-            for key in ['x', 'y', 'likelihood']:
-                df[(scorer, marker_id, key)] = 0
-
-    def _find_non_matching_marker_ids(self, marker_ids_to_match: List[str], template_marker_ids: List[str]) -> List:
-        return [marker_id for marker_id in marker_ids_to_match if marker_id not in template_marker_ids]
-
-    def _remove_marker_ids_not_in_ground_truth(self, marker_ids_to_remove: List[str], df: pd.DataFrame) -> None:
-        columns_to_remove = [column_name for column_name in df.columns if column_name[1] in marker_ids_to_remove]
-        df.drop(columns=columns_to_remove, inplace=True)        
+            self._validate_test_position_marker_ids(test_position_markers_df_filepath = h5_output_filepath, framenum = 1)
 
     def evaluate_triangulation_of_test_position_markers(self, show_3D_plot: bool = True, verbose: bool = True) -> None:        
         self.anipose_io = self._add_reprojection_errors_of_all_test_position_markers(anipose_io=self.anipose_io)
