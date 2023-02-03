@@ -3,7 +3,7 @@ import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-import aniposelib as ap_lib
+#import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
@@ -576,7 +576,7 @@ class Triangulation_Recordings(Triangulation):
                     synchronizer=RecordingVideoUpSynchronizer,
                     use_gpu=video_interface.video_metadata.use_gpu,
                     output_directory=self.output_directory,
-                    synchronize_only=self.synchronize_only,
+                    synchronize_only=synchronize_only,
                     test_mode=test_mode,
                 )
             self.synchronized_videos[

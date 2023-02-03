@@ -147,36 +147,39 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 2
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def synchronize_recordings(self, verbose: bool = False, test_mode: bool = False) -> None:
+    def synchronize_recordings(self, verbose: bool = False, test_mode: bool = False, synchronize_only: bool = False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 if verbose:
                     start_time_recording = time.time()
                 self.objects["triangulation_recordings_objects"][
                     recording
-                ].run_synchronization(test_mode=test_mode)
+                ].run_synchronization(test_mode=test_mode, synchronize_only = synchronize_only)
                 for video in recording_day["recordings"][recording]["videos"]:
-                    recording_day["recordings"][recording]["videos"][video][
-                        "marker_detection_filepath"
-                    ] = str(
-                        self.objects["triangulation_recordings_objects"][
-                            recording
-                        ].triangulation_dlc_cams_filepaths[video]
-                    )
-                    recording_day["recordings"][recording]["videos"][video][
-                        "synchronized_video"
-                    ] = str(
-                        self.objects["triangulation_recordings_objects"][
-                            recording
-                        ].synchronized_videos[video]
-                    )
-                    recording_day["recordings"][recording]["videos"][video][
-                        "framenum_synchronized"
-                    ] = (
-                        self.objects["triangulation_recordings_objects"][recording]
-                        .metadata_from_videos[video]
-                        .framenum_synchronized
-                    )
+                    try:
+                        recording_day["recordings"][recording]["videos"][video][
+                            "synchronized_video"
+                        ] = str(
+                            self.objects["triangulation_recordings_objects"][
+                                recording
+                            ].synchronized_videos[video]
+                        )
+                        recording_day["recordings"][recording]["videos"][video][
+                            "framenum_synchronized"
+                        ] = (
+                            self.objects["triangulation_recordings_objects"][recording]
+                            .metadata_from_videos[video]
+                            .framenum_synchronized
+                        )
+                        recording_day["recordings"][recording]["videos"][video][
+                            "marker_detection_filepath"
+                        ] = str(
+                            self.objects["triangulation_recordings_objects"][
+                                recording
+                            ].triangulation_dlc_cams_filepaths[video]
+                        )
+                    except:
+                        pass
                 if verbose:
                     end_time_recording = time.time()
                     duration = start_time_recording - end_time_recording
