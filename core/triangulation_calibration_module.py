@@ -256,7 +256,7 @@ class Calibration:
         
     def calibrate_optimal(self,
                          triangulation_positions: 'Triangulation_Positions',
-                         max_iters: int=1,
+                         max_iters: int=10,
                          p_threshold: float=0.1,
                          angle_threshold: int=5,
                          verbose: bool=True
