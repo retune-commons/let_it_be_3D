@@ -168,14 +168,19 @@ class Synchronizer(ABC):
                 self.led_timeseries = self._extract_led_pixel_intensities(
                     led_center_coords=led_center_coordinates
                 )
-
-                (
-                    offset_adjusted_start_idx,
-                    remaining_offset,
-                    alignment_error,
-                ) = self._find_best_match_of_template(
-                    template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.8
-                )
+                
+                try:
+                    (
+                        offset_adjusted_start_idx,
+                        remaining_offset,
+                        alignment_error,
+                    ) = self._find_best_match_of_template(
+                        template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.4
+                    )
+                    #finds match in the first 40% of the video # ToDo: make adaptable
+                except ValueError:
+                    offset_adjusted_start_idx, remaining_offset, alignment_error = 0, 0, 1000
+                    
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
                     print("possibly bad synchronization!")
@@ -281,7 +286,7 @@ class Synchronizer(ABC):
                 output_directory=temp_folder,
                 marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(filtering=False)
+            dlc_ending = dlc_interface.analyze_objects(filtering=False, per_process_gpu_memory_fraction = 0.1)
             dlc_created_h5file = temp_folder.joinpath(
                 video_filepath_out.stem + dlc_ending + ".h5"
             )
@@ -805,7 +810,7 @@ class RecordingVideoSynchronizer(Synchronizer):
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if not test_mode and  not output_filepath.exists():
+        if (not test_mode) or (test_mode and not output_filepath.exists()):
             config_filepath = self.video_metadata.processing_filepath
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),

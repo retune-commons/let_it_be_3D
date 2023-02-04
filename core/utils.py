@@ -5,6 +5,22 @@ import pandas as pd
 import imageio as iio
 import numpy as np
 import matplotlib.pyplot as plt
+import yaml
+
+
+def read_config(path):
+    """
+    Reads structured config file defining a project.
+    """
+    if Path(path).exists:
+        try:
+            with open(path, "r") as ymlfile:
+                cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+        except FileNotFoundError:
+            raise (
+            "Could not find the config file at " + str(Path) + " \n Please make sure the path is correct and the file exists")
+
+    return cfg
 
 
 class Coordinates:
@@ -66,7 +82,7 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
     multi_index_column_names = [[], [], []]
     for marker_id in markers:
         for column_name in ("x", "y", "likelihood"):
-            multi_index_column_names[0].append("manually_annotated_marker_positions")
+            multi_index_column_names[0].append("annotated_marker_positions")
             multi_index_column_names[1].append(marker_id)
             multi_index_column_names[2].append(column_name)
     return pd.MultiIndex.from_arrays(

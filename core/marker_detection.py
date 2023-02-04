@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path
+from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path, read_config
 
 
 class MarkerDetection(ABC):
@@ -32,9 +32,17 @@ class MarkerDetection(ABC):
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(self, filtering: bool = False):
+    def analyze_objects(self, filtering: bool = False, per_process_gpu_memory_fraction: float = 1.):
+        
+        try:
+            import tensorflow.compat.v1 as tf
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
+            sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        except:
+            pass
         
         #mute deeplabcut
+        old_stdout = sys.stdout
         text_trap = io.StringIO()
         sys.stdout = text_trap
         with warnings.catch_warnings():
@@ -53,7 +61,7 @@ class DeeplabcutInterface(MarkerDetection):
                 )
             
         #unmute 
-        sys.stdout = sys.__stdout__
+        sys.stdout = old_stdout
 
         return filename
 
@@ -66,8 +74,8 @@ class ManualAnnotation(MarkerDetection):
         only_first_frame: bool = False,
     ) -> Path:
         if labels == None:
-            with open(self.marker_detection_directory, "r") as ymlfile:
-                list_of_labels = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+            ground_truth_config = read_config(self.marker_detection_directory)
+            list_of_labels = ground_truth_config['unique_ids']
         else:
             list_of_labels = labels
 
