@@ -32,14 +32,18 @@ class MarkerDetection(ABC):
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(self, filtering: bool = False, per_process_gpu_memory_fraction: float = 1.):
-        
-        try:
+    def analyze_objects(self, filtering: bool = False, use_gpu: str=""):
+        if use_gpu == "prevent":
             import tensorflow.compat.v1 as tf
-            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
+            sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 0}))
+        elif use_gpu == "low":
+            import tensorflow.compat.v1 as tf
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-        except:
-            pass
+        elif use_gpu == "full":
+            import tensorflow.compat.v1 as tf
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
+            sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         
         #mute deeplabcut
         old_stdout = sys.stdout

@@ -123,11 +123,16 @@ class Synchronizer(ABC):
         pass
 
     def __init__(
-        self, video_metadata: VideoMetadata, use_gpu: bool, output_directory: Path
+        self, video_metadata: VideoMetadata, rapid_aligner_path: Path, output_directory: Path, use_gpu: str=""
     ) -> None:
         self.video_metadata = video_metadata
-        self.use_gpu = use_gpu
+        if self.rapid_aligner_path.name != "":
+            self.use_rapid_aligner = True
+            self.rapid_aligner_path = rapid_aligner_path
+        else:
+            self.use_rapid_aligner = False
         self.output_directory = output_directory
+        self.use_gpu = use_gpu
 
     def run_synchronization(
         self, synchronize_only: bool, test_mode: bool = False
@@ -286,7 +291,7 @@ class Synchronizer(ABC):
                 output_directory=temp_folder,
                 marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(filtering=False, per_process_gpu_memory_fraction = 0.1)
+            dlc_ending = dlc_interface.analyze_objects(filtering=False, use_gpu=self.use_gpu)
             dlc_created_h5file = temp_folder.joinpath(
                 video_filepath_out.stem + dlc_ending + ".h5"
             )
@@ -470,7 +475,7 @@ class Synchronizer(ABC):
         return adjusted_start_frame_idx, remaining_offset
 
     def _run_alignment(self, query: np.ndarray, subject: np.ndarray) -> np.ndarray:
-        if self.use_gpu:
+        if self.use_rapid_aligner:
             alignment_results = self._run_rapid_aligner(query=query, subject=subject)
         else:
             alignment_results = self._run_cpu_aligner(query=query, subject=subject)
@@ -479,8 +484,7 @@ class Synchronizer(ABC):
     def _run_rapid_aligner(self, query: np.ndarray, subject: np.ndarray) -> np.ndarray:
         import sys
 
-        # Todo: implement in project_config.yaml and video_metadata objects
-        sys.path.append("/home/ds/GitHub_repos/rapidAligner/")
+        sys.path.append(str(self.rapid_aligner_path))
         import cupy as cp
         import rapidAligner as ra
 
@@ -815,9 +819,9 @@ class RecordingVideoSynchronizer(Synchronizer):
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
                 output_directory=self.output_directory,
-                marker_detection_directory=config_filepath,
+                marker_detection_directory=config_filepath
             )
-            h5_file = dlc_interface.analyze_objects(filtering=True)
+            h5_file = dlc_interface.analyze_objects(filtering=True, use_gpu=self.use_gpu)
             created_filepath = self.output_directory.joinpath(
                 video_filepath.stem + h5_file
             )

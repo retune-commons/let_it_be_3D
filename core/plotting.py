@@ -162,11 +162,12 @@ class LED_Marker_Plot(Plotting):
 
 
 class Intrinsics(Plotting):
-    def __init__(self, video_metadata: VideoMetadata, output_dir: Path) -> None:
+    def __init__(self, video_metadata: VideoMetadata, output_dir: Path="", plot:bool=False, save:bool=True) -> None:
         self.video_metadata = video_metadata
         self._create_all_images(frame_idx=0)
-        self.filepath = self._create_filepath(output_dir=output_dir)
-        self.plot(plot=False)
+        if save:
+            self.filepath = self._create_filepath(output_dir=output_dir)
+        self.plot(plot=plot, save=save)
 
     def _create_all_images(self, frame_idx: int = 0) -> None:
         self.distorted_input_image = load_single_frame_of_video(
@@ -185,7 +186,7 @@ class Intrinsics(Plotting):
                 self.video_metadata.intrinsic_calibration["D"],
             )
 
-    def plot(self, plot: bool) -> None:
+    def plot(self, plot: bool, save: bool) -> None:
         fig = plt.figure(figsize=(12, 5), facecolor="white")
         gs = fig.add_gridspec(1, 2)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -194,7 +195,8 @@ class Intrinsics(Plotting):
         ax2 = fig.add_subplot(gs[0, 1])
         plt.imshow(self.undistorted_output_image)
         plt.title("undistorted image based on intrinsic calibration")
-        self._save(filepath=self.filepath)
+        if save:
+            self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()

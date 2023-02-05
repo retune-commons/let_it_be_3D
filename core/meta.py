@@ -70,7 +70,6 @@ class meta_interface(ABC):
             }
         else:
             pass
-            # print("no recordings were added for f{filepath_to_recording_config}")
 
     def initialize_meta_config(self) -> None:
         for recording_day in self.meta["recording_days"].values():
@@ -114,9 +113,6 @@ class meta_interface(ABC):
             ]:
                 triangulation_recordings_object = Triangulation_Recordings(
                     recording_directory=Path(recording),
-                    calibration_directory=self.meta["recording_days"][recording_day][
-                        "calibration_directory"
-                    ],
                     recording_config_filepath=self.meta["recording_days"][
                         recording_day
                     ]["recording_config_filepath"],
@@ -224,7 +220,6 @@ class meta_interface(ABC):
             
             positions_object = Triangulation_Positions(
                 positions_directory=recording_day["calibration_directory"],
-                calibration_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
