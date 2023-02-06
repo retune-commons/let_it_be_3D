@@ -25,15 +25,17 @@ class VideoInterface:
     def run_synchronizer(
         self,
         synchronizer: Synchronizer,
-        use_gpu: bool,
+        rapid_aligner_path: Path,
         output_directory: Path,
+        use_gpu: str,
         synchronize_only: bool,
         test_mode: bool,
     ) -> None:
         self.synchronizer_object = synchronizer(
             video_metadata=self.video_metadata,
-            use_gpu=use_gpu,
+            rapid_aligner_path=rapid_aligner_path,
             output_directory=output_directory,
+            use_gpu=use_gpu
         )
         (
             self.marker_detection_filepath,

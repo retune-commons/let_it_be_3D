@@ -15,35 +15,31 @@ from .camera_intrinsics import (
     IntrinsicCalibratorFisheyeCamera,
     IntrinsicCalibratorRegularCameraCharuco,
 )
-from .utils import load_single_frame_of_video, convert_to_path
+from .utils import load_single_frame_of_video, convert_to_path, check_keys, read_config
 
 
 class VideoMetadata:
     def __init__(
         self,
         video_filepath: Path,
-        recording_config_filepath: Path,
-        project_config_filepath: Path,
-        calibration_dir: Path,
+        recording_config_dict: Dict,
+        project_config_dict: Dict,
+        tag: str
     ) -> None:
-
-        self.calibration_dir = convert_to_path(calibration_dir)
+        self._get_video_identity(tag=tag)
         self.exclusion_state = "valid"
 
         self._check_filepaths(
             video_filepath=video_filepath,
-            recording_config_filepath=recording_config_filepath,
-            project_config_filepath=project_config_filepath,
         )
 
-        self._read_metadata(
-            recording_config_filepath=recording_config_filepath,
-            project_config_filepath=project_config_filepath,
+        state = self._read_metadata(
+            recording_config_dict=recording_config_dict,
+            project_config_dict=project_config_dict,
             video_filepath=video_filepath,
         )
         
         self._get_intrinsic_parameters(
-            recording_config_filepath=recording_config_filepath,
             max_calibration_frames=self.max_calibration_frames,
         )
         try:
@@ -55,8 +51,6 @@ class VideoMetadata:
     def _check_filepaths(
         self,
         video_filepath: Path,
-        recording_config_filepath: Path,
-        project_config_filepath: Path,
     ) -> None:
         if (
             (
@@ -74,103 +68,70 @@ class VideoMetadata:
             self.filepath = video_filepath
         else:
             raise ValueError("The filepath is not linked to a video or image.")
-        if (
-            not recording_config_filepath.exists()
-            and recording_config_filepath.suffix == ".yaml"
-        ):
-            raise ValueError(
-                "The recording_config_filepath is not linked to a .yaml-file"
-            )
-        if (
-            not project_config_filepath.exists()
-            or project_config_filepath.suffix != ".yaml"
-        ):
-            raise (
-                f"Could not find a project_config_file at {project_config_filepath}\n Please make sure the path is correct, the file exists and is a .yaml file!"
-            )
 
     def _read_metadata(
         self,
-        project_config_filepath: Path,
-        recording_config_filepath: Path,
+        project_config_dict: Dict,
+        recording_config_dict: Dict,
         video_filepath: Path,
     ) -> None:
-        with open(project_config_filepath, "r") as ymlfile:
-            project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
-        with open(recording_config_filepath, "r") as ymlfile2:
-            recording_config = yaml.load(ymlfile2, Loader=yaml.SafeLoader)
-
-        for key in [
-            "valid_cam_IDs",
-            "paradigms",
-            "animal_lines",
-            "led_extraction_type",
-            "led_extraction_filepath",
-            "max_calibration_frames",
-            "max_cpu_cores_to_pool",
-            "max_ram_digestible_frames",
-            "use_gpu",
-            "load_calibration",
-        ]:
-            try:
-                project_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the project_config_file {project_config_filepath} for {key}."
-                )
-
-        self.valid_cam_ids = project_config["valid_cam_IDs"]
-        self.valid_paradigms = project_config["paradigms"]
-        self.valid_mouse_lines = project_config["animal_lines"]
-        self.load_calibration = project_config["load_calibration"]
+        self.valid_cam_ids = project_config_dict["valid_cam_IDs"]
+        self.valid_paradigms = project_config_dict["paradigms"]
+        self.valid_mouse_lines = project_config_dict["animal_lines"]
+        self.load_calibration = project_config_dict["load_calibration"]
         if self.load_calibration:
             try:
                 self.intrinsic_calibrations_directory = Path(
-                    project_config["intrinsic_calibration_directory"]
+                    project_config_dict["intrinsic_calibration_directory"]
                 )
             except:
                 raise ValueError(
                     "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
                 )
-        self.max_calibration_frames = project_config["max_calibration_frames"]
-        self.max_ram_digestible_frames = project_config["max_ram_digestible_frames"]
-        self.max_cpu_cores_to_pool = project_config["max_cpu_cores_to_pool"]
-        self.use_gpu = project_config["use_gpu"]
+        self.max_calibration_frames = project_config_dict["max_calibration_frames"]
+        self.max_ram_digestible_frames = project_config_dict["max_ram_digestible_frames"]
+        self.max_cpu_cores_to_pool = project_config_dict["max_cpu_cores_to_pool"]
+        
+        while True:
+            undefined_attributes = self._extract_filepath_metadata(self.filepath)
+            if len(undefined_attributes)>0:
+                self._print_message(attributes = undefined_attributes)
+                self._rename_file()
+                if self.filepath.stem == "x":
+                    self.filepath.unlink()
+                    return "del"
+                if self.filepath.stem == "y":
+                    print(f"{video_filepath} needs to be moved!")
+                    return "del"
+            else:
+                break
+        self.recording_date = self.recording_date.strftime("%y%m%d")
+        if self.recording:
+            self.mouse_id = self.mouse_line + "_" + self.mouse_number
 
-        self._extract_filepath_metadata(filepath_name=video_filepath.name)
-
-        for key in ["led_pattern", self.cam_id, "target_fps", "calibration_index"]:
-            try:
-                recording_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing information for {key} in the config_file {recording_config_filepath}!"
-                )
-
-        self.led_pattern = recording_config["led_pattern"]
-        self.target_fps = recording_config["target_fps"]
-        self.calibration_index = recording_config["calibration_index"]
-        if self.recording_date != recording_config["recording_date"]:
+        self.led_pattern = recording_config_dict["led_pattern"]
+        self.target_fps = recording_config_dict["target_fps"]
+        self.calibration_index = recording_config_dict["calibration_index"]
+        if self.recording_date != recording_config_dict["recording_date"]:
             raise ValueError(
-                f"The date of the recording_config_file {recording_config_filepath} and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
+                f"The date of the recording_config_file and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
             )
-        metadata_dict = recording_config[self.cam_id]
 
-        for key in [
+        metadata_dict = recording_config_dict[self.cam_id]
+        keys_to_check = [
             "fps",
             "offset_row_idx",
             "offset_col_idx",
             "flip_h",
             "flip_v",
             "fisheye",
-        ]:
-            try:
-                metadata_dict[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the recording_config_file {recording_config_filepath} for {self.cam_id} for {key}."
-                )
+        ]
+        missing_keys = check_keys(dictionary = metadata_dict, list_of_keys = keys_to_check)
+        if len(missing_keys) > 0:
+            raise KeyError(
+                f"Missing metadata information in the recording_config_file for {self.cam_id} for {missing_keys}."
+            )
 
         self.fps = metadata_dict["fps"]
         self.offset_row_idx = metadata_dict["offset_row_idx"]
@@ -179,38 +140,48 @@ class VideoMetadata:
         self.flip_v = metadata_dict["flip_v"]
         self.fisheye = metadata_dict["fisheye"]
 
-        self.processing_type = project_config["processing_type"][self.cam_id]
-        self.calibration_evaluation_type = project_config[
+        self.processing_type = project_config_dict["processing_type"][self.cam_id]
+        self.calibration_evaluation_type = project_config_dict[
             "calibration_evaluation_type"
         ][self.cam_id]
         self.processing_filepath = Path(
-            project_config["processing_filepath"][self.cam_id]
+            project_config_dict["processing_filepath"][self.cam_id]
         )
         self.calibration_evaluation_filepath = Path(
-            project_config["calibration_evaluation_filepath"][self.cam_id]
+            project_config_dict["calibration_evaluation_filepath"][self.cam_id]
         )
-        self.led_extraction_type = project_config["led_extraction_type"][self.cam_id]
-        self.led_extraction_filepath = project_config["led_extraction_filepath"][
+        self.led_extraction_type = project_config_dict["led_extraction_type"][self.cam_id]
+        self.led_extraction_filepath = project_config_dict["led_extraction_filepath"][
             self.cam_id
         ]
-
-    def _extract_filepath_metadata(self, filepath_name: str) -> None:
+        return "valid"
+    
+    def _get_video_identity(self, tag: str)->None:
         self.charuco_video = False
-        if filepath_name[-4:] == ".AVI":
+        self.positions = False
+        self.recording = False
+        if tag == "calibration":
+            self.charuco_video = True
+        elif tag == "positions":
+            self.positions = True
+        elif tag == "recording":
+            self.recording = True
+
+    def _extract_filepath_metadata(self, filepath_name: Path) -> List:
+        if filepath_name.suffix == ".AVI":
             try:
-                filepath_name = filepath_name.replace(
-                    filepath_name[
-                        filepath_name.index("00") : filepath_name.index("00") + 3
+                filepath_name = Path(filepath_name.name.replace(
+                    filepath_name.name[
+                        filepath_name.name.index("00") : filepath_name.name.index("00") + 3
                     ],
                     "",
-                )
+                ))
             except:
                 pass
             self.cam_id = "Top"
 
-        if "Charuco" in filepath_name or "charuco" in filepath_name:
-            self.charuco_video = True
-            for piece in filepath_name[:-4].split("_"):
+        if self.charuco_video:
+            for piece in filepath_name.stem.split("_"):
                 if piece in self.valid_cam_ids:
                     self.cam_id = piece
                 else:
@@ -225,10 +196,10 @@ class VideoMetadata:
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
-                    self._check_attribute(attribute_to_check=attribute)
+                    raise ValueError(f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!")
 
-        elif "Positions" in filepath_name or "positions" in filepath_name:
-            for piece in filepath_name[:-4].split("_"):
+        elif self.positions:
+            for piece in filepath_name.stem.split("_"):
                 if piece in self.valid_cam_ids:
                     self.cam_id = piece
                 else:
@@ -243,10 +214,10 @@ class VideoMetadata:
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
-                    self._check_attribute(attribute_to_check=attribute)
+                    raise ValueError(f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!")
 
-        else:
-            for piece in filepath_name[:-4].split("_"):
+        elif self.recording:
+            for piece in filepath_name.stem.split("_"):
                 if piece in self.valid_cam_ids:
                     self.cam_id = piece
                 elif piece in self.valid_paradigms:
@@ -279,77 +250,11 @@ class VideoMetadata:
                 "mouse_number",
             ]:
                 if not hasattr(self, attribute):
-                    self._check_attribute(attribute_to_check=attribute)
-            self.mouse_id = self.mouse_line + "_" + self.mouse_number
-        self.recording_date = self.recording_date.strftime("%y%m%d")
-
-    def _check_attribute(self, attribute_to_check: str) -> None:
-        # TODO: input or set_defaults?
-        print(
-            f"{attribute_to_check} could not be extracted automatically for the following file:\n"
-            f"{self.filepath}"
-        )
-
-        messages = {}
-        while True:
-            entered_input = input(attribute_to_check + ": ")
-
-            if attribute_to_check == "cam_id":
-                if entered_input in self.valid_cam_ids:
-                    self.cam_id = entered_input
-                    break
-                else:
-                    messages[
-                        "cam_id"
-                    ] = f"Entered cam_id {entered_input} did not match any of the defined cam_ids. \nPlease enter one of the following ids: {self.valid_cam_ids}"
-            if attribute_to_check == "recording_date":
-                try:
-                    self.recording_date = datetime.date(
-                        year=int("20" + entered_input[0:2]),
-                        month=int(entered_input[2:4]),
-                        day=int(entered_input[4:6]),
-                    )
-                    break
-                except ValueError:
-                    messages[
-                        "recording_date"
-                    ] = f"Entered recording_date {entered_input} does not match the required structure for date. \nPlease enter the date as YYMMDD , e.g., 220928."
-            if attribute_to_check == "paradigm":
-                if entered_input in self.valid_paradigms:
-                    self.paradigm = entered_input
-                    break
-                else:
-                    messages[
-                        "paradigm"
-                    ] = f"Entered paradigm does not match any of the defined paradigms. \nPlease enter one of the following paradigms: {self.valid_paradigms}"
-            if attribute_to_check == "mouse_line":
-                if entered_input in self.valid_mouse_lines:
-                    self.mouse_line = entered_input
-                    break
-                else:
-                    messages[
-                        "mouse_line"
-                    ] = f"Entered mouse_line is not supported. \nPlease enter one of the following lines: {self.valid_mouse_lines}"
-            if attribute_to_check == "mouse_number":
-                sub_pieces = entered_input.split("-")
-                if len(sub_pieces) == 2 and entered_input.startswith("F"):
-                    try:
-                        int(sub_pieces[1])
-                        self.mouse_number = entered_input
-                        break
-                    except ValueError:
-                        messages[
-                            "mouse_number"
-                        ] = f"Entered mouse_number does not match the required structure for a mouse_number. \n Please enter the mouse number as Generation-Number, e.g., F12-45"
-                else:
-                    messages[
-                        "mouse_number"
-                    ] = f"Entered mouse_number does not match the required structure for a mouse_number. \n Please enter the mouse number as Generation-Number, e.g., F12-45"
-            print(messages[attribute_to_check])
-
+                    raise ValueError(f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!")
+        return []
+                    
     def _get_intrinsic_parameters(
         self,
-        recording_config_filepath: Path,
         max_calibration_frames: int,
     ) -> None:
         if self.fisheye:
@@ -496,3 +401,148 @@ class VideoMetadata:
         intrinsic_calibration["size"] = new_size
         intrinsic_calibration["K"] = adjusted_K
         return intrinsic_calibration
+    
+    
+class VideoMetadataChecker(VideoMetadata):
+    def __init__(
+        self,
+        video_filepath: Path,
+        recording_config_dict: Dict,
+        project_config_dict: Dict,
+        tag: str
+    ) -> None:
+        self._get_video_identity(tag=tag)
+        self._check_filepaths(
+            video_filepath=video_filepath
+        )
+
+        state = self._read_metadata(
+            recording_config_dict=recording_config_dict,
+            project_config_dict=project_config_dict,
+            video_filepath=video_filepath,
+        )
+        
+        if state == "del":
+            return state
+        else:
+            self._get_intrinsic_parameters(
+                max_calibration_frames=self.max_calibration_frames,
+            )
+            
+            
+    def _extract_filepath_metadata(self, filepath_name: Path) -> List[str]:
+        undefined_attributes = []
+        if filepath_name.suffix == ".AVI":
+            try:
+                filepath_name = Path(filepath_name.name.replace(
+                    filepath_name.name[
+                        filepath_name.name.index("00") : filepath_name.name.index("00") + 3
+                    ],
+                    "",
+                ))
+            except:
+                pass
+            self.cam_id = "Top"
+
+        if self.charuco_video:
+            for piece in filepath_name.stem.split("_"):
+                if piece in self.valid_cam_ids:
+                    self.cam_id = piece
+                else:
+                    try:
+                        self.recording_date = datetime.date(
+                            year=int("20" + piece[0:2]),
+                            month=int(piece[2:4]),
+                            day=int(piece[4:6]),
+                        )
+                    except ValueError:
+                        pass
+
+            for attribute in ["cam_id", "recording_date"]:
+                if not hasattr(self, attribute):
+                    undefined_attributes.append(attribute)
+
+        elif self.positions:
+            for piece in filepath_name.stem.split("_"):
+                if piece in self.valid_cam_ids:
+                    self.cam_id = piece
+                else:
+                    try:
+                        self.recording_date = datetime.date(
+                            year=int("20" + piece[0:2]),
+                            month=int(piece[2:4]),
+                            day=int(piece[4:6]),
+                        )
+                    except ValueError:
+                        pass
+
+            for attribute in ["cam_id", "recording_date"]:
+                if not hasattr(self, attribute):
+                    undefined_attributes.append(attribute)
+
+        elif self.recording:
+            for piece in filepath_name.stem.split("_"):
+                if piece in self.valid_cam_ids:
+                    self.cam_id = piece
+                elif piece in self.valid_paradigms:
+                    self.paradigm = piece
+                elif piece in self.valid_mouse_lines:
+                    self.mouse_line = piece
+                elif piece.startswith("F"):
+                    sub_pieces = piece.split("-")
+                    if len(sub_pieces) == 2:
+                        try:
+                            int(sub_pieces[1])
+                            self.mouse_number = piece
+                        except ValueError:
+                            pass
+                else:
+                    try:
+                        self.recording_date = datetime.date(
+                            year=int("20" + piece[0:2]),
+                            month=int(piece[2:4]),
+                            day=int(piece[4:6]),
+                        )
+                    except ValueError:
+                        pass
+
+            for attribute in [
+                "cam_id",
+                "recording_date",
+                "paradigm",
+                "mouse_line",
+                "mouse_number",
+            ]:
+                if not hasattr(self, attribute):
+                    undefined_attributes.append(attribute)
+        
+        return undefined_attributes
+    
+    def _print_message(self, attributes: List[str])->None:
+        print(
+                f"The information {attributes} could not be extracted automatically from the following file:\n"
+                f"{self.filepath}"
+            )
+        for attribute in attributes:
+            if attribute == "cam_id":
+                print(f"Cam_id was not found in filename or did not match any of the defined cam_ids. \nPlease include one of the following ids into the filename: {self.valid_cam_ids} or add the cam_id to valid_cam_ids!")
+            elif attribute == "recording_date":
+                print(f"Recording_date was not found in filename or did not match the required structure for date. \nPlease include the date as YYMMDD , e.g., 220928, into the filename!")
+            elif attribute == "paradigm":
+                f"Paradigm was not found in filename or did not match any of the defined paradigms. \nPlease Please include one of the following paradigms into the filename: {self.valid_paradigms} or add the paradigm to valid_paradigmes!"
+            elif attribute == "mouse_line":
+                print(f"Mouse_line was not found in filename or is not supported. \nPlease include one of the following lines into the filename: {self.valid_mouse_lines} or add the line to valid_mouse_lines!")
+            elif attribute == "mouse_number":
+                print("Mouse_number was not found in filename or did not match the required structure for a mouse_number. \n Please include the mouse number as Generation-Number, e.g., F12-45, into the filename!")
+    
+    def _rename_file(self) -> None:
+        suffix = self.filepath.suffix
+        new_filename = Path(input(f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/"))
+        new_filepath = self.filepath.parent.joinpath(new_filename.with_suffix(suffix))
+        if new_filepath == self.filepath:
+            print("The entered filename and the real filename are identical.")
+        elif new_filepath.exists():
+            print("Couldn't rename file, since the entered filename does already exist.")
+        else:
+            self.filepath.rename(new_filepath)
+            self.filepath = new_filepath

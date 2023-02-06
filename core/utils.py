@@ -8,18 +8,27 @@ import matplotlib.pyplot as plt
 import yaml
 
 
-def read_config(path):
+def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
+    missing_keys = []
+    for key in list_of_keys:
+        try:
+            dictionary[key]
+        except KeyError:
+            missing_keys.append(key)
+    return missing_keys
+
+
+def read_config(path: Path)->Dict:
     """
     Reads structured config file defining a project.
     """
-    if Path(path).exists:
-        try:
-            with open(path, "r") as ymlfile:
-                cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-        except FileNotFoundError:
-            raise (
-            "Could not find the config file at " + str(Path) + " \n Please make sure the path is correct and the file exists")
-
+    path = convert_to_path(path)
+    if path.exists and path.suffix == ".yaml":
+        with open(path, "r") as ymlfile:
+            cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+    else:
+        raise (
+            f"Could not open the yaml file at {path}\n Please make sure the path is correct and the file exists!")
     return cfg
 
 
