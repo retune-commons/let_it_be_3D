@@ -126,7 +126,7 @@ class Synchronizer(ABC):
         self, video_metadata: VideoMetadata, rapid_aligner_path: Path, output_directory: Path, use_gpu: str=""
     ) -> None:
         self.video_metadata = video_metadata
-        if self.rapid_aligner_path.name != "":
+        if rapid_aligner_path.name != "":
             self.use_rapid_aligner = True
             self.rapid_aligner_path = rapid_aligner_path
         else:

@@ -108,6 +108,12 @@ class Check_Calibration(Check):
         self.metadata_from_videos = []
         for filepath in charuco_videofiles:
             try:
+                iio.v3.imread(filepath, index=0)
+            except:
+                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
+                charuco_videofiles.remove(filepath)
+        for filepath in charuco_videofiles:
+            try:
                 video_metadata = VideoMetadataChecker(
                     video_filepath=filepath,
                     recording_config_dict=recording_config_dict,
@@ -132,7 +138,7 @@ class Check_Calibration(Check):
             elif len(files_per_cam[key]) > 1:
                 information_duplicates = [(i, file, f"Size: {file.stat().st_size} bytes", f"Framenum: {iio.v2.get_reader(file).count_frames()}") for i, file in enumerate(files_per_cam[key])]
                 print(f'Found {len(files_per_cam[key])} videos for {key} in {self.calibration_directory}!\n {information_duplicates}')
-                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort!')
+                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort and move the file manually!')
                 if file_idx_to_keep == "c":   
                     print(f'You have multiple videos for cam {key} in {self.calibration_directory}, but you decided to abort. If you dont move them manually, this can lead to wrong videos in the analysis!')
                 else:
@@ -201,13 +207,22 @@ class Check_Recording(Check):
            
         self.metadata_from_videos = []
         for filepath in recording_videofiles:
-            video_metadata = VideoMetadataChecker(
-                video_filepath=filepath,
-                recording_config_dict=recording_config_dict,
-                project_config_dict=project_config_dict,
-                tag = 'recording'
-            )
-            self.metadata_from_videos.append(video_metadata)
+            try:
+                iio.v3.imread(filepath, index=0)
+            except:
+                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
+                recording_videofiles.remove(filepath)
+        for filepath in recording_videofiles:
+            try:
+                video_metadata = VideoMetadataChecker(
+                    video_filepath=filepath,
+                    recording_config_dict=recording_config_dict,
+                    project_config_dict=project_config_dict,
+                    tag = 'recording'
+                )
+                self.metadata_from_videos.append(video_metadata)
+            except TypeError:
+                pass
         
         files_per_cam = {}
         cams_not_found = []
@@ -222,8 +237,8 @@ class Check_Recording(Check):
                 cams_not_found.append(key)
             elif len(files_per_cam[key]) > 1:
                 information_duplicates = [(i, file, f"Size: {file.stat().st_size} bytes", f"Framenum: {iio.v2.get_reader(file).count_frames()}") for i, file in enumerate(files_per_cam[key])]
-                print(f'Found {len(files_per_cam[key])} videos for {key} in {self.positions_directory}!\n {information_duplicates}')
-                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort!')
+                print(f'Found {len(files_per_cam[key])} videos for {key} in {self.recording_directory}!\n {information_duplicates}')
+                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort and move the file manually!')
                 if file_idx_to_keep == "c":   
                     print(f'You have multiple videos for cam {key} in {self.recording_directory}, but you decided to abort. If you dont move them manually, this can lead to wrong videos in the analysis!')
                 else:
@@ -232,7 +247,8 @@ class Check_Recording(Check):
                             for video_metadata in self.metadata_from_videos:
                                 if video_metadata.filepath == file:
                                     self.metadata_from_videos.remove(video_metadata)
-                            file.unlink()
+                            if file.exists():
+                                file.unlink()
 
                 
         self._validate_and_save_metadata_for_recording()
@@ -310,6 +326,12 @@ class Check_Positions(Check):
         self.metadata_from_videos = []
         for filepath in positions_files:
             try:
+                iio.v3.imread(filepath, index=0)
+            except:
+                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
+                positions_files.remove(filepath)
+        for filepath in positions_files:
+            try:
                 video_metadata = VideoMetadataChecker(
                     video_filepath=filepath,
                     recording_config_dict=recording_config_dict,
@@ -334,7 +356,7 @@ class Check_Positions(Check):
             elif len(files_per_cam[key]) > 1:
                 information_duplicates = [(i, file, f"Size: {file.stat().st_size} bytes", f"Framenum: {iio.v2.get_reader(file).count_frames()}") for i, file in enumerate(files_per_cam[key])]
                 print(f'Found {len(files_per_cam[key])} videos for {key} in {self.positions_directory}!\n {information_duplicates}')
-                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort!')
+                file_idx_to_keep = input('Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort and move the file manually!')
                 if file_idx_to_keep == "c":   
                     print(f'You have multiple videos for cam {key} in {self.positions_directory}, but you decided to abort. If you dont move them manually, this can lead to wrong videos in the analysis!')
                 else:
@@ -367,6 +389,3 @@ class Check_Positions(Check):
                     f"Go the folder {self.positions_directory} and check the filenames manually!"
                 )
         self.recording_date = list(recording_dates)[0]
-    
-
-    

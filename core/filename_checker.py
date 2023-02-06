@@ -168,9 +168,3 @@ class filename_checker_interface():
                 ground_truth_config_filepath = ground_truth_config_filepath
             )
             self.objects["position_objects"][all_cams_key] = positions_object
-
-#test:
-# B) file duplicates (done?)
-# A) possibility to delete video
-# C) possibility to remove video from recording and move it to another folder manually
-# D) missing files

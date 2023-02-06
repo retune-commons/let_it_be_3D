@@ -98,10 +98,10 @@ class VideoMetadata:
             if len(undefined_attributes)>0:
                 self._print_message(attributes = undefined_attributes)
                 self._rename_file()
-                if self.filepath.name == "x":
+                if self.filepath.stem == "x":
                     self.filepath.unlink()
                     return "del"
-                if self.filepath.name == "y":
+                if self.filepath.stem == "y":
                     print(f"{video_filepath} needs to be moved!")
                     return "del"
             else:
@@ -528,7 +528,7 @@ class VideoMetadataChecker(VideoMetadata):
                 print(f"Cam_id was not found in filename or did not match any of the defined cam_ids. \nPlease include one of the following ids into the filename: {self.valid_cam_ids} or add the cam_id to valid_cam_ids!")
             elif attribute == "recording_date":
                 print(f"Recording_date was not found in filename or did not match the required structure for date. \nPlease include the date as YYMMDD , e.g., 220928, into the filename!")
-            elif atribute == "paradigm":
+            elif attribute == "paradigm":
                 f"Paradigm was not found in filename or did not match any of the defined paradigms. \nPlease Please include one of the following paradigms into the filename: {self.valid_paradigms} or add the paradigm to valid_paradigmes!"
             elif attribute == "mouse_line":
                 print(f"Mouse_line was not found in filename or is not supported. \nPlease include one of the following lines into the filename: {self.valid_mouse_lines} or add the line to valid_mouse_lines!")
