@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Union, Optional
+from typing import List, Tuple, Dict, Union, Optional, OrderedDict
 import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -19,7 +19,7 @@ from .video_synchronization import (
     CharucoVideoSynchronizer,
 )
 from .plotting import Alignment_Plot_Crossvalidation
-from .marker_detection import ManualAnnotation
+from .marker_detection import ManualAnnotation, DeeplabcutInterface
 from .utils import convert_to_path, create_calibration_key, read_config, check_keys, get_multi_index
 
 
@@ -125,7 +125,8 @@ class Calibration:
                 marker_bits=6,
                 aruco_dict=aruco_dict,
             )
-        videos = [[video] for video in self.synchronized_charuco_videofiles.values()]
+        sorted_videos = OrderedDict(sorted(self.synchronized_charuco_videofiles.items()))
+        videos = [[video] for video in sorted_videos.values()]
         self.camera_group.calibrate_videos(
             videos=videos,
             board=charuco_calibration_board,
@@ -292,6 +293,8 @@ class Calibration:
                     "however, all cam_ids must be unique! Please check for duplicates "
                     "in the calibration directory and rename them!"
                 )
+        self.camera_objects.sort(key=lambda x: x.name, reverse=False)
+
 
     def _save_calibration(self) -> None:
         if self.calibration_output_filepath.exists():
@@ -300,18 +303,19 @@ class Calibration:
         
     def calibrate_optimal(self,
                          triangulation_positions: 'Triangulation_Positions',
-                         max_iters: int=10,
+                         max_iters: int=2,
                          p_threshold: float=0.1,
                          angle_threshold: int=5,
                          verbose: bool=True
                          ):
         """ finds optimal calibration through repeated optimisations of anipose """
+        # ToDo make max_iters and p_threshold adaptable?
         report = pd.DataFrame()
         calibration_found = False 
 
         for cal in range(max_iters):
             self.run_calibration(verbose=verbose)
-            # change/return toml filename? or delete toml if threshold not reached? currently overwritten
+            # keep calibrations! (currently overwritten)
 
             triangulation_positions.run_triangulation(calibration_toml_filepath = self.calibration_output_filepath)
             
@@ -326,8 +330,8 @@ class Calibration:
             for reference in calibration_angles_errors.keys():
                 all_angle_errors = list(calibration_angles_errors.values())
 
-            mean_dist_err_percentage = np.asarray(all_percentage_errors).mean()
-            mean_angle_err = np.asarray(all_angle_errors).mean()
+            mean_dist_err_percentage = np.nanmean(np.asarray(all_percentage_errors))
+            mean_angle_err = np.nanmean(np.asarray(all_angle_errors))
 
             # pritn output necessary if we have the report log?
             print(f"Calibration {cal}" +
@@ -906,8 +910,7 @@ class Triangulation_Positions(Triangulation):
                     object_to_analyse=cam.filepath,
                     output_directory=self.output_directory,
                     marker_detection_directory=config)
-                    dlc_ending = dlc_interface.analyze_objects(filtering=False)
-                    h5_output_filepath = self.output_directory.joinpath(cam.filepath.stem + dlc_ending + ".h5")
+                    h5_output_filepath = dlc_interface.analyze_objects(filtering=False, filepath = h5_output_filepath)
             else:
                 print(
                     "Template Matching is not yet implemented for Marker Detection in Positions!"
@@ -993,10 +996,10 @@ class Triangulation_Positions(Triangulation):
                 gt_distances=gt_distances)
             all_distance_errors = [distance_error for marker_id_a, marker_id_b, distance_error, percentage_error in
                                    marker_ids_with_distance_error]
-            mean_distance_error = np.asarray(all_distance_errors).mean()
+            mean_distance_error = np.nanmean(np.asarray(all_distance_errors))
             all_percentage_errors = [percentage_error for marker_id_a, marker_id_b, distance_error, percentage_error in
                                    marker_ids_with_distance_error]
-            mean_percentage_error = np.asarray(all_percentage_errors).mean()
+            mean_percentage_error = np.nanmean(np.asarray(all_percentage_errors))
             anipose_io['distance_errors_in_cm'][reference_distance_id] = {
                 'individual_errors': marker_ids_with_distance_error,
                 'mean_error': mean_distance_error,

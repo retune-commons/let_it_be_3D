@@ -291,14 +291,8 @@ class Synchronizer(ABC):
                 output_directory=temp_folder,
                 marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(filtering=False, use_gpu=self.use_gpu)
-            dlc_created_h5file = temp_folder.joinpath(
-                video_filepath_out.stem + dlc_ending + ".h5"
-            )
-            dlc_created_picklefile = temp_folder.joinpath(
-                video_filepath_out.stem + dlc_ending + "_meta.pickle"
-            )
-            dlc_created_h5file.rename(dlc_filepath_out)
+            dlc_filepath_out = dlc_interface.analyze_objects(filtering=False, use_gpu=self.use_gpu, filepath = dlc_filepath_out)
+            dlc_created_picklefile = Path(dlc_filepath_out.stem + "_meta.pickle")
             df = pd.read_hdf(dlc_filepath_out)
             x_key, y_key, likelihood_key = (
                 [key for key in df.keys() if "LED5" in key and "x" in key],
@@ -821,21 +815,9 @@ class RecordingVideoSynchronizer(Synchronizer):
                 output_directory=self.output_directory,
                 marker_detection_directory=config_filepath
             )
-            h5_file = dlc_interface.analyze_objects(filtering=True, use_gpu=self.use_gpu)
-            created_filepath = self.output_directory.joinpath(
-                video_filepath.stem + h5_file
-            )
+            dlc_ending = dlc_interface.analyze_objects(filtering=True, use_gpu=self.use_gpu, filepath = output_filepath)
 
-            try:
-                Path(str(created_filepath) + ".h5").rename(Path(str(output_filepath) + ".h5"))
-            except:
-                pass
-            try:
-                Path(str(created_filepath) + "_filtered.h5").rename(Path(str(output_filepath) + "_filtered.h5"))
-            except:
-                pass
-
-        return Path(str(output_filepath) + ".h5")
+        return output_filepath
 
     def _run_manual_marker_detection(
         self, video_filepath: Path, test_mode: bool = False
@@ -859,7 +841,7 @@ class RecordingVideoSynchronizer(Synchronizer):
 
     def _create_h5_filepath(self) -> Path:
         h5_filepath = self.output_directory.joinpath(
-            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}"
+            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
         )
         return h5_filepath
 

@@ -32,7 +32,8 @@ class MarkerDetection(ABC):
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(self, filtering: bool = False, use_gpu: str=""):
+    def analyze_objects(self, filepath: Path, filtering: bool = False, use_gpu: str=""):
+        convert_to_path(filepath)
         if use_gpu == "prevent":
             import tensorflow.compat.v1 as tf
             sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 0}))
@@ -54,20 +55,24 @@ class DeeplabcutInterface(MarkerDetection):
 
             import deeplabcut as dlc
 
-            filename = dlc.analyze_videos(
+            dlc_ending = dlc.analyze_videos(
                 config=str(self.marker_detection_directory),
                 videos=[str(self.object_to_analyse)],
                 destfolder=str(self.output_directory),
             )
+            unfiltered_filepath = self.output_directory.joinpath(self.object_to_analyse.stem + dlc_ending + '.h5')
+            unfiltered_filepath.rename(filepath)
             if filtering:
                 dlc.post_processing.filtering.filterpredictions(
                     config=str(self.marker_detection_directory), video=str(self.object_to_analyse), save_as_csv=False
                 )
+                filtered_filepath = self.output_directory.joinpath(unfiltered_filepath.stem + "_filtered.h5")
+                filtered_filepath.rename(filepath.stem + "_filtered.h5")
             
         #unmute 
         sys.stdout = old_stdout
 
-        return filename
+        return filepath
 
 
 class ManualAnnotation(MarkerDetection):

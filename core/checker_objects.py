@@ -79,7 +79,8 @@ class Check_Calibration(Check):
         self.calibration_directory = convert_to_path(calibration_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
-
+        
+        print("\n")
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath)
         self._create_video_objects(
             calibration_directory=self.calibration_directory,
@@ -179,7 +180,7 @@ class Check_Recording(Check):
         self.recording_directory = convert_to_path(recording_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
-
+        print("\n")
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath)
         self._create_video_objects(
             recording_directory=self.recording_directory,
@@ -286,6 +287,7 @@ class Check_Positions(Check):
         project_config_filepath: Path,
         plot:bool=True,
     ) -> None:
+        print("\n")
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
         test_positions_gt = read_config(ground_truth_config_filepath)
         self.positions_directory = convert_to_path(positions_directory)

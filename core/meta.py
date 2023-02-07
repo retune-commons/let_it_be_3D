@@ -72,6 +72,7 @@ class meta_interface(ABC):
             pass
 
     def initialize_meta_config(self) -> None:
+        self.objects = {}
         for recording_day in self.meta["recording_days"].values():
             for file in Path(
                 recording_day["recording_config_filepath"]
@@ -105,7 +106,7 @@ class meta_interface(ABC):
             print("added recording directory succesfully!")
 
     def create_recordings(self) -> None:
-        self.objects = {"triangulation_recordings_objects": {}}
+        self.objects["triangulation_recordings_objects"] = {}
         # optional: create output_directories?
         for recording_day in self.meta["recording_days"]:
             for recording in self.meta["recording_days"][recording_day][
@@ -135,6 +136,7 @@ class meta_interface(ABC):
                     "key": individual_key,
                     "target_fps": triangulation_recordings_object.target_fps,
                     "led_pattern": triangulation_recordings_object.led_pattern,
+                    "calibration_to_use": triangulation_recordings_object.calibration_index,
                     "videos": videos,
                 }
                 self.objects["triangulation_recordings_objects"][
@@ -199,9 +201,8 @@ class meta_interface(ABC):
             )
 
             cams = [video for video in calibration_object.metadata_from_videos]
-            all_cams_key = create_calibration_key(videos = cams, recording_date = calibration_object.recording_date, calibration_index = calibration_object.calibration_index)
 
-            self.objects["calibration_objects"][all_cams_key] = calibration_object
+            self.objects["calibration_objects"][calibration_object.calibration_index] = calibration_object
 
             video_dict = {
                 video: self._create_video_dict(
@@ -209,8 +210,8 @@ class meta_interface(ABC):
                 )
                 for video in calibration_object.metadata_from_videos
             }
-            recording_day["calibrations"]["calibration_keys"][all_cams_key] = {
-                "key": all_cams_key
+            recording_day["calibrations"]["calibration_keys"][calibration_object.calibration_index] = {
+                "key": calibration_object.calibration_index
             }
             recording_day["calibrations"]["target_fps"] = calibration_object.target_fps
             recording_day["calibrations"][
@@ -225,7 +226,7 @@ class meta_interface(ABC):
                 output_directory=recording_day["calibration_directory"],
                 ground_truth_config_filepath = ground_truth_config_filepath
             )
-            self.objects["position_objects"][all_cams_key] = positions_object
+            self.objects["position_objects"][positions_object.calibration_index] = positions_object
             for video in positions_object.metadata_from_videos.values():
                 try:
                     recording_day["calibrations"]["videos"][video.cam_id][
@@ -293,7 +294,7 @@ class meta_interface(ABC):
                         calibration["key"]
                     ].calibration_output_filepath
                 )
-                # add calibration log? reprojerr, etc.
+                # add report
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
@@ -313,10 +314,12 @@ class meta_interface(ABC):
                         recording
                     ].csv_output_filepath
                 )
-                # add reprojection_error
+                # add reprojerr
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
+        
+        
     def load_meta_from_yaml(self, filepath: Path) -> None:
         filepath = convert_to_path(filepath)
         with open(filepath, "r") as ymlfile:
@@ -369,26 +372,8 @@ class meta_interface(ABC):
 
         elif self.meta["meta_step"] == 5:
             for recording_day in self.meta["recording_days"].values():
-                videos = [
-                    video
-                    for video in recording_day["calibrations"]["videos"].keys()
-                    if recording_day["calibrations"]["videos"][video]["exclusion_state"]
-                    == "valid"
-                ]
-                all_videos = list(recording_day["calibrations"]["videos"].keys())
-                calibration_key = create_calibration_key(
-                    videos=videos,
-                    recording_date=recording_day["recording_date"],
-                    calibration_index=recording_day["calibration_index"],
-                )
-                all_calibrations_key = create_calibration_key(
-                    videos=all_videos,
-                    recording_date=recording_day["recording_date"],
-                    calibration_index=recording_day["calibration_index"],
-                )
-                full_calibrations = self.objects["calibration_objects"][
-                    all_calibrations_key
-                ]
+                calibration_index = list(self.meta['recording_days']['Recording_Day_220922_0']['calibrations']['calibration_keys'].keys())[0]
+                full_calibrations = self.objects["calibration_objects"][calibration_index]
 
                 for calibration in recording_day["calibrations"][
                     "calibration_keys"
