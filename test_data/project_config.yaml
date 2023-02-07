@@ -1,0 +1,86 @@
+# supported types: DLC, manual, TM
+# filepaths: 
+# for DLC: the path to config.yaml
+# for manual: the path to the yaml with all marker_names
+calibration_evaluation_filepath:
+  Bottom: "test_data/MarkerDetection/Positions/config.yaml"
+  Ground1: "test_data/MarkerDetection/Positions/config.yaml"
+  Ground2: "test_data/MarkerDetection/Positions/config.yaml"
+  Side1: "test_data/MarkerDetection/Positions/config.yaml"
+  Side2: "test_data/MarkerDetection/Positions/config.yaml"
+  Side3: "test_data/MarkerDetection/Positions/config.yaml"
+  Top: "test_data/MarkerDetection/Positions/config.yaml"
+calibration_evaluation_type:
+  Bottom: DLC
+  Ground1: DLC
+  Ground2: DLC
+  Side1: DLC
+  Side2: DLC
+  Side3: DLC
+  Top: DLC
+processing_filepath:
+  Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground1: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground2: "test_data/MarkerDetection/Bottom/config.yaml"
+  Side1: "test_data/MarkerDetection/Side/config.yaml"
+  Side2: "test_data/MarkerDetection/Side/config.yaml"
+  Side3: "test_data/MarkerDetection/Side/config.yaml"
+  Top: "test_data/MarkerDetection/Top/config.yaml"
+processing_type:
+  Bottom: DLC
+  Ground1: DLC
+  Ground2: DLC
+  Side1: DLC
+  Side2: DLC
+  Side3: DLC
+  Top: DLC
+led_extraction_filepath:
+  Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground1: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground2: "test_data/MarkerDetection/Bottom/config.yaml"
+  Side1: "test_data/MarkerDetection/Side/config.yaml"
+  Side2: "test_data/MarkerDetection/Side/config.yaml"
+  Side3: "test_data/MarkerDetection/Side/config.yaml"
+  Top: "test_data/MarkerDetection/Top/config.yaml"
+led_extraction_type:
+  Bottom: DLC
+  Ground1: DLC
+  Ground2: DLC
+  Side1: DLC
+  Side2: DLC
+  Side3: DLC
+  Top: DLC
+#animal lines need to be strings ('206' or "196")
+animal_lines:
+- "196"
+- "206"
+- "209"
+- "194"
+- "195"
+paradigms: 
+- OTR
+- OTT
+- OTE
+valid_cam_IDs:
+- Bottom
+- Top
+- Side1
+- Side2
+- Side3
+- Ground1
+- Ground2
+calibration_tag: Charuco
+calibration_validation_tag: Position
+# "prevent" disables GPU usage, "low" restricts GPU memory for synchronization but not for DLC analysis, "full" uses entire GPU capacity
+use_gpu: ""
+intrinsic_calibration_directory: test_data/intrinsic_calibrations/
+# load calibration=True means, that you use previously recorded checkerboard calibrations to set the intrinsics of the cameras instead of calibrating on charuco videos (which is currently not possible)
+load_calibration: True
+
+# for 8GB RAM 3000 works nicely, on the server with big RAM, you can increase the number to increase performance speed
+max_ram_digestible_frames: 3000
+max_cpu_cores_to_pool: 0
+# 300 is default and works well if you use a good CPU, for slow CPUs you should decrease
+max_calibration_frames: 300
+# keep "" if you don't have rapid_aligner installed, if you want to use locally installed clone of the rapid_aligner package, insert path as str
+rapid_aligner_path: ""

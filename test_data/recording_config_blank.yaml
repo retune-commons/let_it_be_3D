@@ -1,0 +1,58 @@
+# flip_h and flip_v only if you didn't reset IC Capture flipping in the beginning and video was flipped during recording
+# that means, if you set a ROI and by clicking select_ROI IC Capture moved the ROI
+Bottom:
+  fisheye: True
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 0
+  offset_row_idx: 0
+Ground1:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 0
+  offset_row_idx: 0
+Ground2:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 0
+  offset_row_idx: 0
+Side1:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 0
+  offset_row_idx: 0
+Side2:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 125
+  offset_col_idx: 0
+  offset_row_idx: 0
+Top:
+  fisheye: False
+  flip_h: False
+  flip_v: False
+  fps: 80
+  offset_col_idx: 0
+  offset_row_idx: 0
+target_fps: 80
+led_pattern:
+  0:
+    'led_on_time_in_ms': 50
+    'on_off_period_length_in_ms': 100
+    'motif_duration_in_ms': 3_000
+  1:
+    'led_on_time_in_ms': 50
+    'on_off_period_length_in_ms': 1_000
+    'motif_duration_in_ms': 2_000
+# recording date has to be string ("220826" or '230101')
+recording_date: ''
+#if you have more than one calibration per day, change index
+calibration_index: 0

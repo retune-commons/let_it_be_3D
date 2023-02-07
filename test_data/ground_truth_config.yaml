@@ -1,0 +1,116 @@
+distances: 
+    Screw1Bottom: 
+        Screw2Bottom: 5
+        Screw1Top: 8.1
+        Screw1Nut: 6.1
+        Screw3Bottom: 7
+        Screw4Bottom: 10
+    
+    Screw1Nut:
+        Screw4Top: 10
+        Screw1Top: 2
+    
+    Screw2Bottom:
+        Screw3Bottom: 2
+        Screw4Bottom: 5
+    
+    Screw2Top:
+        Screw1Top: 7.7
+        Screw3Top: 1.9
+    
+    Screw3Bottom:
+        Screw4Bottom: 3
+    
+    Screw3Top:
+        Screw4Top: 4.6
+    
+    Screw4Bottom:
+        Screw4Top: 6.1
+    
+    X1:
+        MazeCornerOpenLeft: 9.4
+        X2: 16.8
+    
+    X2:
+        MazeCornerClosedLeft: 17.4
+
+    MazeCornerOpenLeft:
+        MazeCornerClosedLeft: 50
+        MazeCornerOpenRight: 5
+
+    MazeCornerOpenRight:
+        MazeCornerClosedRight: 50
+        MazeCornerOpenLeft: 5
+
+    MazeCornerClosedLeft:
+        MazeCornerOpenLeft: 50
+        MazeCornerClosedRight: 5
+        MazeCornerOpenRight: 50.24
+
+    MazeCornerClosedRight:
+        MazeCornerClosedLeft: 5
+        MazeCornerOpenRight: 50
+        MazeCornerOpenLeft: 50.24
+
+#calculates angle at the first given marker
+angles:
+    MazeCornerOpenLeft: 
+        value: 90
+        marker: [MazeCornerOpenLeft, MazeCornerOpenRight, MazeCornerClosedLeft]
+
+    MazeCornerOpenRight: 
+        value: 90
+        marker: [MazeCornerOpenRight, MazeCornerOpenLeft, MazeCornerClosedRight]
+
+    MazeCornerClosedLeft: 
+        value: 90
+        marker: [MazeCornerClosedLeft, MazeCornerClosedRight, MazeCornerOpenLeft]
+    
+    MazeCornerClosedRight: 
+        value: 90
+        marker: [MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
+        
+    screw_1: 
+        value: 90
+        marker: [Screw1Bottom, Screw1Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]  
+
+    screw_2: 
+        value: 90
+        marker: [Screw2Bottom, Screw2Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
+
+    screw_3: 
+        value: 90
+        marker: [Screw3Bottom, Screw3Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
+
+    screw_4: 
+        value: 90
+        marker: [Screw4Bottom, Screw4Top, MazeCornerClosedRight, MazeCornerClosedLeft, MazeCornerOpenRight]
+
+marker_ids_to_connect_in_3D_plot:
+    -
+      - Screw1Bottom
+      - Screw4Bottom
+      - Screw4Top
+      - Screw1Nut
+    -
+      - MazeCornerClosedLeft
+      - MazeCornerOpenLeft
+      - MazeCornerOpenRight
+      - MazeCornerClosedRight
+
+unique_ids:
+    - Screw1Bottom
+    - Screw1Nut
+    - Screw1Top
+    - Screw2Bottom
+    - Screw2Top
+    - Screw3Bottom
+    - Screw3Top
+    - Screw4Bottom
+    - Screw4Top
+    - X1
+    - X2
+    - MazeCornerOpenLeft
+    - MazeCornerOpenRight
+    - MazeCornerClosedLeft
+    - MazeCornerClosedRight
