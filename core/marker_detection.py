@@ -66,7 +66,7 @@ class DeeplabcutInterface(MarkerDetection):
                 dlc.post_processing.filtering.filterpredictions(
                     config=str(self.marker_detection_directory), video=str(self.object_to_analyse), save_as_csv=False
                 )
-                filtered_filepath = self.output_directory.joinpath(unfiltered_filepath.stem + "_filtered.h5")
+                filtered_filepath = self.output_directory.joinpath(self.object_to_analyse.stem + dlc_ending + "_filtered.h5")
                 filtered_filepath.rename(filepath.stem + "_filtered.h5")
             
         #unmute 
