@@ -292,7 +292,10 @@ class Synchronizer(ABC):
                 marker_detection_directory=config_filepath,
             )
             dlc_filepath_out = dlc_interface.analyze_objects(filtering=False, use_gpu=self.use_gpu, filepath = dlc_filepath_out)
-            dlc_created_picklefile = Path(dlc_filepath_out.stem + "_meta.pickle")
+            for file in temp_folder.iterdir():
+                if file.suffix == ".pickle":
+                    dlc_created_picklefile = file
+            
             df = pd.read_hdf(dlc_filepath_out)
             x_key, y_key, likelihood_key = (
                 [key for key in df.keys() if "LED5" in key and "x" in key],
