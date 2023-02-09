@@ -20,6 +20,7 @@ class filename_checker_interface():
         self._read_project_config()
         self.recording_configs = []
         self.recording_dates = []
+        self.objects={}
         self.meta = {
             "project_config_filepath": str(self.project_config_filepath),
             "recording_days": {},
@@ -123,7 +124,7 @@ class filename_checker_interface():
             print("added recording directory succesfully!")    
     
     def create_recordings(self) -> None:
-        self.objects = {"check_recordings_objects": {}}
+        self.objects["check_recordings_objects"] = {}
         for recording_day in self.meta["recording_days"]:
             plot = True
             for recording in self.meta["recording_days"][recording_day][

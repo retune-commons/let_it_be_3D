@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Union, Dict
 from pathlib import Path
+import math
 
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 import numpy as np
 import cv2
+import pandas as pd
+import imageio as iio
 
 from .video_metadata import VideoMetadata
 from .utils import Coordinates, load_single_frame_of_video, convert_to_path
@@ -17,7 +21,7 @@ class Plotting(ABC):
         plt.savefig(filepath, dpi=400)
 
     @abstractmethod
-    def plot(self):
+    def _create_plot(self):
         pass
 
     @abstractmethod
@@ -26,6 +30,140 @@ class Plotting(ABC):
 
     def _zscore(self, array: np.ndarray) -> np.ndarray:
         return (array - np.mean(array)) / np.std(array, ddof=0)
+    
+    
+class Plot3D(Plotting):
+    def _create_filepath(self)->str:
+        filename = f'3D_plot_{self.filename_tag}'
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
+        
+class Triangulation_Visualization(Plot3D):
+    def __init__(self, triangulation_object: "Triangulation_Recording", plot: bool = False, save: bool = True)->None:
+        self.p3d = triangulation_object.anipose_io['p3ds'][0]
+        self.bodyparts = triangulation_object.anipose_io['bodyparts']
+        self.filename_tag = triangulation_object.csv_output_filepath.stem
+        self.output_directory = triangulation_object.output_directory
+        self.triangulation_dlc_cams_filepaths = triangulation_object.triangulation_dlc_cams_filepaths
+        self.videos_cams_filepaths = {video_metadata.cam_id: video_metadata.filepath for video_metadata in triangulation_object.metadata_from_videos.values()}
+        self.filepath = self._create_filepath()
+        
+        self._create_plot(plot=plot, save=save)
+        
+    def _create_plot(self, plot: bool, save: bool) -> None:
+        ncols = len(self.triangulation_dlc_cams_filepaths.keys())
+        nrows = 2
+        grid = GridSpec(nrows, ncols,
+                        left=0.1, bottom=0.15, right=0.94, top=0.94, wspace=0.3, hspace=0.3)
+
+        fig = plt.figure(figsize=(15, 15))
+        fig.clf()
+        
+        ax_3d = fig.add_subplot(grid[0, 0:ncols-1], projection='3d')
+        ax_3d.scatter(self.p3d[:, 0], self.p3d[:, 1], self.p3d[:, 2], s=15)
+        for i in range(len(self.bodyparts)):
+            if not math.isnan(self.p3d[i, 0]):
+                ax_3d.text(self.p3d[i, 0], self.p3d[i, 1] + 0.01, self.p3d[i, 2], self.bodyparts[i], size=5, alpha=0.5)
+        for n, cam in enumerate(self.triangulation_dlc_cams_filepaths.keys()):
+            df = pd.read_hdf(self.triangulation_dlc_cams_filepaths[cam])
+            ax_2d = fig.add_subplot(grid[1, n])
+            image = iio.v3.imread(self.videos_cams_filepaths[cam], index = 0)
+            ax_2d.imshow(image)
+            for scorer, marker, _ in df.columns:
+                if df.loc[0, (scorer, marker, 'likelihood')] > 0.6:
+                    x, y = df.loc[0, (scorer, marker, 'x')], df.loc[0, (scorer, marker, 'y')]
+                    ax_2d.scatter(x, y, s=10)
+            ax_2d.set_title(f"{cam}")
+        fig.suptitle('3D_Plot_with_2D_Plots')
+        
+        if save:
+            self._save(filepath=self.filepath)
+        if plot:
+            plt.show()
+        plt.close()
+        
+    def plot(self) -> None:
+        self._create_plot(plot=True, save=False)
+    
+class Calibration_Validation_Plot(Plot3D):
+    def __init__(self, p3d: Dict, bodyparts: List[str], output_directory: Path, marker_ids_to_connect: List[str]=[], plot: bool = False, save: bool = True)->None:
+        self.p3d = p3d
+        self.bodyparts = bodyparts
+        self.filename_tag = "calvin"
+        self.output_directory = convert_to_path(output_directory)
+        self.filepath = self._create_filepath()
+        self._create_plot(plot=plot, save=save, marker_ids_to_connect=marker_ids_to_connect)
+        
+    def _create_plot(self, plot: bool, save: bool, marker_ids_to_connect: List) -> None:
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(self.p3d[:, 0], self.p3d[:, 1], self.p3d[:, 2], c='black', s=15)
+        self._connect_all_marker_ids(ax=ax, points=self.p3d, scheme=marker_ids_to_connect, bodyparts=self.bodyparts)
+        for i in range(len(self.bodyparts)):
+            ax.text(self.p3d[i, 0], self.p3d[i, 1] + 0.01, self.p3d[i, 2], self.bodyparts[i], size=5, alpha=0.5)
+        if save:
+            self._save(filepath=self.filepath)
+        if plot:
+            plt.show()
+        plt.close()
+        
+    def plot(self) -> None:
+        self._create_plot(plot=True, save=False)
+        
+    def _connect_all_marker_ids(self, ax: plt.Figure, points: np.ndarray, scheme: List[Tuple[str]],
+                                bodyparts: List[str]) -> List[plt.Figure]:
+        # ToDo: correct type hints
+        cmap = plt.get_cmap('tab10')
+        bp_dict = dict(zip(bodyparts, range(len(bodyparts))))
+        lines = []
+        for i, bps in enumerate(scheme):
+            line = self._connect_one_set_of_marker_ids(ax=ax, points=points, bps=bps, bp_dict=bp_dict,
+                                                       color=cmap(i)[:3])
+            lines.append(line)
+        return lines  # return neccessary?
+
+    def _connect_one_set_of_marker_ids(self, ax: plt.Figure, points: np.ndarray, bps: List[str], bp_dict: Dict,
+                                       color: np.ndarray) -> plt.Figure:
+        # ToDo: correct type hints
+        ixs = [bp_dict[bp] for bp in bps]
+        return ax.plot(points[ixs, 0], points[ixs, 1], points[ixs, 2], color=color)
+    
+class Predictions_Plot(Plotting):
+    def __init__(self, image: Path, predictions: Path, cam_id: str, plot: bool = False, save: bool = True, output_directory: Optional[Path]=None)->None:
+        self.predictions = predictions
+        self.image = image
+        self.cam_id = cam_id
+        if output_directory == None:
+            output_directory = predictions.parent
+        self.output_directory = convert_to_path(output_directory)
+        self.filepath = self._create_filepath()
+        self._create_plot(plot=plot, save=save)
+        
+    def _create_filepath(self)->str:
+        filename = f'predictions_{self.cam_id}'
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
+    
+    def _create_plot(self, plot: bool, save: bool)->None:
+        df = pd.read_hdf(self.predictions)
+        fig = plt.figure(figsize=(9, 6), facecolor="white")
+        image = iio.v3.imread(self.image, index = 0)
+        plt.imshow(image)
+        for scorer, marker, _ in df.columns:
+            if df.loc[0, (scorer, marker, 'likelihood')] > 0.6:
+                x, y = df.loc[0, (scorer, marker, 'x')], df.loc[0, (scorer, marker, 'y')]
+                plt.scatter(x, y)
+                plt.text(x, y, marker)
+        plt.title(f"Predictions_{self.cam_id}")
+        if save:
+            self._save(filepath=self.filepath)
+        if plot:
+            plt.show()
+        plt.close()
+    
+    def plot(self) -> None:
+        self._create_plot(plot=True, save=False)
+    
 
 
 class Alignment_Plot_Individual(Plotting):
@@ -36,17 +174,19 @@ class Alignment_Plot_Individual(Plotting):
         video_metadata: VideoMetadata,
         output_directory: Path,
         led_box_size: int,
+        plot: bool=False,
+        save: bool=True
     ) -> None:
         self.template = template
         self.led_timeseries = led_timeseries
         self.video_metadata = video_metadata
-        self.output_directory = output_directory
+        self.output_directory = convert_to_path(output_directory)
         self.led_box_size = led_box_size
         self.filepath = self._create_filepath()
-        self._create_plot(plot=False)
+        self._create_plot(plot=plot, save=save)
 
     def plot(self) -> None:
-        self._create_plot(plot=True)
+        self._create_plot(plot=True, save=False)
 
     def _create_filepath(self) -> str:
         if self.video_metadata.charuco_video:
@@ -56,14 +196,15 @@ class Alignment_Plot_Individual(Plotting):
         filepath = self.output_directory.joinpath(filename)
         return str(filepath)
 
-    def _create_plot(self, plot: bool) -> None:
+    def _create_plot(self, plot: bool, save: bool) -> None:
         end_idx = self.template.shape[0]
         fig = plt.figure(figsize=(9, 6), facecolor="white")
         plt.plot(self._zscore(array=self.led_timeseries[:end_idx]))
         plt.plot(self._zscore(array=self.template))
         plt.title(f"{self.video_metadata.cam_id}")
         plt.suptitle(f"LED box size: {self.led_box_size}")
-        self._save(filepath=self.filepath)
+        if save:
+            self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()
@@ -76,17 +217,19 @@ class Alignment_Plot_Crossvalidation(Plotting):
         led_timeseries: Dict,
         metadata: Dict,
         output_directory: Path,
+        plot: bool = False,
+        save: bool = True
     ):
         self.template = template
         self.led_timeseries = led_timeseries
         self.metadata = metadata
-        self.output_directory = output_directory
+        self.output_directory = convert_to_path(output_directory)
         self.filepath = self._create_filepath()
-        self._create_plot(plot=False)
+        self._create_plot(plot=plot, save=save)
 
     def plot(self) -> None:
-        self._create_plot(plot=True)
-
+        self._create_plot(plot=True, save=False)
+        
     def _create_filepath(self) -> str:
         if self.metadata["charuco_video"]:
             filename = f'{self.metadata["recording_date"]}_charuco_synchronization_crossvalidation'
@@ -95,7 +238,7 @@ class Alignment_Plot_Crossvalidation(Plotting):
         filepath = self.output_directory.joinpath(filename)
         return str(filepath)
 
-    def _create_plot(self, plot: bool):
+    def _create_plot(self, plot: bool, save: bool):
         fig = plt.figure(figsize=(9, 6), facecolor="white")
         end_idx = self.template.shape[0]
         for label in self.led_timeseries.keys():
@@ -103,7 +246,8 @@ class Alignment_Plot_Crossvalidation(Plotting):
             plt.plot(self._zscore(array=led_timeseries[:end_idx]), label=label)
         plt.plot(self._zscore(array=self.template), c="black", label="Template")
         plt.legend()
-        self._save(filepath=self.filepath)
+        if save:
+            self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()
@@ -117,17 +261,19 @@ class LED_Marker_Plot(Plotting):
         box_size: int,
         video_metadata: VideoMetadata,
         output_directory: Path,
+        plot: bool=False,
+        save: bool=True
     ) -> None:
         self.image = image
         self.led_center_coordinates = led_center_coordinates
         self.box_size = box_size
         self.video_metadata = video_metadata
-        self.output_directory = output_directory
+        self.output_directory = convert_to_path(output_directory)
         self.filepath = self._create_filepath()
-        self._create_plot(plot=False)
+        self._create_plot(plot=plot, save=save)
 
     def plot(self) -> None:
-        self._create_plot(plot=True)
+        self._create_plot(plot=True, save=False)
 
     def _create_filepath(self) -> Path:
         if self.video_metadata.charuco_video:
@@ -137,7 +283,7 @@ class LED_Marker_Plot(Plotting):
         filepath = self.output_directory.joinpath(filename)
         return filepath
 
-    def _create_plot(self, plot: bool):
+    def _create_plot(self, plot: bool, save: bool):
         fig = plt.figure()
         plt.imshow(self.image)
         plt.scatter(self.led_center_coordinates.x, self.led_center_coordinates.y)
@@ -154,8 +300,8 @@ class LED_Marker_Plot(Plotting):
             [x_start_index, x_start_index, x_end_index, x_end_index, x_start_index],
             [y_start_index, y_end_index, y_end_index, y_start_index, y_start_index],
         )
-
-        self._save(filepath=self.filepath)
+        if save:
+            self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()
@@ -167,7 +313,7 @@ class Intrinsics(Plotting):
         self._create_all_images(frame_idx=0)
         if save:
             self.filepath = self._create_filepath(output_dir=output_dir)
-        self.plot(plot=plot, save=save)
+        self._create_plot(plot=plot, save=save)
 
     def _create_all_images(self, frame_idx: int = 0) -> None:
         self.distorted_input_image = load_single_frame_of_video(
@@ -185,8 +331,11 @@ class Intrinsics(Plotting):
                 self.video_metadata.intrinsic_calibration["K"],
                 self.video_metadata.intrinsic_calibration["D"],
             )
-
-    def plot(self, plot: bool, save: bool) -> None:
+            
+    def plot(self) -> None:
+        self._create_plot(plot=True, save=False)
+                          
+    def _create_plot(self, plot: bool, save: bool) -> None:
         fig = plt.figure(figsize=(12, 5), facecolor="white")
         gs = fig.add_gridspec(1, 2)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -204,8 +353,10 @@ class Intrinsics(Plotting):
     def _create_filepath(self, output_dir: Path) -> Path:
         if self.video_metadata.charuco_video:
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_undistorted_image"
-        else:
+        elif self.video_metadata.recording:
             filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
+        elif self.video_metadata.positions:
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_calvin_undistorted_image"
         filepath = output_dir.joinpath(filename)
         return filepath
 

@@ -16,6 +16,7 @@ from .camera_intrinsics import (
     IntrinsicCalibratorRegularCameraCharuco,
 )
 from .utils import load_single_frame_of_video, convert_to_path, check_keys, read_config
+from .user_specific_rules import user_specific_rules_on_videometadata
 
 
 class VideoMetadata:
@@ -94,15 +95,12 @@ class VideoMetadata:
         self.max_cpu_cores_to_pool = project_config_dict["max_cpu_cores_to_pool"]
         
         while True:
-            undefined_attributes = self._extract_filepath_metadata(self.filepath)
+            undefined_attributes = self._extract_filepath_metadata()
             if len(undefined_attributes)>0:
                 self._print_message(attributes = undefined_attributes)
                 self._rename_file()
                 if self.filepath.stem == "x":
                     self.filepath.unlink()
-                    return "del"
-                if self.filepath.stem == "y":
-                    print(f"{video_filepath} needs to be moved!")
                     return "del"
             else:
                 break
@@ -167,80 +165,72 @@ class VideoMetadata:
         elif tag == "recording":
             self.recording = True
 
-    def _extract_filepath_metadata(self, filepath_name: Path) -> List:
-        if filepath_name.suffix == ".AVI":
-            try:
-                filepath_name = Path(filepath_name.name.replace(
-                    filepath_name.name[
-                        filepath_name.name.index("00") : filepath_name.name.index("00") + 3
-                    ],
-                    "",
-                ))
-            except:
-                pass
-            self.cam_id = "Top"
-
+    def _extract_filepath_metadata(self) -> List:
+        user_specific_rules_on_videometadata(videometadata=self)
         if self.charuco_video:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    else:
+                        try:
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
+                        except ValueError:
+                            pass
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!")
 
         elif self.positions:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    else:
+                        try:
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
+                        except ValueError:
+                            pass
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!")
 
         elif self.recording:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                elif piece in self.valid_paradigms:
-                    self.paradigm = piece
-                elif piece in self.valid_mouse_lines:
-                    self.mouse_line = piece
-                elif piece.startswith("F"):
-                    sub_pieces = piece.split("-")
-                    if len(sub_pieces) == 2:
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    elif piece in self.valid_paradigms:
+                        self.paradigm = piece
+                    elif piece in self.valid_mouse_lines:
+                        self.mouse_line = piece
+                    elif piece.startswith("F"):
+                        sub_pieces = piece.split("-")
+                        if len(sub_pieces) == 2:
+                            try:
+                                int(sub_pieces[1])
+                                self.mouse_number = piece
+                            except ValueError:
+                                pass
+                    else:
                         try:
-                            int(sub_pieces[1])
-                            self.mouse_number = piece
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
                         except ValueError:
                             pass
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
 
             for attribute in [
                 "cam_id",
@@ -430,81 +420,73 @@ class VideoMetadataChecker(VideoMetadata):
             )
             
             
-    def _extract_filepath_metadata(self, filepath_name: Path) -> List[str]:
+    def _extract_filepath_metadata(self) -> List[str]:
         undefined_attributes = []
-        if filepath_name.suffix == ".AVI":
-            try:
-                filepath_name = Path(filepath_name.name.replace(
-                    filepath_name.name[
-                        filepath_name.name.index("00") : filepath_name.name.index("00") + 3
-                    ],
-                    "",
-                ))
-            except:
-                pass
-            self.cam_id = "Top"
-
+        user_specific_rules_on_videometadata(videometadata=self)
         if self.charuco_video:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    else:
+                        try:
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
+                        except ValueError:
+                            pass
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     undefined_attributes.append(attribute)
 
         elif self.positions:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    else:
+                        try:
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
+                        except ValueError:
+                            pass
 
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     undefined_attributes.append(attribute)
 
         elif self.recording:
-            for piece in filepath_name.stem.split("_"):
-                if piece in self.valid_cam_ids:
-                    self.cam_id = piece
-                elif piece in self.valid_paradigms:
-                    self.paradigm = piece
-                elif piece in self.valid_mouse_lines:
-                    self.mouse_line = piece
-                elif piece.startswith("F"):
-                    sub_pieces = piece.split("-")
-                    if len(sub_pieces) == 2:
+            for piece in self.filepath.stem.split("_"):
+                for cam in self.valid_cam_ids:
+                    if piece.lower() == cam.lower():
+                        self.cam_id = cam
+                    elif piece in self.valid_paradigms:
+                        self.paradigm = piece
+                    elif piece in self.valid_mouse_lines:
+                        self.mouse_line = piece
+                    elif piece.startswith("F"):
+                        sub_pieces = piece.split("-")
+                        if len(sub_pieces) == 2:
+                            try:
+                                int(sub_pieces[1])
+                                self.mouse_number = piece
+                            except ValueError:
+                                pass
+                    else:
                         try:
-                            int(sub_pieces[1])
-                            self.mouse_number = piece
+                            self.recording_date = datetime.date(
+                                year=int("20" + piece[0:2]),
+                                month=int(piece[2:4]),
+                                day=int(piece[4:6]),
+                            )
                         except ValueError:
                             pass
-                else:
-                    try:
-                        self.recording_date = datetime.date(
-                            year=int("20" + piece[0:2]),
-                            month=int(piece[2:4]),
-                            day=int(piece[4:6]),
-                        )
-                    except ValueError:
-                        pass
 
             for attribute in [
                 "cam_id",
@@ -537,8 +519,11 @@ class VideoMetadataChecker(VideoMetadata):
     
     def _rename_file(self) -> None:
         suffix = self.filepath.suffix
-        new_filename = Path(input(f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/"))
-        new_filepath = self.filepath.parent.joinpath(new_filename.with_suffix(suffix))
+        new_filename = input(f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/")
+        if new_filename == "y":
+            print(f"{self.filepath} needs to be moved!")
+            raise TypeError
+        new_filepath = self.filepath.parent.joinpath(Path(new_filename).with_suffix(suffix))
         if new_filepath == self.filepath:
             print("The entered filename and the real filename are identical.")
         elif new_filepath.exists():

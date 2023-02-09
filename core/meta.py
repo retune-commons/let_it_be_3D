@@ -8,7 +8,7 @@ from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
 import imageio as iio
 
-from .utils import convert_to_path, create_calibration_key
+from .utils import convert_to_path, create_calibration_key, check_keys, read_config
 from .triangulation_calibration_module import Calibration, Triangulation_Positions, Triangulation_Recordings
 from .video_metadata import VideoMetadata
 
@@ -18,16 +18,7 @@ class meta_interface(ABC):
         self, project_config_filepath: Path, project_name: Optional[str] = None, overwrite: bool=False
     ) -> None:
         self.project_config_filepath = convert_to_path(project_config_filepath)
-        if project_name == None:
-            project_name = "My_project"
-        self.project_name = project_name
-        self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(
-            self.project_name + ".yaml"
-        )
-        if self.standard_yaml_filepath.exists() and overwrite == False:
-            self.standard_yaml_filepath = Path(str(self.standard_yaml_filepath)[:-5] + "_01.yaml")
-        if not self.project_config_filepath.exists():
-            raise FileNotFoundError("The file doesn't exist. Check your path!")
+        self._create_standard_yaml_filepath(project_name=project_name, overwrite=overwrite)
         self._read_project_config()
         self.recording_configs = []
         self.recording_dates = []
@@ -53,23 +44,26 @@ class meta_interface(ABC):
             filepath_to_recording_config.suffix == ".yaml"
             and filepath_to_recording_config.exists()
         ):
-            self.recording_configs.append(filepath_to_recording_config)
-            recording_date, calibration_index = self._read_recording_config(
-                recording_config_filepath=filepath_to_recording_config
-            )
-            self.meta["recording_days"][
-                f"Recording_Day_{recording_date}_{str(calibration_index)}"
-            ] = {
-                "recording_config_filepath": str(filepath_to_recording_config),
-                "recording_date": recording_date,
-                "recording_directories": [],
-                "recordings": {},
-                "calibrations": {},
-                "calibration_directory": str(filepath_to_recording_config.parent),
-                "calibration_index": calibration_index,
-            }
+            if not filepath_to_recording_config in self.recording_configs:
+                self.recording_configs.append(filepath_to_recording_config)
+                recording_date, calibration_index = self._read_recording_config(
+                    recording_config_filepath=filepath_to_recording_config
+                )
+                self.meta["recording_days"][
+                    f"Recording_Day_{recording_date}_{str(calibration_index)}"
+                ] = {
+                    "recording_config_filepath": str(filepath_to_recording_config),
+                    "recording_date": recording_date,
+                    "recording_directories": [],
+                    "recordings": {},
+                    "calibrations": {},
+                    "calibration_directory": str(filepath_to_recording_config.parent),
+                    "calibration_index": calibration_index,
+                }
+            else:
+                print("The config file was already added!")
         else:
-            pass
+            raise FileNotFoundError(f"The path doesn't exist or is not linked to a .yaml file!")
 
     def initialize_meta_config(self) -> None:
         self.objects = {}
@@ -92,8 +86,8 @@ class meta_interface(ABC):
 
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
         file = convert_to_path(file)
-        if not file.exists() or recording_day not in self.meta["recording_days"].keys():
-            print(
+        if not file.is_dir() or recording_day not in self.meta["recording_days"].keys():
+            raise FileNotFoundError(
                 f"couldn't add recording directory! \nCheck your filepath and make sure the recording_day is in {self.meta['recording_days'].keys()}!"
             )
         else:
@@ -275,7 +269,7 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 5
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def calibrate(self, calibrate_optimal: bool = True, verbose: bool = False) -> None:
+    def calibrate(self, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool=False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for calibration in recording_day["calibrations"][
                 "calibration_keys"
@@ -283,11 +277,13 @@ class meta_interface(ABC):
                 if calibrate_optimal:
                     self.objects["calibration_objects"][calibration["key"]].calibrate_optimal(
                         triangulation_positions=self.objects["position_objects"][calibration["key"]],
-                        verbose=verbose
+                        verbose=verbose,
+                        test_mode = test_mode
                     )
                 else:
                     self.objects["calibration_objects"][calibration["key"]].run_calibration(
-                        verbose=verbose
+                        verbose=verbose,
+                        test_mode=test_mode
                     )
                 calibration["toml_filepath"] = str(
                     self.objects["calibration_objects"][
@@ -298,7 +294,7 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def triangulate_recordings(self) -> None:
+    def triangulate_recordings(self, test_mode: bool=False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 toml_filepath = recording_day["calibrations"]["calibration_keys"][
@@ -307,7 +303,7 @@ class meta_interface(ABC):
                 self.objects["triangulation_recordings_objects"][
                     recording
                 ].run_triangulation(
-                    calibration_toml_filepath=toml_filepath, adapt_to_calibration=True
+                    calibration_toml_filepath=toml_filepath, save_first_frame = True, test_mode=test_mode
                 )
                 recording_day["recordings"][recording]["3D_csv"] = str(
                     self.objects["triangulation_recordings_objects"][
@@ -391,41 +387,27 @@ class meta_interface(ABC):
             yaml.dump(self.meta, file)
 
     def _read_project_config(self) -> None:
-        if self.project_config_filepath.exists():
-            with open(self.project_config_filepath, "r") as ymlfile:
-                project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-            for key in [
-                "paradigms",
-            ]:
-                try:
-                    project_config[key]
-                except KeyError:
-                    raise KeyError(
-                        f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
-                    )
-            self.paradigms = project_config["paradigms"]
-        else:
-            raise FileNotFoundError(f"There is no project_config_file at {self.project_config_filepath}!")
+        project_config = read_config(self.project_config_filepath)
+        missing_keys = check_keys(project_config, ["paradigms"])
+        if len(missing_keys) > 0:
+            raise KeyError(
+                f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
+            )
+        self.paradigms = project_config["paradigms"]
 
     def _read_recording_config(self, recording_config_filepath: Path) -> str:
-        if recording_config_filepath.exists():
-            with open(recording_config_filepath, "r") as ymlfile:
-                recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-            for key in ["recording_date"]:
-                try:
-                    recording_config[key]
-                except KeyError:
-                    raise KeyError(
-                        f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
-                    )
-            self.recording_dates.append(recording_config["recording_date"])
-            return str(recording_config["recording_date"]), str(
-                recording_config["calibration_index"]
+        recording_config = read_config(recording_config_filepath)
+        missing_keys = check_keys(recording_config, ["recording_date", "calibration_index"])
+        if len(missing_keys) > 0:
+            raise KeyError(
+                f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
             )
-        else:
-            raise FileNotFoundError(f"There is no recording_config_file at {recording_config_filepath}!")
+        recording_date = str(recording_config["recording_date"])
+        if recording_date not in self.recording_dates:
+            self.recording_dates.append(recording_config["recording_date"])
+        return recording_date, str(
+            recording_config["calibration_index"]
+        )
 
     def _create_video_dict(
         self, video: VideoMetadata, intrinsics: bool = False
@@ -442,3 +424,16 @@ class meta_interface(ABC):
                 video.intrinsic_calibration_filepath
             )
         return dictionary
+
+    def _create_standard_yaml_filepath(self, project_name: str, overwrite: bool):
+        if project_name == None:
+            project_name = "My_project"
+        self.project_name = project_name
+        self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(
+            self.project_name + ".yaml"
+        )
+        while True:
+            if self.standard_yaml_filepath.exists() and overwrite == False:
+                self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(self.standard_yaml_filepath.stem + "_01.yaml")
+            else:
+                break

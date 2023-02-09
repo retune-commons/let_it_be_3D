@@ -68,7 +68,43 @@ class Check(ABC):
                     f"Missing information {dictionary_key} for cam {missing_keys} in the config_file {project_config_filepath}!"
                 )
         return recording_config_dict, project_config_dict
-
+    
+    def _create_video_objects(
+        self,
+        directory: Path,
+        recording_config_dict: Dict,
+        project_config_dict: Dict,
+        videometadata_tag: str,
+        filetypes: [str],
+        filename_tag: str = ""
+    ) -> None:
+        
+        videofiles = [
+            file
+            for file in directory.iterdir()
+            if filename_tag.lower() in file.name.lower()
+            and file.suffix in filetypes
+            and ("synchronized" not in file.name and "Front" not in file.name)
+        ]
+    
+        self.metadata_from_videos = []
+        for filepath in videofiles:
+            try:
+                iio.v3.imread(filepath, index=0)
+            except:
+                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
+                videofiles.remove(filepath)
+        for filepath in videofiles:
+            try:
+                video_metadata = VideoMetadataChecker(
+                    video_filepath=filepath,
+                    recording_config_dict=recording_config_dict,
+                    project_config_dict=project_config_dict,
+                    tag = videometadata_tag
+                )
+                self.metadata_from_videos.append(video_metadata)
+            except TypeError:
+                pass
 
 class Check_Calibration(Check):
     def __init__(self, 
@@ -83,47 +119,18 @@ class Check_Calibration(Check):
         print("\n")
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath)
         self._create_video_objects(
-            calibration_directory=self.calibration_directory,
+            directory=self.calibration_directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
+            videometadata_tag="calibration",
+            filetypes=[".AVI", ".avi", ".mov", ".mp4"],
+            filename_tag=self.calibration_tag   
         )
         if plot:
             print(f'Intrinsic calibrations for calibration of {self.recording_date}')
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
                 Intrinsics(video_metadata = video_metadata, plot = True, save = False)
-                
-    def _create_video_objects(
-        self,
-        calibration_directory: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict
-    ) -> None:
-        charuco_videofiles = [
-            file
-            for file in calibration_directory.iterdir()
-            if (file.name.endswith(".mp4") or file.name.endswith(".mov") or file.name.endswith(".AVI"))
-            and ("synchronized" not in file.name) and self.calibration_tag.lower() in file.name.lower()
-        ]
-           
-        self.metadata_from_videos = []
-        for filepath in charuco_videofiles:
-            try:
-                iio.v3.imread(filepath, index=0)
-            except:
-                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
-                charuco_videofiles.remove(filepath)
-        for filepath in charuco_videofiles:
-            try:
-                video_metadata = VideoMetadataChecker(
-                    video_filepath=filepath,
-                    recording_config_dict=recording_config_dict,
-                    project_config_dict=project_config_dict,
-                    tag = "calibration"
-                )
-                self.metadata_from_videos.append(video_metadata)
-            except TypeError:
-                pass
         
         files_per_cam = {}
         cams_not_found = []
@@ -183,47 +190,17 @@ class Check_Recording(Check):
         print("\n")
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath)
         self._create_video_objects(
-            recording_directory=self.recording_directory,
+            directory=self.recording_directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
+            videometadata_tag="recording",
+            filetypes=[".AVI", ".avi", ".mov", ".mp4"],   
         )
         if plot:
             print(f'Intrinsic calibrations for {self.recording_date}')
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
                 Intrinsics(video_metadata = video_metadata, plot = True, save = False)
-        
-    def _create_video_objects(
-        self,
-        recording_directory: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict
-    ) -> None:
-        recording_videofiles = [
-            file
-            for file in recording_directory.iterdir()
-            if (file.name.endswith(".mp4") or file.name.endswith(".mov") or file.name.endswith(".AVI"))
-            and ("synchronized" not in file.name)
-        ]
-           
-        self.metadata_from_videos = []
-        for filepath in recording_videofiles:
-            try:
-                iio.v3.imread(filepath, index=0)
-            except:
-                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
-                recording_videofiles.remove(filepath)
-        for filepath in recording_videofiles:
-            try:
-                video_metadata = VideoMetadataChecker(
-                    video_filepath=filepath,
-                    recording_config_dict=recording_config_dict,
-                    project_config_dict=project_config_dict,
-                    tag = 'recording'
-                )
-                self.metadata_from_videos.append(video_metadata)
-            except TypeError:
-                pass
         
         files_per_cam = {}
         cams_not_found = []
@@ -296,53 +273,18 @@ class Check_Positions(Check):
 
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(recording_config_filepath = recording_config_filepath, project_config_filepath = project_config_filepath)
         self._create_video_objects(
-            positions_directory=self.positions_directory,
+            directory=self.positions_directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
+            videometadata_tag="positions",
+            filetypes=[".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"],
+            filename_tag=self.calibration_validation_tag   
         )
         if plot:
             print(f'Intrinsic calibrations for positions of {self.recording_date}')
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
                 Intrinsics(video_metadata = video_metadata, plot = True, save = False)
-        
-    def _create_video_objects(
-        self,
-        positions_directory: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict
-    ) -> None:
-        positions_files = [
-            file
-            for file in positions_directory.iterdir()
-            if(
-                file.name.endswith(".tiff")
-                or file.name.endswith(".bmp")
-                or file.name.endswith(".jpg")
-                or file.name.endswith(".png")
-                or file.name.endswith(".AVI")
-            )
-            and self.calibration_validation_tag.lower() in file.name.lower()
-        ]
-           
-        self.metadata_from_videos = []
-        for filepath in positions_files:
-            try:
-                iio.v3.imread(filepath, index=0)
-            except:
-                print(f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!")
-                positions_files.remove(filepath)
-        for filepath in positions_files:
-            try:
-                video_metadata = VideoMetadataChecker(
-                    video_filepath=filepath,
-                    recording_config_dict=recording_config_dict,
-                    project_config_dict=project_config_dict,
-                    tag = "positions"
-                )
-                self.metadata_from_videos.append(video_metadata)
-            except TypeError:
-                pass
         
         files_per_cam = {}
         cams_not_found = []
