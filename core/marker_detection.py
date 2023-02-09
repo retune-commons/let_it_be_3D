@@ -66,7 +66,10 @@ class DeeplabcutInterface(MarkerDetection):
             unfiltered_filepath.rename(filepath.with_suffix('.h5'))
             if filtering:
                 filtered_filepath = self.output_directory.joinpath(self.object_to_analyse.stem + dlc_ending + "_filtered.h5")
-                filtered_filepath.rename(filepath.stem + "_filtered.h5")
+                if filtered_filepath.exists():
+                    filtered_filepath.rename(filepath.stem + "_filtered.h5")
+                else:
+                    print(f"{filtered_filepath} not found! Data was but not filtered.")
             
         #unmute 
         sys.stdout = old_stdout
