@@ -4,6 +4,7 @@ from pathlib import Path
 import math
 
 import matplotlib.pyplot as plt
+
 from matplotlib.gridspec import GridSpec
 import numpy as np
 import cv2
@@ -39,8 +40,10 @@ class Plot3D(Plotting):
         return str(filepath)
         
 class Triangulation_Visualization(Plot3D):
-    def __init__(self, triangulation_object: "Triangulation_Recording", plot: bool = False, save: bool = True)->None:
-        self.p3d = triangulation_object.anipose_io['p3ds'][0]
+    def __init__(self, triangulation_object: "Triangulation", plot: bool = False, save: bool = True, idx: int=0, likelihood_threshold: float=0.6)->None:
+        self.p3d = triangulation_object.anipose_io['p3ds'][idx]
+        self.idx = idx
+        self.likelihood_threshold = likelihood_threshold
         self.bodyparts = triangulation_object.anipose_io['bodyparts']
         self.filename_tag = triangulation_object.csv_output_filepath.stem
         self.output_directory = triangulation_object.output_directory
@@ -50,7 +53,7 @@ class Triangulation_Visualization(Plot3D):
         
         self._create_plot(plot=plot, save=save)
         
-    def _create_plot(self, plot: bool, save: bool) -> None:
+    def _create_plot(self, plot: bool, save: bool, return_fig:bool=False) -> None:
         ncols = len(self.triangulation_dlc_cams_filepaths.keys())
         nrows = 2
         grid = GridSpec(nrows, ncols,
@@ -60,22 +63,27 @@ class Triangulation_Visualization(Plot3D):
         fig.clf()
         
         ax_3d = fig.add_subplot(grid[0, 0:ncols-1], projection='3d')
-        ax_3d.scatter(self.p3d[:, 0], self.p3d[:, 1], self.p3d[:, 2], s=15)
+        ax_3d.scatter(self.p3d[:, 0], self.p3d[:, 1], self.p3d[:, 2], s=15, c='blue')
         for i in range(len(self.bodyparts)):
             if not math.isnan(self.p3d[i, 0]):
                 ax_3d.text(self.p3d[i, 0], self.p3d[i, 1] + 0.01, self.p3d[i, 2], self.bodyparts[i], size=5, alpha=0.5)
         for n, cam in enumerate(self.triangulation_dlc_cams_filepaths.keys()):
             df = pd.read_hdf(self.triangulation_dlc_cams_filepaths[cam])
             ax_2d = fig.add_subplot(grid[1, n])
-            image = iio.v3.imread(self.videos_cams_filepaths[cam], index = 0)
+            image = iio.v3.imread(self.videos_cams_filepaths[cam], index = self.idx)
             ax_2d.imshow(image)
             for scorer, marker, _ in df.columns:
-                if df.loc[0, (scorer, marker, 'likelihood')] > 0.6:
-                    x, y = df.loc[0, (scorer, marker, 'x')], df.loc[0, (scorer, marker, 'y')]
-                    ax_2d.scatter(x, y, s=10)
+                if df.loc[self.idx, (scorer, marker, 'likelihood')] > self.likelihood_threshold:
+                    x, y = df.loc[self.idx, (scorer, marker, 'x')], df.loc[self.idx, (scorer, marker, 'y')]
+                    ax_2d.scatter(x, y, s=10, c='blue')
             ax_2d.set_title(f"{cam}")
         fig.suptitle('3D_Plot_with_2D_Plots')
         
+        if return_fig:
+            from moviepy.video.io.bindings import mplfig_to_npimage
+            npimage = mplfig_to_npimage(fig)
+            plt.close()
+            return npimage
         if save:
             self._save(filepath=self.filepath)
         if plot:
@@ -84,6 +92,9 @@ class Triangulation_Visualization(Plot3D):
         
     def plot(self) -> None:
         self._create_plot(plot=True, save=False)
+        
+    def return_fig(self)->None:
+        return self._create_plot(plot=False, save=False, return_fig=True)
     
 class Calibration_Validation_Plot(Plot3D):
     def __init__(self, p3d: Dict, bodyparts: List[str], output_directory: Path, marker_ids_to_connect: List[str]=[], plot: bool = False, save: bool = True)->None:

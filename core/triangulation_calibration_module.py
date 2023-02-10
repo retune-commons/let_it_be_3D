@@ -713,7 +713,6 @@ class Triangulation_Recordings(Triangulation):
 
     def _validate_unique_cam_ids(self) -> None:
         self.cameras = [camera.name for camera in self.camera_group.cameras]
-        # possibility to create empty .h5 for missing recordings?
         filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
         filepath_keys.sort()
         self.cameras.sort()
@@ -723,7 +722,21 @@ class Triangulation_Recordings(Triangulation):
 
         for camera in self.cameras:
             if camera not in filepath_keys:
-                print(f"Creating empty .h5 file for {camera}!")       
+                print(f"Creating empty .h5 file for {camera}!") 
+                
+    def create_triangulated_video(self, filename: str, start_s: int = 0, end_s: int = 5, output_fps: int = 24, speed: int = 1)->None:
+        from moviepy.editor import VideoClip
+        self.created_video_start_s = start_s
+        self.created_video_output_fps = output_fps
+        self.created_video_speed = speed
+        self.created_video_end_s = end_s
+        triangulated_video = VideoClip(self._get_triangulated_plots, duration=(self.created_video_end_s-self.created_video_start_s)/self.created_video_speed)
+        triangulated_video.write_videofile(f"{self.output_directory.joinpath(filename)}.mp4", fps=self.created_video_output_fps, logger=None)
+        
+    def _get_triangulated_plots(self, idx: int)->np.ndarray:
+        idx = int((self.created_video_start_s + idx*self.created_video_speed)*self.target_fps)
+        t = Triangulation_Visualization(self, plot=False, save=False, idx=idx)
+        return t.return_fig()
 
 
 class Triangulation_Positions(Triangulation):
