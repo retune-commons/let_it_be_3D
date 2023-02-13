@@ -7,18 +7,28 @@ import yaml
 from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
 import imageio as iio
+import pandas as pd
 
 from .utils import convert_to_path, create_calibration_key, check_keys, read_config
-from .triangulation_calibration_module import Calibration, Triangulation_Positions, Triangulation_Recordings
+from .triangulation_calibration_module import (
+    Calibration,
+    Triangulation_Positions,
+    Triangulation_Recordings,
+)
 from .video_metadata import VideoMetadata
 
 
 class meta_interface(ABC):
     def __init__(
-        self, project_config_filepath: Path, project_name: Optional[str] = None, overwrite: bool=False
+        self,
+        project_config_filepath: Path,
+        project_name: Optional[str] = None,
+        overwrite: bool = False,
     ) -> None:
         self.project_config_filepath = convert_to_path(project_config_filepath)
-        self._create_standard_yaml_filepath(project_name=project_name, overwrite=overwrite)
+        self._create_standard_yaml_filepath(
+            project_name=project_name, overwrite=overwrite
+        )
         self._read_project_config()
         self.recording_configs = []
         self.recording_dates = []
@@ -63,7 +73,9 @@ class meta_interface(ABC):
             else:
                 print("The config file was already added!")
         else:
-            raise FileNotFoundError(f"The path doesn't exist or is not linked to a .yaml file!")
+            raise FileNotFoundError(
+                f"The path doesn't exist or is not linked to a .yaml file!"
+            )
 
     def initialize_meta_config(self) -> None:
         self.objects = {}
@@ -80,9 +92,11 @@ class meta_interface(ABC):
             recording_day["num_recordings"] = len(
                 recording_day["recording_directories"]
             )
-            print(f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!")
+            print(
+                f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!"
+            )
         self.meta["meta_step"] = 1
-        self.export_meta_to_yaml(filepath = self.standard_yaml_filepath)
+        self.export_meta_to_yaml(filepath=self.standard_yaml_filepath)
 
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
         file = convert_to_path(file)
@@ -99,7 +113,7 @@ class meta_interface(ABC):
             )
             print("added recording directory succesfully!")
 
-    def create_recordings(self) -> None:
+    def create_recordings(self, test_mode: bool = False) -> None:
         self.objects["triangulation_recordings_objects"] = {}
         # optional: create output_directories?
         for recording_day in self.meta["recording_days"]:
@@ -113,6 +127,7 @@ class meta_interface(ABC):
                     ]["recording_config_filepath"],
                     project_config_filepath=self.meta["project_config_filepath"],
                     output_directory=recording,
+                    test_mode=test_mode,
                 )
                 individual_key = f"{triangulation_recordings_object.mouse_id}_{triangulation_recordings_object.recording_date}_{triangulation_recordings_object.paradigm}"
                 videos = {
@@ -139,14 +154,21 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 2
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def synchronize_recordings(self, verbose: bool = False, test_mode: bool = False, synchronize_only: bool = False) -> None:
+    def synchronize_recordings(
+        self,
+        verbose: bool = False,
+        test_mode: bool = False,
+        synchronize_only: bool = False,
+    ) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 if verbose:
                     start_time_recording = time.time()
                 self.objects["triangulation_recordings_objects"][
                     recording
-                ].run_synchronization(test_mode=test_mode, synchronize_only = synchronize_only)
+                ].run_synchronization(
+                    test_mode=test_mode, synchronize_only=synchronize_only
+                )
                 for video in recording_day["recordings"][recording]["videos"]:
                     try:
                         recording_day["recordings"][recording]["videos"][video][
@@ -175,16 +197,19 @@ class meta_interface(ABC):
                 if verbose:
                     end_time_recording = time.time()
                     duration = end_time_recording - start_time_recording
-                    print(f"The analysis of this recording {recording} took {duration}.\n")
-                    
+                    print(
+                        f"The analysis of this recording {recording} took {duration}.\n"
+                    )
+
         self.meta["meta_step"] = 3
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def create_calibrations(self, ground_truth_config_filepath: Path) -> None:
+    def create_calibrations(
+        self, ground_truth_config_filepath: Path, test_mode: bool = False
+    ) -> None:
         self.objects["calibration_objects"] = {}
         self.objects["position_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
-
             recording_day["calibrations"]["calibration_keys"] = {}
 
             calibration_object = Calibration(
@@ -192,11 +217,14 @@ class meta_interface(ABC):
                 project_config_filepath=self.project_config_filepath,
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 output_directory=recording_day["calibration_directory"],
+                test_mode=test_mode,
             )
 
             cams = [video for video in calibration_object.metadata_from_videos]
 
-            self.objects["calibration_objects"][calibration_object.calibration_index] = calibration_object
+            self.objects["calibration_objects"][
+                calibration_object.calibration_index
+            ] = calibration_object
 
             video_dict = {
                 video: self._create_video_dict(
@@ -204,23 +232,26 @@ class meta_interface(ABC):
                 )
                 for video in calibration_object.metadata_from_videos
             }
-            recording_day["calibrations"]["calibration_keys"][calibration_object.calibration_index] = {
-                "key": calibration_object.calibration_index
-            }
+            recording_day["calibrations"]["calibration_keys"][
+                calibration_object.calibration_index
+            ] = {"key": calibration_object.calibration_index}
             recording_day["calibrations"]["target_fps"] = calibration_object.target_fps
             recording_day["calibrations"][
                 "led_pattern"
             ] = calibration_object.led_pattern
             recording_day["calibrations"]["videos"] = video_dict
-            
+
             positions_object = Triangulation_Positions(
                 positions_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
-                ground_truth_config_filepath = ground_truth_config_filepath
+                ground_truth_config_filepath=ground_truth_config_filepath,
+                test_mode=test_mode,
             )
-            self.objects["position_objects"][positions_object.calibration_index] = positions_object
+            self.objects["position_objects"][
+                positions_object.calibration_index
+            ] = positions_object
             for video in positions_object.metadata_from_videos.values():
                 try:
                     recording_day["calibrations"]["videos"][video.cam_id][
@@ -269,22 +300,27 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 5
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def calibrate(self, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool=False) -> None:
+    def calibrate(
+        self, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool = False
+    ) -> None:
         for recording_day in self.meta["recording_days"].values():
             for calibration in recording_day["calibrations"][
                 "calibration_keys"
             ].values():
                 if calibrate_optimal:
-                    self.objects["calibration_objects"][calibration["key"]].calibrate_optimal(
-                        triangulation_positions=self.objects["position_objects"][calibration["key"]],
+                    self.objects["calibration_objects"][
+                        calibration["key"]
+                    ].calibrate_optimal(
+                        triangulation_positions=self.objects["position_objects"][
+                            calibration["key"]
+                        ],
                         verbose=verbose,
-                        test_mode = test_mode
+                        test_mode=test_mode,
                     )
                 else:
-                    self.objects["calibration_objects"][calibration["key"]].run_calibration(
-                        verbose=verbose,
-                        test_mode=test_mode
-                    )
+                    self.objects["calibration_objects"][
+                        calibration["key"]
+                    ].run_calibration(verbose=verbose, test_mode=test_mode)
                 calibration["toml_filepath"] = str(
                     self.objects["calibration_objects"][
                         calibration["key"]
@@ -294,7 +330,7 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def triangulate_recordings(self, test_mode: bool=False) -> None:
+    def triangulate_recordings(self, test_mode: bool = False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 toml_filepath = recording_day["calibrations"]["calibration_keys"][
@@ -303,7 +339,9 @@ class meta_interface(ABC):
                 self.objects["triangulation_recordings_objects"][
                     recording
                 ].run_triangulation(
-                    calibration_toml_filepath=toml_filepath, save_first_frame = True, test_mode=test_mode
+                    calibration_toml_filepath=toml_filepath,
+                    save_first_frame=True,
+                    test_mode=test_mode,
                 )
                 recording_day["recordings"][recording]["3D_csv"] = str(
                     self.objects["triangulation_recordings_objects"][
@@ -314,8 +352,57 @@ class meta_interface(ABC):
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-        
-        
+    def add_triangulated_csv_to_database(
+        self, data_base_path: str, overwrite: bool = True
+    ) -> None:
+        data_base_path = convert_to_path(data_base_path)
+        data_base = pd.read_csv(data_base_path, dtype="str")
+        for recording_day in self.meta["recording_days"].values():
+            for recording in recording_day["recordings"]:
+                filename = self.objects["triangulation_recordings_objects"][
+                    recording
+                ].csv_output_filepath.stem
+                if any(data_base["recording"] == filename) and not overwrite:
+                    print(
+                        f"{filename} was already in test! if you want to add it anyways use overwrite=True!"
+                    )
+
+                new_df = pd.DataFrame(
+                    {},
+                    columns=[
+                        "recording",
+                        "date",
+                        "session_id",
+                        "paradigm",
+                        "subject_id",
+                        "group_id",
+                        "batch",
+                        "trial_id",
+                    ],
+                )
+
+                subject_id = self.objects["triangulation_recordings_objects"][
+                    recording
+                ].mouse_id
+                recording_date = self.objects["triangulation_recordings_objects"][
+                    recording
+                ].recording_date
+                paradigm = self.objects["triangulation_recordings_objects"][
+                    recording
+                ].paradigm
+
+                if overwrite:
+                    data_base = data_base[data_base["recording"] != filename]
+
+                new_df.loc[0, ["recording", "date", "paradigm", "subject_id"]] = (
+                    filename,
+                    recording_date,
+                    paradigm,
+                    subject_id,
+                )
+                data_base = pd.concat([data_base, new_df])
+        data_base.to_csv(data_base_path, index=False)
+
     def load_meta_from_yaml(self, filepath: Path) -> None:
         filepath = convert_to_path(filepath)
         with open(filepath, "r") as ymlfile:
@@ -368,8 +455,14 @@ class meta_interface(ABC):
 
         elif self.meta["meta_step"] == 5:
             for recording_day in self.meta["recording_days"].values():
-                calibration_index = list(self.meta['recording_days']['Recording_Day_220922_0']['calibrations']['calibration_keys'].keys())[0]
-                full_calibrations = self.objects["calibration_objects"][calibration_index]
+                calibration_index = list(
+                    self.meta["recording_days"]["Recording_Day_220922_0"][
+                        "calibrations"
+                    ]["calibration_keys"].keys()
+                )[0]
+                full_calibrations = self.objects["calibration_objects"][
+                    calibration_index
+                ]
 
                 for calibration in recording_day["calibrations"][
                     "calibration_keys"
@@ -397,7 +490,9 @@ class meta_interface(ABC):
 
     def _read_recording_config(self, recording_config_filepath: Path) -> str:
         recording_config = read_config(recording_config_filepath)
-        missing_keys = check_keys(recording_config, ["recording_date", "calibration_index"])
+        missing_keys = check_keys(
+            recording_config, ["recording_date", "calibration_index"]
+        )
         if len(missing_keys) > 0:
             raise KeyError(
                 f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
@@ -405,9 +500,7 @@ class meta_interface(ABC):
         recording_date = str(recording_config["recording_date"])
         if recording_date not in self.recording_dates:
             self.recording_dates.append(recording_config["recording_date"])
-        return recording_date, str(
-            recording_config["calibration_index"]
-        )
+        return recording_date, str(recording_config["calibration_index"])
 
     def _create_video_dict(
         self, video: VideoMetadata, intrinsics: bool = False
@@ -434,6 +527,10 @@ class meta_interface(ABC):
         )
         while True:
             if self.standard_yaml_filepath.exists() and overwrite == False:
-                self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(self.standard_yaml_filepath.stem + "_01.yaml")
+                self.standard_yaml_filepath = (
+                    self.project_config_filepath.parent.joinpath(
+                        self.standard_yaml_filepath.stem + "_01.yaml"
+                    )
+                )
             else:
                 break

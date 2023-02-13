@@ -16,10 +16,15 @@ from .plotting import Intrinsics
 
 
 class VideoInterface:
-    def __init__(self, video_metadata: VideoMetadata, output_dir: Path) -> None:
+    def __init__(
+        self, video_metadata: VideoMetadata, output_dir: Path, test_mode: bool = False
+    ) -> None:
         self.video_metadata = video_metadata
         self.plot_camera_intrinsics = Intrinsics(
-            video_metadata=video_metadata, output_dir=output_dir
+            video_metadata=video_metadata,
+            output_dir=output_dir,
+            save=not test_mode,
+            plot=False,
         )
 
     def run_synchronizer(
@@ -35,7 +40,7 @@ class VideoInterface:
             video_metadata=self.video_metadata,
             rapid_aligner_path=rapid_aligner_path,
             output_directory=output_directory,
-            use_gpu=use_gpu
+            use_gpu=use_gpu,
         )
         (
             self.marker_detection_filepath,
@@ -51,7 +56,7 @@ class VideoInterface:
             return self._export_as_aniposelib_Camera_object()
 
     def inspect_intrinsic_calibration(self) -> None:
-        self.plot_camera_intrinsics.plot(plot=True)
+        self.plot_camera_intrinsics.plot(plot=True, save=False)
 
     def _export_as_aniposelib_Camera_object(self):
         if self.video_metadata.fisheye:

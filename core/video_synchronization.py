@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import imageio as iio
 import ffmpeg
 import pandas as pd
+import scipy
 
 from .video_metadata import VideoMetadata
 from .utils import Coordinates
@@ -123,7 +124,11 @@ class Synchronizer(ABC):
         pass
 
     def __init__(
-        self, video_metadata: VideoMetadata, rapid_aligner_path: Path, output_directory: Path, use_gpu: str=""
+        self,
+        video_metadata: VideoMetadata,
+        rapid_aligner_path: Path,
+        output_directory: Path,
+        use_gpu: str = "",
     ) -> None:
         self.video_metadata = video_metadata
         if rapid_aligner_path.name != "":
@@ -141,8 +146,16 @@ class Synchronizer(ABC):
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
 
-        synchronized_video_filepath = self._construct_video_filepath()
-        if (not test_mode) or (test_mode and not synchronized_video_filepath.exists()):
+        if (
+            type(self) == RecordingVideoDownSynchronizer
+            or type(self) == CharucoVideoSynchronizer
+        ):
+            output_file = self._construct_video_filepath()
+        elif type(self) == RecordingVideoUpSynchronizer:
+            output_file = self._create_h5_filepath(
+                tag=f"_upsampled{self.target_fps}fps_synchronized"
+            )
+        if (not test_mode) or (test_mode and not output_file.exists()):
             i = 0
             while True:
                 if i == 3:
@@ -173,19 +186,25 @@ class Synchronizer(ABC):
                 self.led_timeseries = self._extract_led_pixel_intensities(
                     led_center_coords=led_center_coordinates
                 )
-                
+
                 try:
                     (
                         offset_adjusted_start_idx,
                         remaining_offset,
                         alignment_error,
                     ) = self._find_best_match_of_template(
-                        template=self.template_blinking_motif, start_time=0, end_time=len(self.led_timeseries)*0.4
+                        template=self.template_blinking_motif,
+                        start_time=0,
+                        end_time=len(self.led_timeseries) * 0.4,
                     )
-                    #finds match in the first 40% of the video # ToDo: make adaptable
+                    # finds match in the first 40% of the video # ToDo: make adaptable
                 except ValueError:
-                    offset_adjusted_start_idx, remaining_offset, alignment_error = 0, 0, 1000
-                    
+                    offset_adjusted_start_idx, remaining_offset, alignment_error = (
+                        0,
+                        0,
+                        1000,
+                    )
+
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
                     print("possibly bad synchronization!")
@@ -206,9 +225,9 @@ class Synchronizer(ABC):
                 )
             )
         else:
-            offset_adjusted_start_idx = None
-            remaining_offset = None
-            
+            offset_adjusted_start_idx = 0
+            remaining_offset = 0
+
         (
             marker_detection_filepath,
             synchronized_video_filepath,
@@ -219,9 +238,17 @@ class Synchronizer(ABC):
             synchronize_only=synchronize_only,
             test_mode=test_mode,
         )
-        self.video_metadata.framenum_synchronized = iio.v2.get_reader(
-            synchronized_video_filepath
-        ).count_frames()
+        if synchronize_only:
+            self.video_metadata.framenum_synchronized = iio.v2.get_reader(
+                synchronized_video_filepath
+            ).count_frames()
+        else:
+            self.video_metadata.framenum_synchronized = pd.read_hdf(
+                marker_detection_filepath
+            ).shape[0]
+        print(
+            f"Frames after synchronization: {self.video_metadata.framenum_synchronized}"
+        )
         self.video_metadata.duration_synchronized = (
             self.video_metadata.framenum_synchronized / self.video_metadata.target_fps
         )
@@ -267,10 +294,10 @@ class Synchronizer(ABC):
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
-            
+
             num_frames_to_pick = 100
             if num_frames_to_pick > self.video_metadata.framenum:
-                num_frames_to_pick = int(self.video_metadata.framenum/2)
+                num_frames_to_pick = int(self.video_metadata.framenum / 2)
             sample_frame_idxs = random.sample(
                 range(self.video_metadata.framenum),
                 num_frames_to_pick,
@@ -291,11 +318,13 @@ class Synchronizer(ABC):
                 output_directory=temp_folder,
                 marker_detection_directory=config_filepath,
             )
-            dlc_filepath_out = dlc_interface.analyze_objects(filtering=False, use_gpu=self.use_gpu, filepath = dlc_filepath_out)
+            dlc_filepath_out = dlc_interface.analyze_objects(
+                filtering=False, use_gpu=self.use_gpu, filepath=dlc_filepath_out
+            )
             for file in temp_folder.iterdir():
                 if file.suffix == ".pickle":
                     dlc_created_picklefile = file
-            
+
             df = pd.read_hdf(dlc_filepath_out)
             x_key, y_key, likelihood_key = (
                 [key for key in df.keys() if "LED5" in key and "x" in key],
@@ -411,6 +440,7 @@ class Synchronizer(ABC):
             video_metadata=self.video_metadata,
             output_directory=self.output_directory,
             led_box_size=self.box_size,
+            alignment_error=alignment_error,
         )
 
         return offset_adjusted_start_idx, remaining_offset, alignment_error
@@ -535,8 +565,12 @@ class Synchronizer(ABC):
         self, start_idx: int, offset: float
     ) -> np.ndarray:
         adjusted_led_timeseries = self.led_timeseries[start_idx:].copy()
-        if self.video_metadata.fps != self.video_metadata.target_fps:
+        if self.video_metadata.fps > self.video_metadata.target_fps:
             adjusted_led_timeseries = self._downsample_led_timeseries(
+                timeseries=adjusted_led_timeseries, offset=offset
+            )
+        else:
+            adjusted_led_timeseries = self._upsample_led_timeseries(
                 timeseries=adjusted_led_timeseries, offset=offset
             )
         return adjusted_led_timeseries
@@ -562,6 +596,21 @@ class Synchronizer(ABC):
             )
         )
         return timeseries[frame_idxs_best_matching_timestamps]
+
+    def _upsample_led_timeseries(
+        self, timeseries: np.ndarray, offset: float
+    ) -> np.ndarray:
+        len_frame_in_ms = 1 / self.video_metadata.fps * 1000
+        len_targetframe_in_ms = 1 / self.target_fps * 1000
+        index_in_ms = np.arange(
+            0, timeseries.shape[0] * len_frame_in_ms, len_frame_in_ms
+        )
+        new_indices = np.arange(
+            offset, (timeseries.shape[0] - 1) * len_frame_in_ms, len_targetframe_in_ms
+        )
+        d = scipy.interpolate.interp1d(index_in_ms, timeseries)
+        upsampled_timeseries = d(new_indices)
+        return upsampled_timeseries
 
     def _compute_fps_adjusted_frame_count(
         self, original_n_frames: int, original_fps: int, target_fps: int
@@ -673,14 +722,18 @@ class Synchronizer(ABC):
     ) -> List[List[int]]:
         frame_idxs_to_sample = []
         while len(idxs_of_frames_to_sample) > max_ram_digestible_frames:
-            frame_idxs_to_sample.append(idxs_of_frames_to_sample[:max_ram_digestible_frames])
-            idxs_of_frames_to_sample = idxs_of_frames_to_sample[max_ram_digestible_frames:]
+            frame_idxs_to_sample.append(
+                idxs_of_frames_to_sample[:max_ram_digestible_frames]
+            )
+            idxs_of_frames_to_sample = idxs_of_frames_to_sample[
+                max_ram_digestible_frames:
+            ]
         frame_idxs_to_sample.append(idxs_of_frames_to_sample)
         return frame_idxs_to_sample
 
     def _initiate_iterative_writing_of_individual_video_parts(
-        self, frame_idxs_to_sample: List[List[int]]) -> List[Path]:
-        
+        self, frame_idxs_to_sample: List[List[int]]
+    ) -> List[Path]:
         if self.video_metadata.max_cpu_cores_to_pool > 1:
             available_cpus = mp.cpu_count()
             if available_cpus > self.video_metadata.max_cpu_cores_to_pool:
@@ -688,7 +741,9 @@ class Synchronizer(ABC):
             else:
                 num_processes = available_cpus
             with mp.Pool(num_processes) as p:
-                filepaths_to_all_video_parts = p.map(self._multiprocessing_function, enumerate(frame_idxs_to_sample))
+                filepaths_to_all_video_parts = p.map(
+                    self._multiprocessing_function, enumerate(frame_idxs_to_sample)
+                )
 
         else:
             filepaths_to_all_video_parts = []
@@ -702,8 +757,10 @@ class Synchronizer(ABC):
                 filepaths_to_all_video_parts.append(filepath_video_part)
 
         return filepaths_to_all_video_parts
-    
-    def _multiprocessing_function(self, idx_and_idxs_of_frames_to_sample: Tuple)->None:
+
+    def _multiprocessing_function(
+        self, idx_and_idxs_of_frames_to_sample: Tuple
+    ) -> None:
         idx = idx_and_idxs_of_frames_to_sample[0]
         idxs_of_frames_to_sample = idx_and_idxs_of_frames_to_sample[1]
         part_id = str(idx).zfill(3)
@@ -736,7 +793,7 @@ class Synchronizer(ABC):
         if self.video_metadata.charuco_video:
             if part_id == None:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized.mp4"
+                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_downsampled{self.target_fps}fps.mp4"
                 )
             else:
                 filepath = self.output_directory.joinpath(
@@ -746,7 +803,7 @@ class Synchronizer(ABC):
         else:
             if part_id == None:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized.mp4"
+                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_downsampled{self.target_fps}fps.mp4"
                 )
             else:
                 filepath = self.output_directory.joinpath(
@@ -773,7 +830,8 @@ class Synchronizer(ABC):
             )
         else:
             output_stream = ffmpeg.output(
-                video_part_streams[0], filename=str(filepath_concatenated_video))
+                video_part_streams[0], filename=str(filepath_concatenated_video)
+            )
         output_stream.run(overwrite_output=True, quiet=True)
         return filepath_concatenated_video
 
@@ -816,9 +874,11 @@ class RecordingVideoSynchronizer(Synchronizer):
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath),
                 output_directory=self.output_directory,
-                marker_detection_directory=config_filepath
+                marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(filtering=True, use_gpu=self.use_gpu, filepath = output_filepath)
+            dlc_ending = dlc_interface.analyze_objects(
+                filtering=True, use_gpu=self.use_gpu, filepath=output_filepath
+            )
 
         return output_filepath
 
@@ -838,15 +898,9 @@ class RecordingVideoSynchronizer(Synchronizer):
                     output_directory=self.output_directory,
                     marker_detection_directory=config_filepath,
                 )
-                manual_interface.analyze_objects(filepath= str(output_filepath) + ".h5")
+                manual_interface.analyze_objects(filepath=str(output_filepath) + ".h5")
 
         return output_filepath
-
-    def _create_h5_filepath(self) -> Path:
-        h5_filepath = self.output_directory.joinpath(
-            f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
-        )
-        return h5_filepath
 
 
 class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
@@ -883,11 +937,71 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
         else:
             return None, downsampled_video_filepath
 
+    def _create_h5_filepath(self, filtered: bool = False) -> Path:
+        if not filtered:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_downsampled{self.target_fps}fps_synchronized.h5"
+            )
+        else:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_downsampled{self.target_fps}fps_synchronized_filtered.h5"
+            )
+        return h5_filepath
+
 
 class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
     @property
     def target_fps(self) -> int:
         return self.video_metadata.target_fps
 
-    def _adjust_video_to_target_fps_and_run_marker_detection(self):
-        pass
+    def _adjust_video_to_target_fps_and_run_marker_detection(
+        self,
+        target_fps: int,
+        start_idx: int,
+        offset: float,
+        test_mode: bool,
+        synchronize_only: bool = False,
+    ):
+        if self.video_metadata.processing_type == "DLC":
+            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+        elif self.video_metadata.processing_type == "manual":
+            detected_markers_filepath = self._run_manual_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+        else:
+            print("TemplateMatching is not yet implemented!")
+
+        upsynchronized_filepath = self._create_h5_filepath(
+            tag=f"_upsampled{self.target_fps}fps_synchronized"
+        )
+        if (not test_mode) or (test_mode and not upsynchronized_filepath.exists()):
+            filtered_filepath = self._create_h5_filepath(filtered=True)
+            df = pd.read_hdf(filtered_filepath)
+            len_frame_in_ms = 1 / self.video_metadata.fps * 1000
+            len_targetframe_in_ms = 1 / self.target_fps * 1000
+            total_offset_in_ms = start_idx * len_frame_in_ms + offset
+            recording_length = (df.shape[0] - 1) * len_frame_in_ms
+            index_in_ms = df.index * len_frame_in_ms
+            new_indices = np.arange(
+                total_offset_in_ms, recording_length, len_targetframe_in_ms
+            )
+            d = scipy.interpolate.interp1d(index_in_ms, df, axis=0)
+            upsampled = d(new_indices)
+            new_df = pd.DataFrame(upsampled, columns=df.columns)
+            new_df.to_hdf(upsynchronized_filepath, "key")
+        return upsynchronized_filepath, None
+
+    def _create_h5_filepath(
+        self, tag: str = "_rawfps_unsynchronized", filtered: bool = False
+    ) -> Path:
+        if not filtered:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+            )
+        else:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
+            )
+        return h5_filepath

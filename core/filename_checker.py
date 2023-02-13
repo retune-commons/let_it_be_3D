@@ -9,18 +9,15 @@ from .utils import convert_to_path, create_calibration_key
 from .checker_objects import Check_Recording, Check_Calibration, Check_Positions
 
 
-
-class filename_checker_interface():
-    def __init__(
-        self, project_config_filepath: Path
-    ) -> None:
+class filename_checker_interface:
+    def __init__(self, project_config_filepath: Path) -> None:
         self.project_config_filepath = convert_to_path(project_config_filepath)
         if not self.project_config_filepath.exists():
             raise FileNotFoundError("The file doesn't exist. Check your path!")
         self._read_project_config()
         self.recording_configs = []
         self.recording_dates = []
-        self.objects={}
+        self.objects = {}
         self.meta = {
             "project_config_filepath": str(self.project_config_filepath),
             "recording_days": {},
@@ -48,17 +45,17 @@ class filename_checker_interface():
                 recording_config_filepath=filepath_to_recording_config
             )
         self.meta["recording_days"][
-                f"Recording_Day_{recording_date}_{str(calibration_index)}"
-            ] = {
-                "recording_config_filepath": str(filepath_to_recording_config),
-                "recording_date": recording_date,
-                "recording_directories": [],
-                "recordings": {},
-                "calibrations": {},
-                "calibration_directory": str(filepath_to_recording_config.parent),
-                "calibration_index": calibration_index,
-            }
-    
+            f"Recording_Day_{recording_date}_{str(calibration_index)}"
+        ] = {
+            "recording_config_filepath": str(filepath_to_recording_config),
+            "recording_date": recording_date,
+            "recording_directories": [],
+            "recordings": {},
+            "calibrations": {},
+            "calibration_directory": str(filepath_to_recording_config.parent),
+            "calibration_index": calibration_index,
+        }
+
     def _read_project_config(self) -> None:
         if self.project_config_filepath.exists():
             with open(self.project_config_filepath, "r") as ymlfile:
@@ -91,7 +88,7 @@ class filename_checker_interface():
         return str(recording_config["recording_date"]), str(
             recording_config["calibration_index"]
         )
-            
+
     def initialize_meta_config(self) -> None:
         for recording_day in self.meta["recording_days"].values():
             for file in Path(
@@ -106,8 +103,10 @@ class filename_checker_interface():
             recording_day["num_recordings"] = len(
                 recording_day["recording_directories"]
             )
-            print(f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!")
-        
+            print(
+                f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!"
+            )
+
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
         file = convert_to_path(file)
         if not file.exists() or recording_day not in self.meta["recording_days"].keys():
@@ -121,8 +120,8 @@ class filename_checker_interface():
             self.meta["recording_days"][recording_day]["num_recordings"] = len(
                 recording_day["recording_directories"]
             )
-            print("added recording directory succesfully!")    
-    
+            print("added recording directory succesfully!")
+
     def create_recordings(self) -> None:
         self.objects["check_recordings_objects"] = {}
         for recording_day in self.meta["recording_days"]:
@@ -136,19 +135,18 @@ class filename_checker_interface():
                         recording_day
                     ]["recording_config_filepath"],
                     project_config_filepath=self.meta["project_config_filepath"],
-                    plot = plot
+                    plot=plot,
                 )
                 individual_key = f"{check_recordings_object.mouse_id}_{check_recordings_object.recording_date}_{check_recordings_object.paradigm}"
                 self.objects["check_recordings_objects"][
                     individual_key
                 ] = check_recordings_object
                 plot = False
-     
-    def create_calibrations(self,  ground_truth_config_filepath: Path) -> None:
+
+    def create_calibrations(self, ground_truth_config_filepath: Path) -> None:
         self.objects["calibration_objects"] = {}
         self.objects["position_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
-
             recording_day["calibrations"]["calibration_keys"] = {}
 
             calibration_object = Check_Calibration(
@@ -158,14 +156,18 @@ class filename_checker_interface():
             )
 
             cams = [video.cam_id for video in calibration_object.metadata_from_videos]
-            all_cams_key = create_calibration_key(videos = cams, recording_date = calibration_object.recording_date, calibration_index = calibration_object.calibration_index)
+            all_cams_key = create_calibration_key(
+                videos=cams,
+                recording_date=calibration_object.recording_date,
+                calibration_index=calibration_object.calibration_index,
+            )
 
             self.objects["calibration_objects"][all_cams_key] = calibration_object
-            
+
             positions_object = Check_Positions(
                 positions_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
-                ground_truth_config_filepath = ground_truth_config_filepath
+                ground_truth_config_filepath=ground_truth_config_filepath,
             )
             self.objects["position_objects"][all_cams_key] = positions_object

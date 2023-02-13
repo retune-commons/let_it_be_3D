@@ -67,10 +67,7 @@ class Visualization:
             # the line above fixes axes
 
         for bodypart in self.bodyparts:
-            if bodypart not in set(
-                [
-                    "LED5"]
-            ):
+            if bodypart not in set(["LED5"]):
                 if not math.isnan(self.df.loc[frame_idx, f"{bodypart}_x"]):
                     ax.text(
                         self.df.loc[frame_idx, f"{bodypart}_x"],

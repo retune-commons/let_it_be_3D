@@ -11,7 +11,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-from .utils import construct_dlc_output_style_df_from_manual_marker_coords, convert_to_path, read_config
+from .utils import (
+    construct_dlc_output_style_df_from_manual_marker_coords,
+    convert_to_path,
+    read_config,
+)
 
 
 class MarkerDetection(ABC):
@@ -24,7 +28,9 @@ class MarkerDetection(ABC):
         self.object_to_analyse = convert_to_path(object_to_analyse)
         self.output_directory = convert_to_path(output_directory)
         if type(marker_detection_directory) != None:
-            self.marker_detection_directory = convert_to_path(marker_detection_directory)
+            self.marker_detection_directory = convert_to_path(
+                marker_detection_directory
+            )
 
     @abstractmethod
     def analyze_objects():
@@ -32,21 +38,26 @@ class MarkerDetection(ABC):
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(self, filepath: Path, filtering: bool = False, use_gpu: str=""):
+    def analyze_objects(
+        self, filepath: Path, filtering: bool = False, use_gpu: str = ""
+    ):
         filepath = convert_to_path(filepath)
         if use_gpu == "prevent":
             import tensorflow.compat.v1 as tf
-            sess = tf.Session(config=tf.ConfigProto(device_count={'GPU': 0}))
+
+            sess = tf.Session(config=tf.ConfigProto(device_count={"GPU": 0}))
         elif use_gpu == "low":
             import tensorflow.compat.v1 as tf
+
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         elif use_gpu == "full":
             import tensorflow.compat.v1 as tf
+
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-        
-        #mute deeplabcut
+
+        # mute deeplabcut
         old_stdout = sys.stdout
         text_trap = io.StringIO()
         sys.stdout = text_trap
@@ -61,17 +72,27 @@ class DeeplabcutInterface(MarkerDetection):
                 destfolder=str(self.output_directory),
             )
             if filtering:
-                dlc.filterpredictions(config = str(self.marker_detection_directory), video = [str(self.object_to_analyse)], save_as_csv=False)
-            unfiltered_filepath = self.output_directory.joinpath(self.object_to_analyse.stem + dlc_ending + '.h5')
-            unfiltered_filepath.rename(filepath.with_suffix('.h5'))
+                dlc.filterpredictions(
+                    config=str(self.marker_detection_directory),
+                    video=[str(self.object_to_analyse)],
+                    save_as_csv=False,
+                )
+            unfiltered_filepath = self.output_directory.joinpath(
+                self.object_to_analyse.stem + dlc_ending + ".h5"
+            )
+            unfiltered_filepath.rename(filepath.with_suffix(".h5"))
             if filtering:
-                filtered_filepath = self.output_directory.joinpath(self.object_to_analyse.stem + dlc_ending + "_filtered.h5")
+                filtered_filepath = self.output_directory.joinpath(
+                    self.object_to_analyse.stem + dlc_ending + "_filtered.h5"
+                )
                 if filtered_filepath.exists():
-                    filtered_filepath.rename(filepath.stem + "_filtered.h5")
+                    filtered_filepath.rename(
+                        self.output_directory.joinpath(filepath.stem + "_filtered.h5")
+                    )
                 else:
                     print(f"{filtered_filepath} not found! Data was but not filtered.")
-            
-        #unmute 
+
+        # unmute
         sys.stdout = old_stdout
 
         return filepath
@@ -86,7 +107,7 @@ class ManualAnnotation(MarkerDetection):
     ) -> Path:
         if labels == None:
             ground_truth_config = read_config(self.marker_detection_directory)
-            list_of_labels = ground_truth_config['unique_ids']
+            list_of_labels = ground_truth_config["unique_ids"]
         else:
             list_of_labels = labels
 

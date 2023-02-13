@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import yaml
 
+
 def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
     missing_keys = []
     for key in list_of_keys:
@@ -17,7 +18,7 @@ def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
     return missing_keys
 
 
-def read_config(path: Path)->Dict:
+def read_config(path: Path) -> Dict:
     """
     Reads structured config file defining a project.
     """
@@ -27,7 +28,8 @@ def read_config(path: Path)->Dict:
             cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     else:
         raise FileNotFoundError(
-            f"Could not open the yaml file at {path}\n Please make sure the path is correct and the file exists!")
+            f"Could not open the yaml file at {path}\n Please make sure the path is correct and the file exists!"
+        )
     return cfg
 
 
