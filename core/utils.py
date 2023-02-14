@@ -75,14 +75,14 @@ def convert_to_path(attribute: Union[str, Path]) -> Path:
 
 
 def construct_dlc_output_style_df_from_manual_marker_coords(
-    manual_test_position_marker_coords_pred: Dict,
+    manual_annotated_marker_coords_pred: Dict,
 ) -> pd.DataFrame:
     multi_index = get_multi_index(
-        markers=manual_test_position_marker_coords_pred.keys()
+        markers=manual_annotated_marker_coords_pred.keys()
     )
     df = pd.DataFrame(data={}, columns=multi_index)
     for scorer, marker_id, key in df.columns:
-        df[(scorer, marker_id, key)] = manual_test_position_marker_coords_pred[
+        df[(scorer, marker_id, key)] = manual_annotated_marker_coords_pred[
             marker_id
         ][key]
     return df
@@ -92,7 +92,7 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
     multi_index_column_names = [[], [], []]
     for marker_id in markers:
         for column_name in ("x", "y", "likelihood"):
-            multi_index_column_names[0].append("annotated_marker_positions")
+            multi_index_column_names[0].append("annotated_markers")
             multi_index_column_names[1].append(marker_id)
             multi_index_column_names[2].append(column_name)
     return pd.MultiIndex.from_arrays(

@@ -48,18 +48,18 @@ def _set_distances_from_configuration(distances_to_compute, anipose_io):
 
 
 def add_all_real_distances_errors(
-    anipose_io: Dict, test_positions_distances: Dict
+    anipose_io: Dict, ground_truth_distances: Dict
 ) -> Dict:
     all_distance_to_cm_conversion_factors = (
         _get_conversion_factors_from_different_references(
-            anipose_io=anipose_io, test_positions_distances=test_positions_distances
+            anipose_io=anipose_io, ground_truth_distances=ground_truth_distances
         )
     )
     anipose_io = _add_distances_in_cm_for_each_conversion_factor(
         anipose_io=anipose_io, conversion_factors=all_distance_to_cm_conversion_factors
     )
     anipose_io = _add_distance_errors(
-        anipose_io=anipose_io, gt_distances=test_positions_distances
+        anipose_io=anipose_io, gt_distances=ground_truth_distances
     )
     return anipose_io
 
@@ -107,14 +107,14 @@ def _add_distances_in_cm_for_each_conversion_factor(
     return anipose_io
 
 
-def add_reprojection_errors_of_all_test_position_markers(anipose_io: Dict) -> Dict:
-    anipose_io["reprojection_errors_test_position_markers"] = {}
+def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Dict) -> Dict:
+    anipose_io["reprojection_errors_calibration_validation_markers"] = {}
     all_reprojection_errors = []
     for key in anipose_io["df_xyz"].iloc[0].keys():
         if "error" in key:
             reprojection_error = anipose_io["df_xyz"][key].iloc[0]
             marker_id = key[: key.find("_error")]
-            anipose_io["reprojection_errors_test_position_markers"][
+            anipose_io["reprojection_errors_calibration_validation_markers"][
                 marker_id
             ] = reprojection_error  # since we only have a single image
             if type(reprojection_error) != np.nan:
@@ -123,7 +123,7 @@ def add_reprojection_errors_of_all_test_position_markers(anipose_io: Dict) -> Di
                 # or as alternative, use something like this after blindly appending all errors to drop the nan´s:
                 # anipose_io['reprojerr'][np.logical_not(np.isnan(anipose_io['reprojerr']))]
                 all_reprojection_errors.append(reprojection_error)
-    anipose_io["reprojection_errors_test_position_markers"]["mean"] = np.asarray(
+    anipose_io["reprojection_errors_calibration_validation_markers"]["mean"] = np.asarray(
         all_reprojection_errors
     ).mean()
     return anipose_io
@@ -276,13 +276,13 @@ def _convert_all_xyz_distances(anipose_io: Dict, conversion_factor: float) -> Di
 
 
 def _get_conversion_factors_from_different_references(
-    anipose_io: Dict, test_positions_distances: Dict
+    anipose_io: Dict, ground_truth_distances: Dict
 ) -> Dict:  # Tuple? List?
     all_conversion_factors = {}
-    for reference, markers in test_positions_distances.items():
+    for reference, markers in ground_truth_distances.items():
         for m in markers:
             reference_marker_ids = (reference, m)
-            distance_in_cm = test_positions_distances[reference][m]
+            distance_in_cm = ground_truth_distances[reference][m]
             reference_distance_id = reference + "_" + m
             distance_to_cm_conversion_factor = _get_xyz_to_cm_conversion_factor(
                 reference_marker_ids=reference_marker_ids,

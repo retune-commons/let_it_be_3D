@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import imageio.v3 as iio
 
 from .utils import convert_to_path, create_calibration_key
-from .checker_objects import Check_Recording, Check_Calibration, Check_Positions
+from .checker_objects import Check_Recording, Check_Calibration, Check_Calibration_Validation
 
 
 class filename_checker_interface:
@@ -145,7 +145,7 @@ class filename_checker_interface:
 
     def create_calibrations(self, ground_truth_config_filepath: Path) -> None:
         self.objects["calibration_objects"] = {}
-        self.objects["position_objects"] = {}
+        self.objects["calibration_validation_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
             recording_day["calibrations"]["calibration_keys"] = {}
 
@@ -164,10 +164,10 @@ class filename_checker_interface:
 
             self.objects["calibration_objects"][all_cams_key] = calibration_object
 
-            positions_object = Check_Positions(
-                positions_directory=recording_day["calibration_directory"],
+            calibration_validation_object = Check_Calibration_Validation(
+                calibration_validation_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 ground_truth_config_filepath=ground_truth_config_filepath,
             )
-            self.objects["position_objects"][all_cams_key] = positions_object
+            self.objects["calibration_validation_objects"][all_cams_key] = calibration_validation_object

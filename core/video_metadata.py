@@ -159,12 +159,12 @@ class VideoMetadata:
 
     def _get_video_identity(self, tag: str) -> None:
         self.charuco_video = False
-        self.positions = False
+        self.calvin = False
         self.recording = False
         if tag == "calibration":
             self.charuco_video = True
-        elif tag == "positions":
-            self.positions = True
+        elif tag == "calvin":
+            self.calvin = True
         elif tag == "recording":
             self.recording = True
 
@@ -191,7 +191,7 @@ class VideoMetadata:
                         f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!"
                     )
 
-        elif self.positions:
+        elif self.calvin:
             for piece in self.filepath.stem.split("_"):
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():
@@ -452,7 +452,7 @@ class VideoMetadataChecker(VideoMetadata):
                 if not hasattr(self, attribute):
                     undefined_attributes.append(attribute)
 
-        elif self.positions:
+        elif self.calvin:
             for piece in self.filepath.stem.split("_"):
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():

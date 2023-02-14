@@ -407,10 +407,10 @@ class Check_Recording(Check):
         self.mouse_id = list(mouse_ids)[0]
 
 
-class Check_Positions(Check):
+class Check_Calibration_Validation(Check):
     def __init__(
         self,
-        positions_directory: Path,
+        calibration_validation_directory: Path,
         recording_config_filepath: Path,
         ground_truth_config_filepath: Path,
         project_config_filepath: Path,
@@ -418,8 +418,8 @@ class Check_Positions(Check):
     ) -> None:
         print("\n")
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
-        test_positions_gt = read_config(ground_truth_config_filepath)
-        self.positions_directory = convert_to_path(positions_directory)
+        calibration_validation_gt = read_config(ground_truth_config_filepath)
+        self.calibration_validation_directory = convert_to_path(calibration_validation_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
 
@@ -428,15 +428,15 @@ class Check_Positions(Check):
             project_config_filepath=project_config_filepath,
         )
         self._create_video_objects(
-            directory=self.positions_directory,
+            directory=self.calibration_validation_directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
-            videometadata_tag="positions",
+            videometadata_tag="calvin",
             filetypes=[".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"],
             filename_tag=self.calibration_validation_tag,
         )
         if plot:
-            print(f"Intrinsic calibrations for positions of {self.recording_date}")
+            print(f"Intrinsic calibrations for calvin of {self.recording_date}")
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
                 Intrinsics(video_metadata=video_metadata, plot=True, save=False)
@@ -463,14 +463,14 @@ class Check_Positions(Check):
                     for i, file in enumerate(files_per_cam[key])
                 ]
                 print(
-                    f"Found {len(files_per_cam[key])} videos for {key} in {self.positions_directory}!\n {information_duplicates}"
+                    f"Found {len(files_per_cam[key])} videos for {key} in {self.calibration_validation_directory}!\n {information_duplicates}"
                 )
                 file_idx_to_keep = input(
                     "Enter the number of the file you want to keep (other files will be deleted!)!\nEnter c if you want to abort and move the file manually!"
                 )
                 if file_idx_to_keep == "c":
                     print(
-                        f"You have multiple videos for cam {key} in {self.positions_directory}, but you decided to abort. If you dont move them manually, this can lead to wrong videos in the analysis!"
+                        f"You have multiple videos for cam {key} in {self.calibration_validation_directory}, but you decided to abort. If you dont move them manually, this can lead to wrong videos in the analysis!"
                     )
                 else:
                     for i, file in enumerate(files_per_cam[key]):
@@ -487,7 +487,7 @@ class Check_Positions(Check):
                 self.cameras_missing_in_recording_config.remove(cam)
         if len(cams_not_found) > 0:
             print(
-                f"At {self.positions_directory}\nFound no video for {cams_not_found}!"
+                f"At {self.calibration_validation_directory}\nFound no video for {cams_not_found}!"
             )
         if len(self.cameras_missing_in_recording_config) > 0:
             print(
@@ -502,9 +502,9 @@ class Check_Positions(Check):
         for attribute in [recording_dates]:
             if len(attribute) > 1:
                 raise ValueError(
-                    f"The filenames of the position images give different metadata! Reasons could be:\n"
+                    f"The filenames of the calvin images give different metadata! Reasons could be:\n"
                     f"  - image belongs to another calibration\n"
                     f"  - image filename is valid, but wrong\n"
-                    f"Go the folder {self.positions_directory} and check the filenames manually!"
+                    f"Go the folder {self.calibration_validation_directory} and check the filenames manually!"
                 )
         self.recording_date = list(recording_dates)[0]

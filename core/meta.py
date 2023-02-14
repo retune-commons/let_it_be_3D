@@ -12,7 +12,7 @@ import pandas as pd
 from .utils import convert_to_path, create_calibration_key, check_keys, read_config
 from .triangulation_calibration_module import (
     Calibration,
-    Triangulation_Positions,
+    Calibration_Validation,
     Triangulation_Recordings,
 )
 from .video_metadata import VideoMetadata
@@ -208,7 +208,7 @@ class meta_interface(ABC):
         self, ground_truth_config_filepath: Path, test_mode: bool = False
     ) -> None:
         self.objects["calibration_objects"] = {}
-        self.objects["position_objects"] = {}
+        self.objects["calibration_validation_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
             recording_day["calibrations"]["calibration_keys"] = {}
 
@@ -241,21 +241,21 @@ class meta_interface(ABC):
             ] = calibration_object.led_pattern
             recording_day["calibrations"]["videos"] = video_dict
 
-            positions_object = Triangulation_Positions(
-                positions_directory=recording_day["calibration_directory"],
+            calibration_validation_object = Calibration_Validation(
+                calibration_validation_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
                 ground_truth_config_filepath=ground_truth_config_filepath,
                 test_mode=test_mode,
             )
-            self.objects["position_objects"][
-                positions_object.calibration_index
-            ] = positions_object
-            for video in positions_object.metadata_from_videos.values():
+            self.objects["calibration_validation_objects"][
+                calibration_validation.calibration_index
+            ] = calibration_validation
+            for video in calibration_validation.metadata_from_videos.values():
                 try:
                     recording_day["calibrations"]["videos"][video.cam_id][
-                        "positions_image_filepath"
+                        "calibration_validation_image_filepath"
                     ] = str(video.filepath)
                 except:
                     pass
@@ -281,21 +281,21 @@ class meta_interface(ABC):
                         video
                     ].framenum_synchronized
 
-                self.objects["position_objects"][
+                self.objects["calibration_validation_objects"][
                     calibration["key"]
                 ].get_marker_predictions()
                 for video in recording_day["calibrations"]["videos"]:
                     try:
                         recording_day["calibrations"]["videos"][video][
-                            "positions_marker_detection_filepath"
+                            "calibration_validation_marker_detection_filepath"
                         ] = str(
-                            self.objects["position_objects"][
+                            self.objects["calibration_validation_objects"][
                                 calibration["key"]
                             ].triangulation_dlc_cams_filepaths[video]
                         )
                     except:
                         recording_day["calibrations"]["videos"][video][
-                            "positions_marker_detection_filepath"
+                            "calibration_validation_marker_detection_filepath"
                         ] = None
         self.meta["meta_step"] = 5
         self.export_meta_to_yaml(self.standard_yaml_filepath)
@@ -311,7 +311,7 @@ class meta_interface(ABC):
                     self.objects["calibration_objects"][
                         calibration["key"]
                     ].calibrate_optimal(
-                        triangulation_positions=self.objects["position_objects"][
+                        calibration_validation=self.objects["calibration_validation_objects"][
                             calibration["key"]
                         ],
                         verbose=verbose,
@@ -446,12 +446,12 @@ class meta_interface(ABC):
                         video_metadata.filepath = recording_day["calibrations"][
                             "videos"
                         ][video_metadata.cam_id]["filepath"]
-                    for video_metadata in self.objects["position_objects"][
+                    for video_metadata in self.objects["calibration_validation_objects"][
                         calibration["key"]
                     ].metadata_from_videos.values():
                         video_metadata.filepath = recording_day["calibrations"][
                             "videos"
-                        ][video_metadata.cam_id]["positions_image_filepath"]
+                        ][video_metadata.cam_id]["calibration_validation_image_filepath"]
 
         elif self.meta["meta_step"] == 5:
             for recording_day in self.meta["recording_days"].values():
@@ -467,12 +467,12 @@ class meta_interface(ABC):
                 for calibration in recording_day["calibrations"][
                     "calibration_keys"
                 ].values():
-                    for video_metadata in self.objects["position_objects"][
+                    for video_metadata in self.objects["calibration_validation_objects"][
                         calibration["key"]
                     ].metadata_from_video.values():
                         video_metadata.filepath = recording_day["calibrations"][
                             "videos"
-                        ][video_metadata.cam_id]["positions_marker_detection_filepath"]
+                        ][video_metadata.cam_id]["calibration_validation_marker_detection_filepath"]
 
     def export_meta_to_yaml(self, filepath: Path) -> None:
         filepath = convert_to_path(filepath)

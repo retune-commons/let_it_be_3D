@@ -70,6 +70,9 @@ valid_cam_IDs:
 - Ground1
 - Ground2
 calibration_tag: Charuco
+# every tag is valid except "calvin" or "CALVIN"
+# calvin is the abbreviation for calibration_validation used in the repository
+# using it as calibration_validation_tag or calibration_tag can lead to issues with file detection
 calibration_validation_tag: Position
 # "prevent" disables GPU usage, "low" restricts GPU memory for synchronization but not for DLC analysis, "full" uses entire GPU capacity
 use_gpu: ""

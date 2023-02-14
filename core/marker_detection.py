@@ -151,7 +151,7 @@ class ManualAnnotation(MarkerDetection):
                 break
 
         df = construct_dlc_output_style_df_from_manual_marker_coords(
-            manual_test_position_marker_coords_pred=frames_annotated
+            manual_annotated_marker_coords_pred=frames_annotated
         )
         df.to_hdf(filepath, "df")
         return filepath

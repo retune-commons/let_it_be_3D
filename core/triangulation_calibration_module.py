@@ -33,7 +33,7 @@ from .utils import (
     get_multi_index,
 )
 from .angles_and_distances import (
-    add_reprojection_errors_of_all_test_position_markers,
+    add_reprojection_errors_of_all_calibration_validation_markers,
     set_distances_and_angles_for_evaluation,
     fill_in_distances,
     add_all_real_distances_errors,
@@ -376,7 +376,7 @@ class Calibration(Triangulation_Calibration):
 
     def calibrate_optimal(
         self,
-        triangulation_positions: "Triangulation_Positions",
+        calibration_validation: "Calibration_Validation",
         max_iters: int = 2,
         p_threshold: float = 0.1,
         angle_threshold: int = 5,
@@ -392,18 +392,18 @@ class Calibration(Triangulation_Calibration):
             self.run_calibration(verbose=verbose, test_mode=test_mode)
             # keep calibrations! (currently overwritten)
 
-            triangulation_positions.run_triangulation(
+            calibration_validation.run_triangulation(
                 calibration_toml_filepath=self.calibration_output_filepath
             )
 
-            triangulation_positions.evaluate_triangulation_of_test_position_markers()
-            calibration_errors = triangulation_positions.anipose_io[
+            calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
+            calibration_errors = calibration_validation.anipose_io[
                 "distance_errors_in_cm"
             ]
-            calibration_angles_errors = triangulation_positions.anipose_io[
+            calibration_angles_errors = calibration_validation.anipose_io[
                 "angles_error_screws_plan"
             ]
-            reprojerr_nonan = triangulation_positions.anipose_io["reproj_nonan"].mean()
+            reprojerr_nonan = calibration_validation.anipose_io["reproj_nonan"].mean()
 
             for reference in calibration_errors.keys():
                 all_percentage_errors = [
@@ -587,26 +587,26 @@ class Triangulation(Triangulation_Calibration):
                 for i in range(framenum):
                     df.loc[i, :] = 0
                 df.to_hdf(h5_output_filepath, "empty")
-                self._validate_test_position_marker_ids(
-                    test_position_markers_df_filepath=h5_output_filepath,
+                self._validate_calibration_validation_marker_ids(
+                    calibration_validation_markers_df_filepath=h5_output_filepath,
                     framenum=framenum,
                 )
                 self.triangulation_dlc_cams_filepaths[cam] = h5_output_filepath
 
-    def _validate_test_position_marker_ids(
+    def _validate_calibration_validation_marker_ids(
         self,
-        test_position_markers_df_filepath: Path,
+        calibration_validation_markers_df_filepath: Path,
         framenum: int,
         add_missing_marker_ids_with_0_likelihood: bool = True,
     ) -> None:
         defined_marker_ids = self.markers
-        test_position_markers_df = pd.read_hdf(test_position_markers_df_filepath)
+        calibration_validation_markers_df = pd.read_hdf(calibration_validation_markers_df_filepath)
 
         prediction_marker_ids = list(
             set(
                 [
                     marker_id
-                    for scorer, marker_id, key in test_position_markers_df.columns
+                    for scorer, marker_id, key in calibration_validation_markers_df.columns
                 ]
             )
         )
@@ -622,7 +622,7 @@ class Triangulation(Triangulation_Calibration):
         ):
             self._add_missing_marker_ids_to_prediction(
                 missing_marker_ids=marker_ids_not_in_prediction,
-                df=test_position_markers_df,
+                df=calibration_validation_markers_df,
                 framenum=framenum,
             )
             print(
@@ -632,14 +632,14 @@ class Triangulation(Triangulation_Calibration):
         if len(marker_ids_not_in_ground_truth) > 0:
             self._remove_marker_ids_not_in_ground_truth(
                 marker_ids_to_remove=marker_ids_not_in_ground_truth,
-                df=test_position_markers_df,
+                df=calibration_validation_markers_df,
             )
             print(
                 "The following marker_ids were deleted from the dataframe, since they were "
                 f"not present in the ground truth: {marker_ids_not_in_ground_truth}."
             )
-        test_position_markers_df.to_hdf(
-            test_position_markers_df_filepath, "empty", mode="w"
+        calibration_validation_markers_df.to_hdf(
+            calibration_validation_markers_df_filepath, "empty", mode="w"
         )
 
     def _add_missing_marker_ids_to_prediction(
@@ -954,10 +954,10 @@ class Triangulation_Recordings(Triangulation):
         return t.return_fig()
 
 
-class Triangulation_Positions(Triangulation):
+class Calibration_Validation(Triangulation):
     def __init__(
         self,
-        positions_directory: Path,
+        calibration_validation_directory: Path,
         recording_config_filepath: Path,
         ground_truth_config_filepath: Path,
         project_config_filepath: Path,
@@ -965,8 +965,8 @@ class Triangulation_Positions(Triangulation):
         test_mode: bool = False,
     ) -> None:
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
-        self.test_positions_gt = read_config(ground_truth_config_filepath)
-        self.positions_directory = convert_to_path(positions_directory)
+        self.ground_truth_config = read_config(ground_truth_config_filepath)
+        self.calibration_validation_directory = convert_to_path(calibration_validation_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
@@ -977,19 +977,19 @@ class Triangulation_Positions(Triangulation):
             project_config_filepath=project_config_filepath,
         )
         self._create_video_objects(
-            directory=self.positions_directory,
+            directory=self.calibration_validation_directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
-            videometadata_tag="positions",
+            videometadata_tag="calvin",
             filetypes=[".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"],
             filename_tag=self.calibration_validation_tag,
             test_mode=test_mode,
         )
 
         self.csv_output_filepath = self.output_directory.joinpath(
-            f"Positions_{self.recording_date}.csv"
+            f"Calvin_{self.recording_date}.csv"
         )
-        self.markers = self.test_positions_gt["unique_ids"]
+        self.markers = self.ground_truth_config["unique_ids"]
 
     def _validate_and_save_metadata_for_recording(self):
         recording_dates = set(
@@ -999,10 +999,10 @@ class Triangulation_Positions(Triangulation):
         for attribute in [recording_dates]:
             if len(attribute) > 1:
                 raise ValueError(
-                    f"The filenames of the position images give different metadata! Reasons could be:\n"
+                    f"The filenames of the calibration_validation images give different metadata! Reasons could be:\n"
                     f"  - image belongs to another calibration\n"
                     f"  - image filename is valid, but wrong\n"
-                    f"Go the folder {self.positions_directory} and check the filenames manually!"
+                    f"Go the folder {self.calibration_validation_directory} and check the filenames manually!"
                 )
         self.recording_date = list(recording_dates)[0]
 
@@ -1011,7 +1011,7 @@ class Triangulation_Positions(Triangulation):
         self.cameras = list(self.metadata_from_videos.keys())
         if self.cameras.sort() != cameras.sort():
             raise ValueError(
-                f"The cam_ids of the recordings in {self.positions_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
+                f"The cam_ids of the recordings in {self.calibration_validation_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
                 "Are there missing or additional files in the calibration or the recording folder?"
             )
 
@@ -1020,7 +1020,7 @@ class Triangulation_Positions(Triangulation):
         self.triangulation_dlc_cams_filepaths = {}
         for cam in self.metadata_from_videos.values():
             h5_output_filepath = self.output_directory.joinpath(
-                f"Positions_{cam.recording_date}_{cam.cam_id}.h5"
+                f"Calvin_{cam.recording_date}_{cam.cam_id}.h5"
             )
             self.triangulation_dlc_cams_filepaths[cam.cam_id] = h5_output_filepath
             if cam.calibration_evaluation_type == "manual":
@@ -1047,10 +1047,10 @@ class Triangulation_Positions(Triangulation):
                     )
             else:
                 print(
-                    "Template Matching is not yet implemented for Marker Detection in Positions!"
+                    "Template Matching is not yet implemented for Marker Detection in Calvin!"
                 )
-            self._validate_test_position_marker_ids(
-                test_position_markers_df_filepath=h5_output_filepath, framenum=1
+            self._validate_calibration_validation_marker_ids(
+                calibration_validation_markers_df_filepath=h5_output_filepath, framenum=1
             )
             Predictions_Plot(
                 image=cam.filepath,
@@ -1059,21 +1059,21 @@ class Triangulation_Positions(Triangulation):
                 cam_id=cam.cam_id,
             )
 
-    def evaluate_triangulation_of_test_position_markers(
+    def evaluate_triangulation_of_calibration_validation_markers(
         self, show_3D_plot: bool = True, verbose: int = 1
     ) -> None:
-        self.anipose_io = add_reprojection_errors_of_all_test_position_markers(
+        self.anipose_io = add_reprojection_errors_of_all_calibration_validation_markers(
             anipose_io=self.anipose_io
         )
         self.anipose_io = set_distances_and_angles_for_evaluation(
-            self.test_positions_gt, self.anipose_io
+            self.ground_truth_config, self.anipose_io
         )
-        gt_distances = fill_in_distances(self.test_positions_gt["distances"])
+        gt_distances = fill_in_distances(self.ground_truth_config["distances"])
         self.anipose_io = add_all_real_distances_errors(
-            anipose_io=self.anipose_io, test_positions_distances=gt_distances
+            anipose_io=self.anipose_io, ground_truth_distances=gt_distances
         )
         self.anipose_io = set_angles_error_between_screws_and_plane(
-            self.test_positions_gt["angles"], self.anipose_io
+            self.ground_truth_config["angles"], self.anipose_io
         )
 
         if verbose > 0:
@@ -1093,7 +1093,7 @@ class Triangulation_Positions(Triangulation):
                 p3d=self.anipose_io["p3ds"][0],
                 bodyparts=self.anipose_io["bodyparts"],
                 output_directory=self.output_directory,
-                marker_ids_to_connect=self.test_positions_gt[
+                marker_ids_to_connect=self.ground_truth_config[
                     "marker_ids_to_connect_in_3D_plot"
                 ],
                 plot=True,

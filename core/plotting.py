@@ -466,7 +466,7 @@ class Intrinsics(Plotting):
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_undistorted_image"
         elif self.video_metadata.recording:
             filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
-        elif self.video_metadata.positions:
+        elif self.video_metadata.calvin:
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_calvin_undistorted_image"
         filepath = output_dir.joinpath(filename)
         return filepath
