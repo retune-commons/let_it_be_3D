@@ -880,7 +880,7 @@ class Triangulation_Recordings(Triangulation):
 
     def _create_csv_filepath(self) -> None:
         filepath_out = self.output_directory.joinpath(
-            f"{self.mouse_id}_{self.recording_date}_{self.paradigm}.csv"
+            f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps.csv"
         )
         return filepath_out
 
@@ -1101,5 +1101,5 @@ class Calibration_Validation(Triangulation):
             )
 
     def _create_csv_filepath(self) -> None:
-        filepath_out = self.output_directory.joinpath(f"{self.recording_date}.csv")
+        filepath_out = self.output_directory.joinpath(f"{self.recording_date}_{self.target_fps}fps.csv")
         return filepath_out

@@ -908,6 +908,7 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
     def target_fps(self) -> int:
         return self.video_metadata.target_fps
 
+    """
     def _adjust_video_to_target_fps_and_run_marker_detection(
         self,
         target_fps: int,
@@ -945,6 +946,54 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
         else:
             h5_filepath = self.output_directory.joinpath(
                 f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_downsampled{self.target_fps}fps_synchronized_filtered.h5"
+            )
+        return h5_filepath
+    """
+
+        
+    def _adjust_video_to_target_fps_and_run_marker_detection(
+        self,
+        start_idx: int,
+        offset: float,
+        target_fps: int = 30,
+        test_mode: bool = False,
+        synchronize_only: bool = False
+    ) -> Path:
+        
+        if self.video_metadata.processing_type == "DLC":
+            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+        elif self.video_metadata.processing_type == "manual":
+            detected_markers_filepath = self._run_manual_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+        else:
+            print("TemplateMatching is not yet implemented!")
+
+        downsynchronized_filepath = self._create_h5_filepath(
+            tag=f"_downsampled{self.target_fps}fps_synchronized"
+        )
+        
+        if (not test_mode) or (test_mode and not downsynchronized_filepath.exists()):
+            
+            filtered_filepath = self._create_h5_filepath(filtered=True)
+            
+            df = pd.read_hdf(filtered_filepath)
+            frame_idxs_to_sample = self._get_sampling_frame_idxs(start_idx=start_idx, offset=offset, target_fps=target_fps)
+            new_df = df.loc[frame_idxs_to_sample, :]
+            new_df.to_hdf(downsynchronized_filepath, "key")
+        return downsynchronized_filepath, None
+        
+        
+    def _create_h5_filepath(self, tag: str = "_rawfps_unsynchronized", filtered: bool = False) -> Path:
+        if not filtered:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+            )
+        else:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
             )
         return h5_filepath
 
