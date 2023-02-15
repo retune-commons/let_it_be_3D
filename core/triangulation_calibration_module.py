@@ -802,7 +802,7 @@ class Triangulation_Recordings(Triangulation):
         for video_interface in self.video_interfaces.values():
             if (
                 video_interface.video_metadata.fps
-                > video_interface.video_metadata.target_fps
+                >= video_interface.video_metadata.target_fps
             ):
                 video_interface.run_synchronizer(
                     synchronizer=RecordingVideoDownSynchronizer,

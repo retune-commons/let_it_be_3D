@@ -146,15 +146,14 @@ class Synchronizer(ABC):
             blinking_patterns_metadata=self.video_metadata.led_pattern
         )
 
-        if (
-            type(self) == RecordingVideoDownSynchronizer
-            or type(self) == CharucoVideoSynchronizer
-        ):
+        if type(self) == CharucoVideoSynchronizer:
             output_file = self._construct_video_filepath()
         elif type(self) == RecordingVideoUpSynchronizer:
             output_file = self._create_h5_filepath(
                 tag=f"_upsampled{self.target_fps}fps_synchronized"
             )
+        elif type(self) == RecordingVideoDownSynchronizer:
+            output_file = self._create_h5_filepath(tag=f"_downsampled{self.target_fps}fps_synchronized")
         if (not test_mode) or (test_mode and not output_file.exists()):
             i = 0
             while True:
@@ -204,6 +203,7 @@ class Synchronizer(ABC):
                         0,
                         1000,
                     )
+                    print('Could not synchronize')
 
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
