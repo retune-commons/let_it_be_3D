@@ -110,8 +110,8 @@ class Triangulation_Calibration(ABC):
             for file in directory.iterdir()
             if filename_tag.lower() in file.name.lower()
             and file.suffix in filetypes
-            and ("synchronized" not in file.name and "Front" not in file.name)
-        ]
+            and "synchronized" not in file.name]
+            #and "Front" not in file.name
 
         self.video_interfaces = {}
         self.metadata_from_videos = {}
@@ -488,16 +488,22 @@ class Triangulation(Triangulation_Calibration):
         p3ds_flat = self.camera_group.triangulate(
             self.anipose_io["points_flat"], progress=True
         )
+        
+        """
+        #alternative, but reprojerr not working in this case, so will throw Error before creating a new 3Ddf:
+        p3ds_flat = self.camera_group.triangulate_optim(
+            self.anipose_io["points"], init_ransac = False, init_progress=True
+        ).reshape(self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+        """
+        
         self._postprocess_triangulations_and_calculate_reprojection_error(
             p3ds_flat=p3ds_flat
         )
-        if save_first_frame:
-            self.visualisation_3D = Triangulation_Visualization(
-                self, plot=True, save=True
-            )
         if not test_mode:
             self._get_dataframe_of_triangulated_points()
             self._save_dataframe_as_csv()
+        if save_first_frame:
+            self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
 
     def _get_metadata_from_configs(
         self, recording_config_filepath: Path, project_config_filepath: Path
@@ -735,7 +741,6 @@ class Triangulation(Triangulation_Calibration):
         all_scores[~good_points] = 2
         scores_3d = np.min(all_scores, axis=0)
 
-        # try how df looks like without those 3 lines
         scores_3d[num_cams < 2] = np.nan
         all_errors[num_cams < 2] = np.nan
         num_cams[num_cams < 2] = np.nan

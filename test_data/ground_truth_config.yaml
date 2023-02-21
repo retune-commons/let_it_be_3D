@@ -52,7 +52,7 @@ distances:
         MazeCornerOpenRight: 50
         MazeCornerOpenLeft: 50.24
 
-#calculates angle at the first given marker
+# calculates angle at the first given marker
 angles:
     MazeCornerOpenLeft: 
         value: 90
