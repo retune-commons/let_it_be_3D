@@ -10,6 +10,7 @@ calibration_evaluation_filepath:
   Side2: "test_data/MarkerDetection/Positions/config.yaml"
   Side3: "test_data/MarkerDetection/Positions/config.yaml"
   Top: "test_data/MarkerDetection/Positions/config.yaml"
+  Front: "test_data/MarkerDetection/Positions/config.yaml"
 calibration_evaluation_type:
   Bottom: DLC
   Ground1: DLC
@@ -18,6 +19,7 @@ calibration_evaluation_type:
   Side2: DLC
   Side3: DLC
   Top: DLC
+  Front: DLC
 processing_filepath:
   Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
   Ground1: "test_data/MarkerDetection/Bottom/config.yaml"
@@ -26,6 +28,7 @@ processing_filepath:
   Side2: "test_data/MarkerDetection/Side/config.yaml"
   Side3: "test_data/MarkerDetection/Side/config.yaml"
   Top: "test_data/MarkerDetection/Top/config.yaml"
+  Front: ""
 processing_type:
   Bottom: DLC
   Ground1: DLC
@@ -34,6 +37,7 @@ processing_type:
   Side2: DLC
   Side3: DLC
   Top: DLC
+  Front: manual
 led_extraction_filepath:
   Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
   Ground1: "test_data/MarkerDetection/Bottom/config.yaml"
@@ -42,6 +46,7 @@ led_extraction_filepath:
   Side2: "test_data/MarkerDetection/Side/config.yaml"
   Side3: "test_data/MarkerDetection/Side/config.yaml"
   Top: "test_data/MarkerDetection/Top/config.yaml"
+  Front: ""
 led_extraction_type:
   Bottom: DLC
   Ground1: DLC
@@ -50,6 +55,7 @@ led_extraction_type:
   Side2: DLC
   Side3: DLC
   Top: DLC
+  Front: manual
 #animal lines need to be strings ('206' or "196")
 animal_lines:
 - "196"
