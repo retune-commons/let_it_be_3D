@@ -50,10 +50,8 @@ def _set_distances_from_configuration(distances_to_compute, anipose_io):
 def add_all_real_distances_errors(
     anipose_io: Dict, test_positions_distances: Dict
 ) -> Dict:
-    all_distance_to_cm_conversion_factors = (
-        _get_conversion_factors_from_different_references(
-            anipose_io=anipose_io, test_positions_distances=test_positions_distances
-        )
+    all_distance_to_cm_conversion_factors = _get_conversion_factors_from_different_references(
+        anipose_io=anipose_io, test_positions_distances=test_positions_distances
     )
     anipose_io = _add_distances_in_cm_for_each_conversion_factor(
         anipose_io=anipose_io, conversion_factors=all_distance_to_cm_conversion_factors
@@ -70,10 +68,8 @@ def _add_distance_errors(anipose_io: Dict, gt_distances: Dict) -> Dict:
         "distances_in_cm"
     ].items():
         anipose_io["distance_errors_in_cm"][reference_distance_id] = {}
-        marker_ids_with_distance_error = (
-            _compute_differences_between_triangulated_and_gt_distances(
-                triangulated_distances=triangulated_distances, gt_distances=gt_distances
-            )
+        marker_ids_with_distance_error = _compute_differences_between_triangulated_and_gt_distances(
+            triangulated_distances=triangulated_distances, gt_distances=gt_distances
         )
         all_distance_errors = [
             distance_error
@@ -329,7 +325,7 @@ def _get_length_in_3d_space(PointA: np.array, PointB: np.array) -> float:
 def _get_angle_from_law_of_cosines(
     length_a: float, length_b: float, length_c: float
 ) -> float:
-    cos_angle = (length_c**2 + length_b**2 - length_a**2) / (
+    cos_angle = (length_c ** 2 + length_b ** 2 - length_a ** 2) / (
         2 * length_b * length_c
     )
     return math.degrees(math.acos(cos_angle))

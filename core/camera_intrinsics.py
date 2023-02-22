@@ -80,11 +80,9 @@ class IntrinsicCameraCalibrator(ABC):
         # check, how the charuco calibration works and whether the following function calls are needed in the abstract class
         # rename to board instead of checkerboard
         if len(detected_checkerboard_corners_per_image) != self.max_calibration_frames:
-            detected_checkerboard_corners_per_image = (
-                self._attempt_to_match_max_frame_count(
-                    corners_per_image=detected_checkerboard_corners_per_image,
-                    already_selected_frame_idxs=selected_frame_idxs,
-                )
+            detected_checkerboard_corners_per_image = self._attempt_to_match_max_frame_count(
+                corners_per_image=detected_checkerboard_corners_per_image,
+                already_selected_frame_idxs=selected_frame_idxs,
             )
         object_points = self._compute_object_points(
             n_detected_boards=len(detected_checkerboard_corners_per_image)

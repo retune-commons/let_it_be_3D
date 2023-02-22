@@ -14,6 +14,7 @@ def check_if_same(items: List):
     """
     return all(x == items[0] for x in items)
 
+
 def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
     missing_keys = []
     for key in list_of_keys:

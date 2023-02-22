@@ -527,10 +527,8 @@ class meta_interface(ABC):
         )
         while True:
             if self.standard_yaml_filepath.exists() and overwrite == False:
-                self.standard_yaml_filepath = (
-                    self.project_config_filepath.parent.joinpath(
-                        self.standard_yaml_filepath.stem + "_01.yaml"
-                    )
+                self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(
+                    self.standard_yaml_filepath.stem + "_01.yaml"
                 )
             else:
                 break

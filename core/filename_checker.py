@@ -85,8 +85,9 @@ class filename_checker_interface:
                     f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
                 )
         self.recording_dates.append(recording_config["recording_date"])
-        return str(recording_config["recording_date"]), str(
-            recording_config["calibration_index"]
+        return (
+            str(recording_config["recording_date"]),
+            str(recording_config["calibration_index"]),
         )
 
     def initialize_meta_config(self) -> None:

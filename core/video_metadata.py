@@ -30,9 +30,7 @@ class VideoMetadata:
         self._get_video_identity(tag=tag)
         self.exclusion_state = "valid"
 
-        self._check_filepaths(
-            video_filepath=video_filepath,
-        )
+        self._check_filepaths(video_filepath=video_filepath,)
 
         state = self._read_metadata(
             recording_config_dict=recording_config_dict,
@@ -48,10 +46,7 @@ class VideoMetadata:
         except:
             self.framenum = 0
 
-    def _check_filepaths(
-        self,
-        video_filepath: Path,
-    ) -> None:
+    def _check_filepaths(self, video_filepath: Path,) -> None:
         if (
             video_filepath.suffix == ".mp4"
             or video_filepath.suffix == ".mov"
@@ -252,10 +247,7 @@ class VideoMetadata:
                     )
         return []
 
-    def _get_intrinsic_parameters(
-        self,
-        max_calibration_frames: int,
-    ) -> None:
+    def _get_intrinsic_parameters(self, max_calibration_frames: int,) -> None:
         if self.fisheye:
             try:
                 intrinsic_calibration_filepath = [
@@ -354,12 +346,10 @@ class VideoMetadata:
             new_video_size=new_video_size,
         )
         adjusted_K = self._get_adjusted_K(K=unadjusted_intrinsic_calibration["K"])
-        adjusted_intrinsic_calibration = (
-            self._incorporate_adjustments_in_intrinsic_calibration(
-                intrinsic_calibration=unadjusted_intrinsic_calibration.copy(),
-                new_size=new_video_size,
-                adjusted_K=adjusted_K,
-            )
+        adjusted_intrinsic_calibration = self._incorporate_adjustments_in_intrinsic_calibration(
+            intrinsic_calibration=unadjusted_intrinsic_calibration.copy(),
+            new_size=new_video_size,
+            adjusted_K=adjusted_K,
         )
         return adjusted_intrinsic_calibration
 

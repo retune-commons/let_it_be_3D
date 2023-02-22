@@ -219,10 +219,8 @@ class Synchronizer(ABC):
                 output_directory=self.output_directory,
             )
 
-            self.led_timeseries_for_cross_video_validation = (
-                self._adjust_led_timeseries_for_cross_validation(
-                    start_idx=offset_adjusted_start_idx, offset=remaining_offset
-                )
+            self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(
+                start_idx=offset_adjusted_start_idx, offset=remaining_offset
             )
         else:
             offset_adjusted_start_idx = 0
@@ -299,8 +297,7 @@ class Synchronizer(ABC):
             if num_frames_to_pick > self.video_metadata.framenum:
                 num_frames_to_pick = int(self.video_metadata.framenum / 2)
             sample_frame_idxs = random.sample(
-                range(self.video_metadata.framenum),
-                num_frames_to_pick,
+                range(self.video_metadata.framenum), num_frames_to_pick,
             )
 
             selected_frames = []
@@ -533,7 +530,7 @@ class Synchronizer(ABC):
         is_ = np.zeros(n, dtype=s.dtype)
         is_[: len(s)] = s
         delta = n - len(s)
-        x, y = self._cumsum(is_, kahan), self._cumsum(is_**2, kahan)
+        x, y = self._cumsum(is_, kahan), self._cumsum(is_ ** 2, kahan)
         x = x[+m:] - x[:-m]
         y = y[+m:] - y[:-m]
         z = np.sqrt(np.maximum(y / m - np.square(x / m), 0))
@@ -589,11 +586,9 @@ class Synchronizer(ABC):
         target_timestamps = self._compute_timestamps(
             n_frames=n_frames_after_downsampling, fps=self.video_metadata.target_fps
         )
-        frame_idxs_best_matching_timestamps = (
-            self._find_frame_idxs_closest_to_target_timestamps(
-                target_timestamps=target_timestamps,
-                original_timestamps=original_timestamps,
-            )
+        frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(
+            target_timestamps=target_timestamps,
+            original_timestamps=original_timestamps,
         )
         return timeseries[frame_idxs_best_matching_timestamps]
 
@@ -664,23 +659,18 @@ class Synchronizer(ABC):
             max_ram_digestible_frames=self.video_metadata.max_ram_digestible_frames,
         )
         if len(frame_idxs_to_sample) > 1:
-            filepaths_all_video_parts = (
-                self._initiate_iterative_writing_of_individual_video_parts(
-                    frame_idxs_to_sample=sampling_frame_idxs_per_part,
-                )
+            filepaths_all_video_parts = self._initiate_iterative_writing_of_individual_video_parts(
+                frame_idxs_to_sample=sampling_frame_idxs_per_part,
             )
-            filepath_downsampled_video = (
-                self._concatenate_individual_video_parts_on_disk(
-                    filepaths_of_video_parts=filepaths_all_video_parts
-                )
+            filepath_downsampled_video = self._concatenate_individual_video_parts_on_disk(
+                filepaths_of_video_parts=filepaths_all_video_parts
             )
             self._delete_individual_video_parts(
                 filepaths_of_video_parts=filepaths_all_video_parts
             )
         else:
             filepath_downsampled_video = self._write_video_to_disk(
-                idxs_of_frames_to_sample=frame_idxs_to_sample[0],
-                target_fps=target_fps,
+                idxs_of_frames_to_sample=frame_idxs_to_sample[0], target_fps=target_fps,
             )
         return filepath_downsampled_video
 
@@ -699,11 +689,9 @@ class Synchronizer(ABC):
         target_timestamps = self._compute_timestamps(
             n_frames=n_frames_after_downsampling, fps=target_fps
         )
-        frame_idxs_best_matching_timestamps = (
-            self._find_frame_idxs_closest_to_target_timestamps(
-                target_timestamps=target_timestamps,
-                original_timestamps=original_timestamps,
-            )
+        frame_idxs_best_matching_timestamps = self._find_frame_idxs_closest_to_target_timestamps(
+            target_timestamps=target_timestamps,
+            original_timestamps=original_timestamps,
         )
         sampling_frame_idxs = self._adjust_frame_idxs_for_synchronization_shift(
             unadjusted_frame_idxs=frame_idxs_best_matching_timestamps,
@@ -855,11 +843,14 @@ class CharucoVideoSynchronizer(Synchronizer):
         test_mode: bool,
         synchronize_only: bool = True,
     ) -> Tuple[Path]:
-        return None, self._downsample_video(
-            start_idx=start_idx,
-            offset=offset,
-            target_fps=self.target_fps,
-            test_mode=test_mode,
+        return (
+            None,
+            self._downsample_video(
+                start_idx=start_idx,
+                offset=offset,
+                target_fps=self.target_fps,
+                test_mode=test_mode,
+            ),
         )
 
 

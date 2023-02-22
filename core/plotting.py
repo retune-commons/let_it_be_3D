@@ -402,9 +402,7 @@ class LED_Marker_Plot(Plotting):
             [y_start_index, y_end_index, y_end_index, y_start_index, y_start_index],
         )
         plt.title(f"{self.video_metadata.cam_id}")
-        plt.suptitle(
-            f"LED box size: {self.box_size}"
-        )
+        plt.suptitle(f"LED box size: {self.box_size}")
         if save:
             self._save(filepath=self.filepath)
         if plot:
@@ -431,10 +429,8 @@ class Intrinsics(Plotting):
             filepath=self.video_metadata.filepath, frame_idx=frame_idx
         )
         if self.video_metadata.fisheye:
-            self.undistorted_output_image = (
-                self._undistort_fisheye_image_for_inspection(
-                    image=self.distorted_input_image
-                )
+            self.undistorted_output_image = self._undistort_fisheye_image_for_inspection(
+                image=self.distorted_input_image
             )
         else:
             self.undistorted_output_image = cv2.undistort(
