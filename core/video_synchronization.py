@@ -153,7 +153,7 @@ class Synchronizer(ABC):
                 tag=f"_upsampled{self.target_fps}fps_synchronized"
             )
         elif type(self) == RecordingVideoDownSynchronizer:
-            output_file = self._create_h5_filepath(tag=f"_downsampled{self.target_fps}fps_synchronized")
+            output_file = self._create_h5_filepath(tag = f"_downsampled{self.target_fps}fps_synchronized")
         if (not test_mode) or (test_mode and not output_file.exists()):
             i = 0
             while True:
@@ -194,9 +194,9 @@ class Synchronizer(ABC):
                     ) = self._find_best_match_of_template(
                         template=self.template_blinking_motif,
                         start_time=0,
-                        end_time=len(self.led_timeseries) * 0.4,
+                        end_time=120000,
                     )
-                    # finds match in the first 40% of the video # ToDo: make adaptable
+                    # finds match in the first 120s of the video # ToDo: make adaptable
                 except ValueError:
                     offset_adjusted_start_idx, remaining_offset, alignment_error = (
                         0,
