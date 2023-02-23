@@ -250,9 +250,9 @@ class meta_interface(ABC):
                 test_mode=test_mode,
             )
             self.objects["calibration_validation_objects"][
-                calibration_validation.calibration_index
-            ] = calibration_validation
-            for video in calibration_validation.metadata_from_videos.values():
+                calibration_validation_object.calibration_index
+            ] = calibration_validation_object
+            for video in calibration_validation_object.metadata_from_videos.values():
                 try:
                     recording_day["calibrations"]["videos"][video.cam_id][
                         "calibration_validation_image_filepath"

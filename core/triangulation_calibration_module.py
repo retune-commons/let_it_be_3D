@@ -110,7 +110,7 @@ class Triangulation_Calibration(ABC):
             for file in directory.iterdir()
             if filename_tag.lower() in file.name.lower()
             and file.suffix in filetypes
-            and ("synchronized" not in file.name and "Front" not in file.name)
+            and "synchronized" not in file.name
         ]
 
         self.video_interfaces = {}
@@ -230,9 +230,10 @@ class Calibration(Triangulation_Calibration):
         verbose: int = 0,
         charuco_calibration_board: Optional = None,
         test_mode: bool = False,
+        iteration: int = 0,
     ) -> None:
         cams = list(self.metadata_from_videos.keys())
-        filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml"
+        filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index, iteration = iteration)}.toml"
 
         self.calibration_output_filepath = self.output_directory.joinpath(filename)
         if (not test_mode) or (
@@ -377,7 +378,7 @@ class Calibration(Triangulation_Calibration):
     def calibrate_optimal(
         self,
         calibration_validation: "Calibration_Validation",
-        max_iters: int = 2,
+        max_iters: int = 5,
         p_threshold: float = 0.1,
         angle_threshold: int = 5,
         verbose: int = 1,
@@ -389,8 +390,7 @@ class Calibration(Triangulation_Calibration):
         calibration_found = False
 
         for cal in range(max_iters):
-            self.run_calibration(verbose=verbose, test_mode=test_mode)
-            # keep calibrations! (currently overwritten)
+            self.run_calibration(verbose=verbose, test_mode=test_mode, iteration=cal)
 
             calibration_validation.run_triangulation(
                 calibration_toml_filepath=self.calibration_output_filepath
@@ -802,7 +802,7 @@ class Triangulation_Recordings(Triangulation):
         for video_interface in self.video_interfaces.values():
             if (
                 video_interface.video_metadata.fps
-                > video_interface.video_metadata.target_fps
+                >= video_interface.video_metadata.target_fps
             ):
                 video_interface.run_synchronizer(
                     synchronizer=RecordingVideoDownSynchronizer,
