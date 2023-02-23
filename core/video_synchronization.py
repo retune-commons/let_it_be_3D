@@ -203,6 +203,7 @@ class Synchronizer(ABC):
                         0,
                         1000,
                     )
+                    print('Could not synchronize')
 
                 # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
                 if alignment_error > self.alignment_threshold:
@@ -217,7 +218,7 @@ class Synchronizer(ABC):
                 video_metadata=self.video_metadata,
                 output_directory=self.output_directory,
             )
-
+            
             self.led_timeseries_for_cross_video_validation = (
                 self._adjust_led_timeseries_for_cross_validation(
                     start_idx=offset_adjusted_start_idx, offset=remaining_offset
@@ -246,7 +247,7 @@ class Synchronizer(ABC):
                 marker_detection_filepath
             ).shape[0]
         print(
-            f"Frames after synchronization: {self.video_metadata.framenum_synchronized}"
+            f"{self.video_metadata.cam_id} Frames after synchronization: {self.video_metadata.framenum_synchronized}"
         )
         self.video_metadata.duration_synchronized = (
             self.video_metadata.framenum_synchronized / self.video_metadata.target_fps
@@ -959,22 +960,22 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
         synchronize_only: bool = False
     ) -> Path:
         
-        if self.video_metadata.processing_type == "DLC":
-            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
-            )
-        elif self.video_metadata.processing_type == "manual":
-            detected_markers_filepath = self._run_manual_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
-            )
-        else:
-            print("TemplateMatching is not yet implemented!")
-
         downsynchronized_filepath = self._create_h5_filepath(
             tag=f"_downsampled{self.target_fps}fps_synchronized"
         )
         
         if (not test_mode) or (test_mode and not downsynchronized_filepath.exists()):
+        
+            if self.video_metadata.processing_type == "DLC":
+                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                )
+            elif self.video_metadata.processing_type == "manual":
+                detected_markers_filepath = self._run_manual_marker_detection(
+                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                )
+            else:
+                print("TemplateMatching is not yet implemented!")
             
             filtered_filepath = self._create_h5_filepath(filtered=True)
             
@@ -1010,21 +1011,24 @@ class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
         test_mode: bool,
         synchronize_only: bool = False,
     ):
-        if self.video_metadata.processing_type == "DLC":
-            detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
-            )
-        elif self.video_metadata.processing_type == "manual":
-            detected_markers_filepath = self._run_manual_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
-            )
-        else:
-            print("TemplateMatching is not yet implemented!")
-
+        
+        
         upsynchronized_filepath = self._create_h5_filepath(
             tag=f"_upsampled{self.target_fps}fps_synchronized"
         )
         if (not test_mode) or (test_mode and not upsynchronized_filepath.exists()):
+            
+            if self.video_metadata.processing_type == "DLC":
+                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                )
+            elif self.video_metadata.processing_type == "manual":
+                detected_markers_filepath = self._run_manual_marker_detection(
+                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                )
+            else:
+                print("TemplateMatching is not yet implemented!")
+
             filtered_filepath = self._create_h5_filepath(filtered=True)
             df = pd.read_hdf(filtered_filepath)
             len_frame_in_ms = 1 / self.video_metadata.fps * 1000

@@ -101,15 +101,27 @@ class Triangulation_Visualization(Plot3D):
             image = iio.v3.imread(self.videos_cams_filepaths[cam], index=self.idx)
             ax_2d.imshow(image)
             for scorer, marker, _ in df.columns:
-                if (
-                    df.loc[self.idx, (scorer, marker, "likelihood")]
-                    > self.likelihood_threshold
-                ):
-                    x, y = (
-                        df.loc[self.idx, (scorer, marker, "x")],
-                        df.loc[self.idx, (scorer, marker, "y")],
-                    )
-                    ax_2d.scatter(x, y, s=10, c="blue")
+                idx = df.index[self.idx]
+                try:
+                    if (
+                        df.loc[idx, (scorer, marker, "likelihood")]
+                        > self.likelihood_threshold
+                    ):
+                        x, y = (
+                            df.loc[idx, (scorer, marker, "x")],
+                            df.loc[idx, (scorer, marker, "y")],
+                        )
+                        ax_2d.scatter(x, y, s=10, c="blue")
+                except ValueError:
+                    if (
+                        df.loc[idx, (scorer, marker, "likelihood")].values[0]
+                        > self.likelihood_threshold
+                    ):
+                        x, y = (
+                            df.loc[idx, (scorer, marker, "x")].values[0],
+                            df.loc[idx, (scorer, marker, "y")].values[0],
+                        )
+                        ax_2d.scatter(x, y, s=10, c="blue")
             ax_2d.set_title(f"{cam}")
         fig.suptitle("3D_Plot_with_2D_Plots")
 

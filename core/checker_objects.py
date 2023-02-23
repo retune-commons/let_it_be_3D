@@ -222,22 +222,6 @@ class Check_Calibration(Check):
                 f"No information for {self.cameras_missing_in_recording_config} in the config_file {recording_config_filepath}!"
             )
 
-        synch_videofiles = [
-            file
-            for file in self.calibration_directory.iterdir()
-            if file.suffix == ".mp4"
-            and "synchronized" in file.name
-            and "Front" not in file.name
-            and "downsampled" not in file.name
-        ]
-
-        for file in synch_videofiles:
-            file.rename(
-                file.parent.joinpath(
-                    file.stem + f"_downsampled{self.target_fps}fps" + ".mp4"
-                )
-            )
-
     def _validate_and_save_metadata_for_recording(self) -> None:
         recording_dates = set(
             video_metadata.recording_date
@@ -338,58 +322,6 @@ class Check_Recording(Check):
         if len(self.cameras_missing_in_recording_config) > 0:
             print(
                 f"No information for {self.cameras_missing_in_recording_config} in the config_file {recording_config_filepath}!"
-            )
-
-        synch_videofiles = [
-            file
-            for file in self.recording_directory.iterdir()
-            if file.suffix == ".mp4"
-            and "synchronized" in file.name
-            and "Front" not in file.name
-            and "downsampled" not in file.name
-        ]
-
-        for file in synch_videofiles:
-            file.rename(
-                file.parent.joinpath(
-                    file.stem + f"_downsampled{self.target_fps}fps" + ".mp4"
-                )
-            )
-
-        synch_hdffiles = [
-            file
-            for file in self.recording_directory.iterdir()
-            if file.suffix == ".h5"
-            and "Front" not in file.name
-            and "filtered" not in file.name
-            and "downsampled" not in file.name
-            and "SyncData" not in file.name
-        ]
-
-        for file in synch_hdffiles:
-            file.rename(
-                file.parent.joinpath(
-                    file.stem + f"_downsampled{self.target_fps}fps_synchronized" + ".h5"
-                )
-            )
-
-        filtered_hdffiles = [
-            file
-            for file in self.recording_directory.iterdir()
-            if file.suffix == ".h5"
-            and "Front" not in file.name
-            and "_filtered" in file.name
-            and "downsampled" not in file.name
-            and "SyncData" not in file.name
-        ]
-
-        for file in filtered_hdffiles:
-            file.rename(
-                file.parent.joinpath(
-                    file.stem.replace("_filtered", "")
-                    + f"_downsampled{self.target_fps}fps_synchronized_filtered"
-                    + ".h5"
-                )
             )
 
     def _validate_and_save_metadata_for_recording(self) -> None:
