@@ -41,19 +41,6 @@ from .angles_and_distances import (
 )
 
 
-def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int) -> None:
-    # makes little sense since only the beginning, not the end of the videos is synchronized
-    synch_framenum_median = np.median(
-        [
-            video_metadata.framenum_synchronized
-            for video_metadata in metadata_from_videos.values()
-        ]
-    )
-    synch_duration_median = synch_framenum_median / target_fps
-    for video_metadata in metadata_from_videos.values():
-        if video_metadata.duration_synchronized < synch_duration_median - 1:
-            video_metadata.exclusion_state = "exclude"
-
 
 class Triangulation_Calibration(ABC):
     @abstractmethod
@@ -222,7 +209,6 @@ class Calibration(Triangulation_Calibration):
             )
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
-        # exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def run_calibration(
         self,
@@ -504,6 +490,30 @@ class Triangulation(Triangulation_Calibration):
             self._save_dataframe_as_csv()
         if save_first_frame:
             self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
+            
+    def exclude_markers(self, all_markers_to_exclude_config: Path):
+        all_markers_to_exclude = read_config(all_markers_to_exclude_config)
+        
+        missing_cams = check_keys(all_markers_to_exclude, list(self.triangulation_dlc_cams_filepaths))
+        if len(missing_cams)>0:
+            print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config)}!")
+        
+        for cam_id in self.triangulation_dlc_cams_filepaths:
+            h5_file = self.triangulation_dlc_cams_filepaths[cam_id]
+            df = pd.read_hdf(h5_file)
+            markers = set(b for a, b, c in df.keys())
+            markers_to_exclude_per_cam = all_markers_to_exclude[cam_id]
+            existing_markers_to_exclude = list(set(markers) & set(markers_to_exclude_per_cam))
+            not_existing_markers = [marker for marker in markers_to_exclude_per_cam if marker not in markers]
+            if len(not_existing_markers) > 0:
+                print(f"The following markers were not found in the dataframe, but were given as markers to exclude for {cam_id}: {not_existing_markers}!")
+            if len(existing_markers_to_exclude)>0:
+                for i, keys in enumerate(df.columns):
+                    a, b, c = keys
+                    if b in existing_markers_to_exclude and c == "likelihood":
+                        df.isetitem(i, 0)
+                df.to_hdf(h5_file, key="dlc", mode="w")
+            # do not replace, but create new file and give it to triangulation_dlc_cams_filepaths!
 
     def _get_metadata_from_configs(
         self, recording_config_filepath: Path, project_config_filepath: Path
@@ -881,7 +891,6 @@ class Triangulation_Recordings(Triangulation):
             )
         except IndexError:
             pass
-        # exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def _create_csv_filepath(self) -> None:
         filepath_out = self.output_directory.joinpath(

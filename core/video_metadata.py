@@ -370,6 +370,8 @@ class VideoMetadata:
             size = iio.v3.immeta(self.filepath, exclude_applied=False)["shape"]
         return size
 
+    
+    # adjust maybe and test again????
     def _get_correct_x_y_offsets(
         self,
         intrinsic_calibration_video_size: Tuple[int, int],
@@ -391,8 +393,8 @@ class VideoMetadata:
 
     def _get_adjusted_K(self, K: np.ndarray) -> np.ndarray:
         adjusted_K = K.copy()
-        adjusted_K[0][2] = adjusted_K[0][2] - self.offset_row_idx
-        adjusted_K[1][2] = adjusted_K[1][2] - self.offset_col_idx
+        adjusted_K[0][2] = adjusted_K[0][2] - self.offset_col_idx
+        adjusted_K[1][2] = adjusted_K[1][2] - self.offset_row_idx
         return adjusted_K
 
     def _incorporate_adjustments_in_intrinsic_calibration(
