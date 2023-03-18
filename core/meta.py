@@ -351,7 +351,17 @@ class meta_interface(ABC):
                 # add reprojerr
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
-
+    
+    def normalize_recordings(self, normalization_config_path: Path)->None:
+        normalization_config_path = convert_to_path(normalization_config_path)
+        for recording_day in self.meta["recording_days"].values():
+            for recording in recording_day["recordings"]:
+                self.objects["triangulation_recordings_objects"][
+                    recording
+                ].normalize(normalization_config_path=normalization_config_path)
+        self.meta["meta_step"] = 8
+        self.export_meta_to_yaml(self.standard_yaml_filepath)
+    
     def add_triangulated_csv_to_database(
         self, data_base_path: str, overwrite: bool = True
     ) -> None:

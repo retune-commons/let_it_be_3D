@@ -32,7 +32,53 @@ class Plotting(ABC):
     def _zscore(self, array: np.ndarray) -> np.ndarray:
         return (array - np.mean(array)) / np.std(array, ddof=0)
 
+class Rotation_Visualization(Plotting):
+    def __init__(
+        self,
+        rotated_markers: List,
+        config: Dict,
+        filepath: Path,
+        rotation_error: float,
+        plot: bool = False,
+        save: bool = True):
+        self.rotated_markers = rotated_markers
+        self.config = config
+        self.rotation_error = rotation_error
+        self.filepath=self._create_filepath(filepath=filepath)
+        self._create_plot(plot=plot, save=save)
+    
+    def _create_plot(self, plot: bool, save: bool)->None:
+        # plots the 4 rotated corners (yellow) compared to the reference space (blue)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        for elem in self.rotated_markers:
+            ax.scatter(elem[0], elem[1], elem[2], color = 'orange', alpha=0.5)
 
+        for elem in self.config["ReferenceRotationCoords"]:
+            ax.scatter(elem[0], elem[1], elem[2], color = 'blue', alpha=0.5)
+
+        x = [point[0] for point in self.rotated_markers]
+        y = [point[1] for point in self.rotated_markers]
+        z = [point[2] for point in self.rotated_markers]
+        ax.plot(x, y, z, c="blue")
+
+        ax.scatter(self.config["InvisibleMarkers"]["x"], self.config["InvisibleMarkers"]["y"], self.config["InvisibleMarkers"]["z"], alpha = 0)
+        
+        fig.suptitle(f"Rotation Error: {self.rotation_error}")
+        
+        if save:
+            self._save(filepath=self.filepath)
+        if plot:
+            plt.show()
+        plt.close()
+    
+    def plot(self) -> None:
+        self._create_plot(plot=True, save=False)
+        
+    def _create_filepath(self, filepath):
+        return Path(filepath.parent.joinpath(filepath.stem + ".png"))
+    
+    
 class Plot3D(Plotting):
     def _create_filepath(self) -> str:
         filename = f"3D_plot_{self.filename_tag}"
