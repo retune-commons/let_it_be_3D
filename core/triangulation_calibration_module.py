@@ -495,12 +495,12 @@ class Triangulation(Triangulation_Calibration):
         if save_first_frame:
             self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
             
-    def exclude_markers(self, all_markers_to_exclude_config: Path):
-        all_markers_to_exclude = read_config(all_markers_to_exclude_config)
+    def exclude_markers(self, all_markers_to_exclude_config_path: Path):
+        all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
         
         missing_cams = check_keys(all_markers_to_exclude, list(self.triangulation_dlc_cams_filepaths))
         if len(missing_cams)>0:
-            print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config)}!")
+            print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config_path)}!")
         
         for cam_id in self.triangulation_dlc_cams_filepaths:
             h5_file = self.triangulation_dlc_cams_filepaths[cam_id]
