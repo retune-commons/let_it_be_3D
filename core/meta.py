@@ -310,24 +310,15 @@ class meta_interface(ABC):
                 "calibration_keys"
             ]:
                 if calibrate_optimal:
-                    self.objects["calibration_objects"][
-                        calibration
-                    ].calibrate_optimal(
-                        calibration_validation=self.objects["calibration_validation_objects"][
+                    recording_day["calibrations"]["toml_filepaths"][calibration] = str(
+                        self.objects["calibration_objects"][
                             calibration
-                        ],
-                        verbose=verbose,
-                        test_mode=test_mode,
-                    )
+                        ].calibrate_optimal(
+                            calibration_validation=self.objects["calibration_validation_objects"][calibration],
+                            verbose=verbose,
+                            test_mode=test_mode))
                 else:
-                    self.objects["calibration_objects"][
-                        calibration
-                    ].run_calibration(verbose=verbose, test_mode=test_mode)
-                recording_day["calibrations"]["toml_filepaths"][calibration] = str(
-                    self.objects["calibration_objects"][
-                        calibration
-                    ].calibration_output_filepath
-                )
+                    recording_day["calibrations"]["toml_filepaths"][calibration] = str(self.objects["calibration_objects"][calibration].run_calibration(verbose=verbose, test_mode=test_mode))
                 # add report
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)

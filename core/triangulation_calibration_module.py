@@ -219,14 +219,14 @@ class Calibration(Triangulation_Calibration):
         verbose: int = 0,
         charuco_calibration_board: Optional = None,
         test_mode: bool = False,
-        iteration: int = 0,
+        iteration: Optional[int] = None,
     ) -> None:
         cams = list(self.metadata_from_videos.keys())
         filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index, iteration = iteration)}.toml"
 
-        self.calibration_output_filepath = self.output_directory.joinpath(filename)
+        calibration_filepath = self.output_directory.joinpath(filename)
         if (not test_mode) or (
-            test_mode and not self.calibration_output_filepath.exists()
+            test_mode and not calibration_filepath.exists()
         ):
             if charuco_calibration_board == None:
                 aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
@@ -249,7 +249,7 @@ class Calibration(Triangulation_Calibration):
                 init_extrinsics=True,
                 verbose=verbose > 1,
             )
-            self._save_calibration()
+            self._save_calibration(calibration_filepath=calibration_filepath)
 
     def initialize_camera_group(self) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
@@ -359,10 +359,10 @@ class Calibration(Triangulation_Calibration):
                 )
         self.camera_objects.sort(key=lambda x: x.name, reverse=False)
 
-    def _save_calibration(self) -> None:
-        if self.calibration_output_filepath.exists():
-            self.calibration_output_filepath.unlink()
-        self.camera_group.dump(self.calibration_output_filepath)
+    def _save_calibration(self, calibration_filepath: Path) -> None:
+        if calibration_filepath.exists():
+            calibration_filepath.unlink()
+        self.camera_group.dump(calibration_filepath)
 
     def calibrate_optimal(
         self,
@@ -375,14 +375,20 @@ class Calibration(Triangulation_Calibration):
     ):
         """finds optimal calibration through repeated optimisations of anipose"""
         # ToDo make max_iters and p_threshold adaptable?
+        
         report = pd.DataFrame()
         calibration_found = False
+        cams = list(self.metadata_from_videos.keys())
+        good_calibration_filepath = self.output_directory.joinpath(f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml")
 
         for cal in range(max_iters):
-            self.run_calibration(verbose=verbose, test_mode=test_mode, iteration=cal)
-
+            if good_calibration_filepath.exists() and test_mode:
+                calibration_filepath = good_calibration_filepath
+            else:
+                calibration_filepath = self.run_calibration(verbose=verbose, test_mode=test_mode, iteration=cal)
+            
             calibration_validation.run_triangulation(
-                calibration_toml_filepath=self.calibration_output_filepath
+                calibration_toml_filepath=calibration_filepath
             )
 
             calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
@@ -403,7 +409,7 @@ class Calibration(Triangulation_Calibration):
                         "individual_errors"
                     ]
                 ]
-
+                
             for reference in calibration_angles_errors.keys():
                 all_angle_errors = list(calibration_angles_errors.values())
 
@@ -428,16 +434,19 @@ class Calibration(Triangulation_Calibration):
                 and mean_angle_err < angle_threshold
             ):
                 calibration_found = True
-                print("Good Calibration reached!")
+                calibration_filepath.rename(good_calibration_filepath)
+                calibration_filepath=good_calibration_filepath
+                print(f"Good Calibration reached at iteration {cal}! Named it {good_calibration_filepath}.")
                 break
-
-        if not calibration_found:
-            print("No optimal calibration found with given thresholds")
 
         report_filepath = self.output_directory.joinpath(
             f"{self.recording_date}_calibration_report.csv"
         )
         report.to_csv(report_filepath, index=False)
+        
+        if not calibration_found:
+            print("No optimal calibration found with given thresholds! Returned last executed calibration!")
+        return calibration_filepath
 
 
 class Triangulation(Triangulation_Calibration):
