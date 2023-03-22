@@ -370,8 +370,6 @@ class VideoMetadata:
             size = iio.v3.immeta(self.filepath, exclude_applied=False)["shape"]
         return size
 
-    
-    # adjust maybe and test again????
     def _get_correct_x_y_offsets(
         self,
         intrinsic_calibration_video_size: Tuple[int, int],
@@ -383,7 +381,6 @@ class VideoMetadata:
                 - new_video_size[0]
                 - self.offset_row_idx
             )
-            # rows or cols first in intrinsic_calibration_video_size? (rows for now, but maybe this will be changed?)
         if self.flip_h:
             self.offset_col_idx = (
                 intrinsic_calibration_video_size[0]
