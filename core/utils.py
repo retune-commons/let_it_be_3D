@@ -8,6 +8,16 @@ import matplotlib.pyplot as plt
 import yaml
 
 
+def get_3D_df_keys(key: str)->Tuple[str]:
+        return key + "_x", key + "_y", key + "_z"
+
+def get_3D_array(df: pd.DataFrame, key: str, index: Optional[int]=None)->np.array:
+    x, y, z = get_3D_df_keys(key)
+    if index==None:
+        return np.array([df[x], df[y], df[z]])
+    else:
+        return np.array([df[x][index], df[y][index], df[z][index]])
+
 def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
     missing_keys = []
     for key in list_of_keys:

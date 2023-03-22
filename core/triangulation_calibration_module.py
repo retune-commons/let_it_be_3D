@@ -4,6 +4,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import itertools as it
 import math
+from scipy.spatial.transform import Rotation
 
 import aniposelib as ap_lib
 import cv2
@@ -23,6 +24,7 @@ from .plotting import (
     Predictions_Plot,
     Calibration_Validation_Plot,
     Triangulation_Visualization,
+    Rotation_Visualization,
 )
 from .marker_detection import ManualAnnotation, DeeplabcutInterface
 from .utils import (
@@ -31,6 +33,8 @@ from .utils import (
     read_config,
     check_keys,
     get_multi_index,
+    get_3D_df_keys,
+    get_3D_array,
 )
 from .angles_and_distances import (
     add_reprojection_errors_of_all_calibration_validation_markers,
@@ -40,19 +44,6 @@ from .angles_and_distances import (
     set_angles_error_between_screws_and_plane,
 )
 
-
-def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int) -> None:
-    # makes little sense since only the beginning, not the end of the videos is synchronized
-    synch_framenum_median = np.median(
-        [
-            video_metadata.framenum_synchronized
-            for video_metadata in metadata_from_videos.values()
-        ]
-    )
-    synch_duration_median = synch_framenum_median / target_fps
-    for video_metadata in metadata_from_videos.values():
-        if video_metadata.duration_synchronized < synch_duration_median - 1:
-            video_metadata.exclusion_state = "exclude"
 
 
 class Triangulation_Calibration(ABC):
@@ -221,7 +212,6 @@ class Calibration(Triangulation_Calibration):
             )
         self._validate_unique_cam_ids()
         self.initialize_camera_group()
-        # exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
     def run_calibration(
         self,
@@ -500,9 +490,33 @@ class Triangulation(Triangulation_Calibration):
         )
         if not test_mode:
             self._get_dataframe_of_triangulated_points()
-            self._save_dataframe_as_csv()
+            self._save_dataframe_as_csv(filepath = self.csv_output_filepath, df = self.df)
         if save_first_frame:
             self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
+            
+    def exclude_markers(self, all_markers_to_exclude_config_path: Path):
+        all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
+        
+        missing_cams = check_keys(all_markers_to_exclude, list(self.triangulation_dlc_cams_filepaths))
+        if len(missing_cams)>0:
+            print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config_path)}!")
+        
+        for cam_id in self.triangulation_dlc_cams_filepaths:
+            h5_file = self.triangulation_dlc_cams_filepaths[cam_id]
+            df = pd.read_hdf(h5_file)
+            markers = set(b for a, b, c in df.keys())
+            markers_to_exclude_per_cam = all_markers_to_exclude[cam_id]
+            existing_markers_to_exclude = list(set(markers) & set(markers_to_exclude_per_cam))
+            not_existing_markers = [marker for marker in markers_to_exclude_per_cam if marker not in markers]
+            if len(not_existing_markers) > 0:
+                print(f"The following markers were not found in the dataframe, but were given as markers to exclude for {cam_id}: {not_existing_markers}!")
+            if len(existing_markers_to_exclude)>0:
+                for i, keys in enumerate(df.columns):
+                    a, b, c = keys
+                    if b in existing_markers_to_exclude and c == "likelihood":
+                        df.isetitem(i, 0)
+                df.to_hdf(h5_file, key="dlc", mode="w")
+            # do not replace, but create new file and give it to triangulation_dlc_cams_filepaths!
 
     def _get_metadata_from_configs(
         self, recording_config_filepath: Path, project_config_filepath: Path
@@ -588,9 +602,8 @@ class Triangulation(Triangulation_Calibration):
                 h5_output_filepath = self.output_directory.joinpath(
                     self.csv_output_filepath.stem + f"empty_{cam}.h5"
                 )
-                df = pd.DataFrame(data={}, columns=get_multi_index(markers), dtype=int)
-                for i in range(framenum):
-                    df.loc[i, :] = 0
+                cols = get_multi_index(markers)
+                df = pd.DataFrame(data=np.zeros((framenum, len(cols))), columns=cols, dtype=int)
                 df.to_hdf(h5_output_filepath, "empty")
                 self._validate_calibration_validation_marker_ids(
                     calibration_validation_markers_df_filepath=h5_output_filepath,
@@ -762,10 +775,11 @@ class Triangulation(Triangulation_Calibration):
         self.df = df
         self.anipose_io["df_xyz"] = df
 
-    def _save_dataframe_as_csv(self) -> None:
-        if self.csv_output_filepath.exists():
-            self.csv_output_filepath.unlink()
-        self.df.to_csv(self.csv_output_filepath, index=False)
+    def _save_dataframe_as_csv(self, filepath: str, df: pd.DataFrame) -> None:
+        filepath = convert_to_path(filepath)
+        if filepath.exists():
+            filepath.unlink()
+        df.to_csv(filepath, index=False)
 
 
 class Triangulation_Recordings(Triangulation):
@@ -880,12 +894,16 @@ class Triangulation_Recordings(Triangulation):
             )
         except IndexError:
             pass
-        # exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps)
 
-    def _create_csv_filepath(self) -> None:
-        filepath_out = self.output_directory.joinpath(
-            f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps.csv"
-        )
+    def _create_csv_filepath(self, flag: Optional[str]=None) -> None:
+        if flag == None:
+            filepath_out = self.output_directory.joinpath(
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps.csv"
+            )
+        else:
+            filepath_out = self.output_directory.joinpath(
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps_{flag}.csv"
+            )
         return filepath_out
 
     def _validate_and_save_metadata_for_recording(self) -> None:
@@ -949,6 +967,53 @@ class Triangulation_Recordings(Triangulation):
             f"{filename}.mp4", fps=self.created_video_output_fps, logger=None
         )
 
+    def normalize(self, normalization_config_path: Path)->None:
+        normalization_config_path = convert_to_path(normalization_config_path)
+        config = read_config(normalization_config_path)
+        
+        # ToDo: define a function to get the frame, in which the maze angles and lengths match as best as possible
+        best_frame = 0
+        
+        x, y, z = get_3D_array(self.df, config['center'], best_frame)
+        for key in self.df.keys():
+            if '_x' in key:
+                self.df[key] = self.df[key]-x
+            if '_y' in key:
+                self.df[key] = self.df[key]-y
+            if '_z' in key:
+                self.df[key] = self.df[key]-z
+
+        marker0, marker1 = get_3D_array(self.df, config['ReferenceLengthMarkers'][0], best_frame), get_3D_array(self.df, config['ReferenceLengthMarkers'][1], best_frame)
+        lengthleftside = np.sqrt((marker0[0]-marker1[0])**2 + (marker0[1]-marker1[1])**2 + (marker0[2]-marker1[2])**2)
+        conversionfactor = config['ReferenceLengthCm']/lengthleftside
+        
+        bp_keys_unflat=set(get_3D_df_keys(key[:-2]) for key in self.df.keys() if not 'error' in key and not 'score' in key and not "M_" in key and not 'center' in key and not 'fn' in key)
+        bp_keys = list(it.chain(*bp_keys_unflat))
+        
+        normalised = self.df
+        normalised[bp_keys]*=conversionfactor
+        reference_rotation_markers = []
+        for marker in config['ReferenceRotationMarkers']:
+            reference_rotation_markers.append(get_3D_array(normalised, marker, best_frame))
+        # the rotation matrix between the referencespace and the reconstructedspace is calculated. 
+        r = Rotation.align_vectors(config["ReferenceRotationCoords"], reference_rotation_markers)
+        rotation_error = r[1]
+        
+        rotated = normalised
+        for key in bp_keys_unflat:
+            rot_points = r[0].apply(normalised.loc[:, [key[0], key[1], key[2]]])
+            rotated.loc[:, key[0]]= rot_points[:, 0]
+            rotated.loc[:, key[1]]= rot_points[:, 1]
+            rotated.loc[:, key[2]]= rot_points[:, 2]
+        
+        rotated_markers = []
+        for marker in config['ReferenceRotationMarkers']:
+            rotated_markers.append(get_3D_array(rotated, marker, best_frame))
+        
+        rotated_filepath = self._create_csv_filepath(flag="rotated")
+        self._save_dataframe_as_csv(filepath = rotated_filepath, df = rotated)
+        Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = rotated_filepath, rotation_error = rotation_error)
+        
     def _get_triangulated_plots(self, idx: int) -> np.ndarray:
         idx = int(
             (self.created_video_start_s + idx * self.created_video_speed)
@@ -1011,13 +1076,17 @@ class Calibration_Validation(Triangulation):
         self.recording_date = list(recording_dates)[0]
 
     def _validate_unique_cam_ids(self):
-        cameras = [camera.name for camera in self.camera_group.cameras]
-        self.cameras = list(self.metadata_from_videos.keys())
-        if self.cameras.sort() != cameras.sort():
-            raise ValueError(
-                f"The cam_ids of the recordings in {self.calibration_validation_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
-                "Are there missing or additional files in the calibration or the recording folder?"
-            )
+        self.cameras = [camera.name for camera in self.camera_group.cameras]
+        filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
+        filepath_keys.sort()
+        self.cameras.sort()
+        for camera in filepath_keys:
+            if camera not in self.cameras:
+                self.triangulation_dlc_cams_filepaths.pop(camera)
+
+        for camera in self.cameras:
+            if camera not in filepath_keys:
+                print(f"Creating empty .h5 file for {camera}!")
 
     def get_marker_predictions(self) -> None:
         self.csv_output_filepath = self._create_csv_filepath()

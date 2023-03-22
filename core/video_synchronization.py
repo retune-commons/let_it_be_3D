@@ -197,7 +197,9 @@ class Synchronizer(ABC):
                         end_time=120000,
                     )
                     # finds match in the first 120s of the video # ToDo: make adaptable
+
                 except ValueError:
+                    # throws error if end_time > video_length
                     offset_adjusted_start_idx, remaining_offset, alignment_error = (
                         0,
                         0,

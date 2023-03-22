@@ -106,8 +106,7 @@ class ManualAnnotation(MarkerDetection):
         only_first_frame: bool = False,
     ) -> Path:
         if labels == None:
-            ground_truth_config = read_config(self.marker_detection_directory)
-            list_of_labels = ground_truth_config["unique_ids"]
+            list_of_labels = read_config(self.marker_detection_directory)
         else:
             list_of_labels = labels
 

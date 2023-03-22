@@ -145,7 +145,7 @@ class meta_interface(ABC):
                     "key": individual_key,
                     "target_fps": triangulation_recordings_object.target_fps,
                     "led_pattern": triangulation_recordings_object.led_pattern,
-                    "calibration_to_use": triangulation_recordings_object.calibration_index,
+                    "calibration_to_use": triangulation_recordings_object.recording_date + f'_{triangulation_recordings_object.calibration_index}',
                     "videos": videos,
                 }
                 self.objects["triangulation_recordings_objects"][
@@ -210,7 +210,7 @@ class meta_interface(ABC):
         self.objects["calibration_objects"] = {}
         self.objects["calibration_validation_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
-            recording_day["calibrations"]["calibration_keys"] = {}
+            recording_day["calibrations"]["calibration_keys"] = []
 
             calibration_object = Calibration(
                 calibration_directory=recording_day["calibration_directory"],
@@ -222,8 +222,10 @@ class meta_interface(ABC):
 
             cams = [video for video in calibration_object.metadata_from_videos]
 
+            unique_calibration_key = calibration_object.recording_date + f'_{calibration_object.calibration_index}'
+            
             self.objects["calibration_objects"][
-                calibration_object.calibration_index
+                unique_calibration_key
             ] = calibration_object
 
             video_dict = {
@@ -232,9 +234,7 @@ class meta_interface(ABC):
                 )
                 for video in calibration_object.metadata_from_videos
             }
-            recording_day["calibrations"]["calibration_keys"][
-                calibration_object.calibration_index
-            ] = {"key": calibration_object.calibration_index}
+            recording_day["calibrations"]["calibration_keys"].append(unique_calibration_key)
             recording_day["calibrations"]["target_fps"] = calibration_object.target_fps
             recording_day["calibrations"][
                 "led_pattern"
@@ -250,8 +250,9 @@ class meta_interface(ABC):
                 test_mode=test_mode,
             )
             self.objects["calibration_validation_objects"][
-                calibration_validation_object.calibration_index
+                unique_calibration_key
             ] = calibration_validation_object
+            
             for video in calibration_validation_object.metadata_from_videos.values():
                 try:
                     recording_day["calibrations"]["videos"][video.cam_id][
@@ -266,9 +267,9 @@ class meta_interface(ABC):
         for recording_day in self.meta["recording_days"].values():
             for calibration in recording_day["calibrations"][
                 "calibration_keys"
-            ].values():
+            ]:
                 calibration_object = self.objects["calibration_objects"][
-                    calibration["key"]
+                    calibration
                 ]
                 calibration_object.run_synchronization(test_mode=test_mode)
                 for video in recording_day["calibrations"]["videos"]:
@@ -282,7 +283,7 @@ class meta_interface(ABC):
                     ].framenum_synchronized
 
                 self.objects["calibration_validation_objects"][
-                    calibration["key"]
+                    calibration
                 ].get_marker_predictions()
                 for video in recording_day["calibrations"]["videos"]:
                     try:
@@ -290,7 +291,7 @@ class meta_interface(ABC):
                             "calibration_validation_marker_detection_filepath"
                         ] = str(
                             self.objects["calibration_validation_objects"][
-                                calibration["key"]
+                                calibration
                             ].triangulation_dlc_cams_filepaths[video]
                         )
                     except:
@@ -304,26 +305,27 @@ class meta_interface(ABC):
         self, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool = False
     ) -> None:
         for recording_day in self.meta["recording_days"].values():
+            recording_day["calibrations"]["toml_filepaths"] = {}
             for calibration in recording_day["calibrations"][
                 "calibration_keys"
-            ].values():
+            ]:
                 if calibrate_optimal:
                     self.objects["calibration_objects"][
-                        calibration["key"]
+                        calibration
                     ].calibrate_optimal(
                         calibration_validation=self.objects["calibration_validation_objects"][
-                            calibration["key"]
+                            calibration
                         ],
                         verbose=verbose,
                         test_mode=test_mode,
                     )
                 else:
                     self.objects["calibration_objects"][
-                        calibration["key"]
+                        calibration
                     ].run_calibration(verbose=verbose, test_mode=test_mode)
-                calibration["toml_filepath"] = str(
+                recording_day["calibrations"]["toml_filepaths"][calibration] = str(
                     self.objects["calibration_objects"][
-                        calibration["key"]
+                        calibration
                     ].calibration_output_filepath
                 )
                 # add report
@@ -333,9 +335,9 @@ class meta_interface(ABC):
     def triangulate_recordings(self, test_mode: bool = False) -> None:
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
-                toml_filepath = recording_day["calibrations"]["calibration_keys"][
+                toml_filepath = recording_day['calibrations']['toml_filepaths'][
                     recording_day["recordings"][recording]["calibration_to_use"]
-                ]["toml_filepath"]
+                ]
                 self.objects["triangulation_recordings_objects"][
                     recording
                 ].run_triangulation(
@@ -351,7 +353,30 @@ class meta_interface(ABC):
                 # add reprojerr
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
-
+        
+    def exclude_markers(self, all_markers_to_exclude_config_path: Path)->None:
+        all_markers_to_exclude_config_path = convert_to_path(all_markers_to_exclude_config_path)
+        for recording_day in self.meta["recording_days"].values():
+            for recording in recording_day["recordings"]:
+                self.objects["triangulation_recordings_objects"][
+                    recording
+                ].exclude_markers(all_markers_to_exclude_config_path=all_markers_to_exclude_config_path)
+        for recording_day in self.meta["recording_days"].values():
+            for calibration_key in recording_day['calibrations']['calibration_keys']:
+                self.objects['calibration_validation_objects'][
+                    calibration_key
+                ].exclude_markers(all_markers_to_exclude_config_path=all_markers_to_exclude_config_path)
+        
+    def normalize_recordings(self, normalization_config_path: Path)->None:
+        normalization_config_path = convert_to_path(normalization_config_path)
+        for recording_day in self.meta["recording_days"].values():
+            for recording in recording_day["recordings"]:
+                self.objects["triangulation_recordings_objects"][
+                    recording
+                ].normalize(normalization_config_path=normalization_config_path)
+        self.meta["meta_step"] = 8
+        self.export_meta_to_yaml(self.standard_yaml_filepath)
+    
     def add_triangulated_csv_to_database(
         self, data_base_path: str, overwrite: bool = True
     ) -> None:
@@ -435,10 +460,10 @@ class meta_interface(ABC):
                     "calibration_keys"
                 ].values():
                     self.objects["calibration_objects"][
-                        calibration["key"]
+                        calibration
                     ].target_fps = recording_day["calibrations"]["target_fps"]
                     for video_metadata in self.objects["calibration_objects"][
-                        calibration["key"]
+                        calibration
                     ].metadata_from_videos.values():
                         video_metadata.fps = recording_day["calibrations"]["videos"][
                             video_metadata.cam_id
@@ -447,7 +472,7 @@ class meta_interface(ABC):
                             "videos"
                         ][video_metadata.cam_id]["filepath"]
                     for video_metadata in self.objects["calibration_validation_objects"][
-                        calibration["key"]
+                        calibration
                     ].metadata_from_videos.values():
                         video_metadata.filepath = recording_day["calibrations"][
                             "videos"
@@ -468,7 +493,7 @@ class meta_interface(ABC):
                     "calibration_keys"
                 ].values():
                     for video_metadata in self.objects["calibration_validation_objects"][
-                        calibration["key"]
+                        calibration
                     ].metadata_from_video.values():
                         video_metadata.filepath = recording_day["calibrations"][
                             "videos"
