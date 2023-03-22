@@ -603,9 +603,8 @@ class Triangulation(Triangulation_Calibration):
                 h5_output_filepath = self.output_directory.joinpath(
                     self.csv_output_filepath.stem + f"empty_{cam}.h5"
                 )
-                df = pd.DataFrame(data={}, columns=get_multi_index(markers), dtype=int)
-                for i in range(framenum):
-                    df.loc[i, :] = 0
+                cols = get_multi_index(markers)
+                df = pd.DataFrame(data=np.zeros((framenum, len(cols))), columns=cols, dtype=int)
                 df.to_hdf(h5_output_filepath, "empty")
                 self._validate_calibration_validation_marker_ids(
                     calibration_validation_markers_df_filepath=h5_output_filepath,
@@ -1078,13 +1077,17 @@ class Calibration_Validation(Triangulation):
         self.recording_date = list(recording_dates)[0]
 
     def _validate_unique_cam_ids(self):
-        cameras = [camera.name for camera in self.camera_group.cameras]
-        self.cameras = list(self.metadata_from_videos.keys())
-        if self.cameras.sort() != cameras.sort():
-            raise ValueError(
-                f"The cam_ids of the recordings in {self.calibration_validation_directory} do not match the cam_ids of the camera_group at {self.calibration_toml_filepath}.\n"
-                "Are there missing or additional files in the calibration or the recording folder?"
-            )
+        self.cameras = [camera.name for camera in self.camera_group.cameras]
+        filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
+        filepath_keys.sort()
+        self.cameras.sort()
+        for camera in filepath_keys:
+            if camera not in self.cameras:
+                self.triangulation_dlc_cams_filepaths.pop(camera)
+
+        for camera in self.cameras:
+            if camera not in filepath_keys:
+                print(f"Creating empty .h5 file for {camera}!")
 
     def get_marker_predictions(self) -> None:
         self.csv_output_filepath = self._create_csv_filepath()

@@ -194,10 +194,11 @@ class Synchronizer(ABC):
                     ) = self._find_best_match_of_template(
                         template=self.template_blinking_motif,
                         start_time=0,
-                        end_time=len(self.led_timeseries) * 0.4,
+                        end_time=120000,
                     )
-                    # finds match in the first 40% of the video # ToDo: make adaptable
+                    # finds match in the first xy ms between start_time and end_time
                 except ValueError:
+                    # throws error if end_time > video_length
                     offset_adjusted_start_idx, remaining_offset, alignment_error = (
                         0,
                         0,
