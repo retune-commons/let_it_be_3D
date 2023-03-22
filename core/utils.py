@@ -111,10 +111,14 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
 
 
 def create_calibration_key(
-    videos: List[str], recording_date: str, calibration_index: int
+    videos: List[str], recording_date: str, calibration_index: int, iteration: Optional[int]=None,
 ) -> str:
     key = ""
     videos.sort()
     for elem in videos:
         key = key + "_" + elem
-    return recording_date + "_" + str(calibration_index) + key
+    if iteration==None:
+        calibration_key =  recording_date + "_" + str(calibration_index) + key
+    else:
+        calibration_key =  recording_date + "_" + str(calibration_index) + key + "_" + str(iteration)
+    return calibration_key

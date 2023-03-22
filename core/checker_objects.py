@@ -8,6 +8,7 @@ import imageio as iio
 from .utils import convert_to_path, read_config, check_keys
 from .video_metadata import VideoMetadataChecker
 from .plotting import Intrinsics
+from .user_specific_rules import user_specific_rules_on_triangulation_calibration_videos
 
 
 class Check(ABC):
@@ -109,7 +110,7 @@ class Check(ABC):
             for file in directory.iterdir()
             if filename_tag.lower() in file.name.lower()
             and file.suffix in filetypes
-            and ("synchronized" not in file.name and "Front" not in file.name)
+            and "synchronized" not in file.name
         ]
 
         self.metadata_from_videos = []
@@ -203,6 +204,9 @@ class Check_Calibration(Check):
                                 if video_metadata.filepath == file:
                                     self.metadata_from_videos.remove(video_metadata)
                             file.unlink()
+        
+        for video_metadata in self.metadata_from_videos:
+            user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 
         self._validate_and_save_metadata_for_recording()
         for cam in cams_not_found:
@@ -302,6 +306,9 @@ class Check_Recording(Check):
                                     self.metadata_from_videos.remove(video_metadata)
                             if file.exists():
                                 file.unlink()
+                                
+        for video_metadata in self.metadata_from_videos:
+            user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 
         self._validate_and_save_metadata_for_recording()
         for cam in cams_not_found:
@@ -413,6 +420,9 @@ class Check_Calibration_Validation(Check):
                                 if video_metadata.filepath == file:
                                     self.metadata_from_videos.remove(video_metadata)
                             file.unlink()
+        
+        for video_metadata in self.metadata_from_videos:
+            user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 
         self._validate_and_save_metadata_for_recording()
         for cam in cams_not_found:
