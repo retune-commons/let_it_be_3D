@@ -1,0 +1,100 @@
+Side1:
+- MazeCornerClosedLeft
+- MazeCornerClosedRight
+- MazeCornerOpenRight
+#- Screw1Top
+
+Side2:
+- MazeCornerOpenRight
+- MazeCornerOpenLeft
+- X1
+- X2
+- Screw1Top
+
+Side3:
+- MazeCornerOpenRight
+- MazeCornerOpenLeft
+#- MazeCornerClosedLeft
+#- MazeCornerClosedRight
+- X1
+- X2
+- IliacCrestLeft
+- IliacCrestRight
+
+Bottom:
+- Screw1Nut
+- Screw1Top
+- Screw2Top
+- Screw3Top
+- Screw4Top
+- IliacCrestLeft
+- IliacCrestRight
+- HipLeft
+- HipRight
+#- ShoulderLeft
+#- ShoulderRight
+#- ElbowLeft
+#- ElbowRight
+
+Front:
+#- MazeCornerClosedLeft
+#- MazeCornerClosedRight
+- X1
+- X2
+- Screw1Bottom
+- Screw2Bottom
+- Screw2Top
+- Screw3Bottom
+- Screw3Top
+- Screw4Bottom
+
+Ground1:
+- MazeCornerClosedLeft
+#- MazeCornerClosedRight
+- X2
+#- Screw1Nut
+- Screw2Top
+- Screw3Top
+- Screw4Top
+- IliacCrestLeft
+- IliacCrestRight
+- HipLeft
+- HipRight
+#- ShoulderLeft
+#- ShoulderRight
+#- ElbowLeft
+#- ElbowRight
+
+Ground2:
+- MazeCornerClosedLeft
+- MazeCornerOpenRight
+- MazeCornerOpenLeft
+- X1
+- Screw1Bottom
+- Screw2Bottom
+- Screw3Bottom
+- Screw4Bottom
+- IliacCrestLeft
+- IliacCrestRight
+- HipLeft
+- HipRight
+- ShoulderLeft
+- ShoulderRight
+- ElbowLeft
+- ElbowRight
+
+Top:
+- X1
+- X2
+- Screw1Bottom
+- Screw2Bottom
+- Screw3Bottom
+- Screw4Bottom
+- HindPawRight
+- HindPawLeft
+- ForePawRight
+- ForePawLeft
+- BackAnkleLeft
+- BackAngleRight
+- WristLeft
+- WristRight

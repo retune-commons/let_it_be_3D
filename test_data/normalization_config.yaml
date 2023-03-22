@@ -1,0 +1,27 @@
+center: MazeCornerClosedLeft
+ReferenceLengthCm: 50
+ReferenceLengthMarkers:
+- MazeCornerClosedLeft
+- MazeCornerOpenLeft
+ReferenceRotationCoords:
+- - 0
+  - 0
+  - 0
+- - 0
+  - 5
+  - 0
+- - 50
+  - 5
+  - 0
+- - 50
+  - 0
+  - 0
+ReferenceRotationMarkers:
+- MazeCornerClosedLeft
+- MazeCornerClosedRight
+- MazeCornerOpenRight
+- MazeCornerOpenLeft
+InvisibleMarkers:
+ x: [0, 0, 0, 0, 0, 0, 0, 0]
+ y: [0, 50, 50, 0, 0, 50, 50, 0]
+ z: [0, 0, 0, 0, 50, 50, 50, 50]
