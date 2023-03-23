@@ -242,7 +242,7 @@ class Calibration(Triangulation_Calibration):
                 sorted(self.synchronized_charuco_videofiles.items())
             )
             videos = [[video] for video in sorted_videos.values()]
-            self.camera_group.calibrate_videos(
+            self.reprojerr , _ = self.camera_group.calibrate_videos(
                 videos=videos,
                 board=charuco_calibration_board,
                 init_intrinsics=not use_own_intrinsic_calibration,
@@ -250,6 +250,9 @@ class Calibration(Triangulation_Calibration):
                 verbose=verbose > 1,
             )
             self._save_calibration(calibration_filepath=calibration_filepath)
+        else:
+            self.reprojerr = 0
+        return calibration_filepath
 
     def initialize_camera_group(self) -> None:
         self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
@@ -384,6 +387,7 @@ class Calibration(Triangulation_Calibration):
         for cal in range(max_iters):
             if good_calibration_filepath.exists() and test_mode:
                 calibration_filepath = good_calibration_filepath
+                self.reprojerr=0
             else:
                 calibration_filepath = self.run_calibration(verbose=verbose, test_mode=test_mode, iteration=cal)
             
@@ -439,10 +443,10 @@ class Calibration(Triangulation_Calibration):
                 print(f"Good Calibration reached at iteration {cal}! Named it {good_calibration_filepath}.")
                 break
 
-        report_filepath = self.output_directory.joinpath(
+        self.report_filepath = self.output_directory.joinpath(
             f"{self.recording_date}_calibration_report.csv"
         )
-        report.to_csv(report_filepath, index=False)
+        report.to_csv(self.report_filepath, index=False)
         
         if not calibration_found:
             print("No optimal calibration found with given thresholds! Returned last executed calibration!")
@@ -503,12 +507,13 @@ class Triangulation(Triangulation_Calibration):
         if save_first_frame:
             self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
             
-    def exclude_markers(self, all_markers_to_exclude_config_path: Path):
+    def exclude_markers(self, all_markers_to_exclude_config_path: Path, verbose: bool=True):
         all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
         
         missing_cams = check_keys(all_markers_to_exclude, list(self.triangulation_dlc_cams_filepaths))
         if len(missing_cams)>0:
-            print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config_path)}!")
+            if verbose:
+                print(f"Found no markers to exclude for {missing_cams} in {str(all_markers_to_exclude_config_path)}!")
         
         for cam_id in self.triangulation_dlc_cams_filepaths:
             h5_file = self.triangulation_dlc_cams_filepaths[cam_id]
@@ -518,7 +523,8 @@ class Triangulation(Triangulation_Calibration):
             existing_markers_to_exclude = list(set(markers) & set(markers_to_exclude_per_cam))
             not_existing_markers = [marker for marker in markers_to_exclude_per_cam if marker not in markers]
             if len(not_existing_markers) > 0:
-                print(f"The following markers were not found in the dataframe, but were given as markers to exclude for {cam_id}: {not_existing_markers}!")
+                if verbose:
+                    print(f"The following markers were not found in the dataframe, but were given as markers to exclude for {cam_id}: {not_existing_markers}!")
             if len(existing_markers_to_exclude)>0:
                 for i, keys in enumerate(df.columns):
                     a, b, c = keys
@@ -1006,7 +1012,7 @@ class Triangulation_Recordings(Triangulation):
             reference_rotation_markers.append(get_3D_array(normalised, marker, best_frame))
         # the rotation matrix between the referencespace and the reconstructedspace is calculated. 
         r = Rotation.align_vectors(config["ReferenceRotationCoords"], reference_rotation_markers)
-        rotation_error = r[1]
+        self.rotation_error = r[1]
         
         rotated = normalised
         for key in bp_keys_unflat:
@@ -1019,9 +1025,9 @@ class Triangulation_Recordings(Triangulation):
         for marker in config['ReferenceRotationMarkers']:
             rotated_markers.append(get_3D_array(rotated, marker, best_frame))
         
-        rotated_filepath = self._create_csv_filepath(flag="rotated")
-        self._save_dataframe_as_csv(filepath = rotated_filepath, df = rotated)
-        Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = rotated_filepath, rotation_error = rotation_error)
+        self.rotated_filepath = self._create_csv_filepath(flag="rotated")
+        self._save_dataframe_as_csv(filepath = self.rotated_filepath, df = rotated)
+        Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = self.rotated_filepath, rotation_error = self.rotation_error)
         
     def _get_triangulated_plots(self, idx: int) -> np.ndarray:
         idx = int(
