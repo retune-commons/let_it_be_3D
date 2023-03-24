@@ -3,6 +3,7 @@ from typing import List, Tuple, Optional, Union, Dict
 import random
 import multiprocessing as mp
 import time
+from datetime import datetime
 
 from tqdm.auto import tqdm as TQDM
 from pathlib import Path
@@ -12,6 +13,7 @@ import imageio as iio
 import ffmpeg
 import pandas as pd
 import scipy
+import pickle
 
 from .video_metadata import VideoMetadata
 from .utils import Coordinates
@@ -94,11 +96,6 @@ class MultiMotifTemplate(TimeseriesTemplate):
 
 class Synchronizer(ABC):
     @property
-    # differnet thresholds for different patterns!
-    def alignment_threshold(self) -> int:
-        return 100
-
-    @property
     # different thresholds for different patterns!
     def box_size(self) -> int:
         return 15
@@ -128,6 +125,7 @@ class Synchronizer(ABC):
         video_metadata: VideoMetadata,
         rapid_aligner_path: Path,
         output_directory: Path,
+        synchro_metadata: Dict,
         use_gpu: str = "",
     ) -> None:
         self.video_metadata = video_metadata
@@ -138,80 +136,22 @@ class Synchronizer(ABC):
             self.use_rapid_aligner = False
         self.output_directory = output_directory
         self.use_gpu = use_gpu
+        self.synchro_metadata = synchro_metadata
 
     def run_synchronization(
         self, synchronize_only: bool, test_mode: bool = False
     ) -> Tuple[Path, bool]:
-        self.template_blinking_motif = self._construct_template_motif(
-            blinking_patterns_metadata=self.video_metadata.led_pattern
-        )
+        
+        self.template_blinking_motif = self._construct_template_motif(blinking_patterns_metadata=self.video_metadata.led_pattern)
 
-        if type(self) == CharucoVideoSynchronizer:
-            output_file = self._construct_video_filepath()
-        elif type(self) == RecordingVideoUpSynchronizer:
-            output_file = self._create_h5_filepath(
-                tag=f"_upsampled{self.target_fps}fps_synchronized"
-            )
-        elif type(self) == RecordingVideoDownSynchronizer:
-            output_file = self._create_h5_filepath(tag = f"_downsampled{self.target_fps}fps_synchronized")
+        output_file = self._get_output_filepath()
+        synchro_file = self._get_synchro_filepath()
+            
         if (not test_mode) or (test_mode and not output_file.exists()):
-            i = 0
-            while True:
-                if i == 3:
-                    """
-                    self.video_metadata.led_extraction_type = "manual"
-                    led_center_coordinates = self._get_LED_center_coordinates()
-                    """
-                    print(
-                        "Could not synchronize the video. \n"
-                        "Make sure, that you chose the right synchronization pattern, \n"
-                        "that the LED is visible during the pattern\n"
-                        "and that you chose a proper alignment threshold!"
-                    )
-                    self.video_metadata.exclusion_state = "exclude"
-                    return None, None
-                elif i < 3:
-                    led_center_coordinates = self._get_LED_center_coordinates()
-                else:
-                    print(
-                        "Could not synchronize the video. \n"
-                        "Make sure, that you chose the right synchronization pattern, \n"
-                        "that the LED is visible during the pattern\n"
-                        "and that you chose a proper alignment threshold!"
-                    )
-                    self.video_metadata.exclusion_state = "exclude"
-                    return None, None
+            led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._run_synchro_marker_detection_and_get_offsets()
 
-                self.led_timeseries = self._extract_led_pixel_intensities(
-                    led_center_coords=led_center_coordinates
-                )
-
-                try:
-                    (
-                        offset_adjusted_start_idx,
-                        remaining_offset,
-                        alignment_error,
-                    ) = self._find_best_match_of_template(
-                        template=self.template_blinking_motif,
-                        start_time=0,
-                        end_time=120000,
-                    )
-                    # finds match in the first 120s of the video # ToDo: make adaptable
-
-                except ValueError:
-                    # throws error if end_time > video_length
-                    offset_adjusted_start_idx, remaining_offset, alignment_error = (
-                        0,
-                        0,
-                        1000,
-                    )
-                    print('Could not synchronize')
-
-                # make synchronization adaptable: (if below threshold: repeat/continue anyways/manual input)
-                if alignment_error > self.alignment_threshold:
-                    print("possibly bad synchronization!")
-                break
-                # i += 1
+            if alignment_error > self.synchro_metadata["synchro_error_threshold"]:
+                led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._handle_synchro_fails()
 
             self.led_detection = LED_Marker_Plot(
                 image=iio.v3.imread(self.video_metadata.filepath, index=0),
@@ -221,41 +161,91 @@ class Synchronizer(ABC):
                 output_directory=self.output_directory,
             )
             
-            self.led_timeseries_for_cross_video_validation = (
-                self._adjust_led_timeseries_for_cross_validation(
-                    start_idx=offset_adjusted_start_idx, offset=remaining_offset
-                )
-            )
+            self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx=offset_adjusted_start_idx, offset=remaining_offset)
+            
+            self._save_synchro(filepath = synchro_file, led_center_coordinates = led_center_coordinates, offset_adjusted_start_idx = offset_adjusted_start_idx, remaining_offset = remaining_offset, alignment_error = alignment_error)
         else:
-            offset_adjusted_start_idx = 0
-            remaining_offset = 0
+            offset_adjusted_start_idx, remaining_offset = 0, 0
+            if synchro_file.exists():
+                led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._load_synchro(filepath=synchro_file)
 
-        (
-            marker_detection_filepath,
-            synchronized_video_filepath,
-        ) = self._adjust_video_to_target_fps_and_run_marker_detection(
-            target_fps=self.target_fps,
-            start_idx=offset_adjusted_start_idx,
-            offset=remaining_offset,
-            synchronize_only=synchronize_only,
-            test_mode=test_mode,
-        )
-        if synchronize_only:
-            self.video_metadata.framenum_synchronized = iio.v2.get_reader(
-                synchronized_video_filepath
-            ).count_frames()
-        else:
-            self.video_metadata.framenum_synchronized = pd.read_hdf(
-                marker_detection_filepath
-            ).shape[0]
-        print(
-            f"{self.video_metadata.cam_id} Frames after synchronization: {self.video_metadata.framenum_synchronized}"
-        )
-        self.video_metadata.duration_synchronized = (
-            self.video_metadata.framenum_synchronized / self.video_metadata.target_fps
-        )
+        marker_detection_filepath, synchronized_video_filepath = self._adjust_video_to_target_fps_and_run_marker_detection(target_fps=self.target_fps, start_idx=offset_adjusted_start_idx, offset=remaining_offset, synchronize_only=synchronize_only, test_mode=test_mode)
+        
+        self._get_framenumber_of_synchronized_files(synchronize_only = synchronize_only, synchronized_video_filepath=synchronized_video_filepath, marker_detection_filepath=marker_detection_filepath)
+        
         return marker_detection_filepath, synchronized_video_filepath
+    
+    def _load_synchro(self, filepath: Path)->Tuple[str]:
+        with open(filepath, "rb") as file:
+            synchro_object = pickle.load(file)
+        return Coordinates(synchro_object["led_center_coordinates"][0], synchro_object["led_center_coordinates"][1]), synchro_object["offset_adjusted_start_idx"], synchro_object["remaining_offset"], synchro_object["alignment_error"]
+        
+    def _save_synchro(self, filepath: Path, led_center_coordinates: Coordinates, offset_adjusted_start_idx: int, remaining_offset: int, alignment_error: float)->None:
+        time = datetime.now().strftime("%Y%m%d%H%M%S")
+        synchro_dict = {"filepath": str(self.video_metadata.filepath), 
+                        "fps": self.video_metadata.fps, 
+                        "led_center_coordinates": (led_center_coordinates.y, led_center_coordinates.x), 
+                        "offset_adjusted_start_idx": offset_adjusted_start_idx, 
+                        "remaining_offset": remaining_offset, 
+                        "alignment_error": alignment_error, 
+                        "time": time, 
+                        "scorer": self.video_metadata.led_extraction_filepath, 
+                        "synchro_marker": self.synchro_metadata["synchro_marker"], 
+                        "method": self.video_metadata.led_extraction_type, 
+                        "pattern": self.video_metadata.led_pattern}
+        with open(filepath, "wb") as file:
+            pickle.dump(synchro_dict, file)
+            
+    def _run_synchro_marker_detection_and_get_offsets(self)->None:
+        led_center_coordinates = self._get_LED_center_coordinates()
+        self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
+        offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"], end_time=self.synchro_metadata["end_pattern_match_ms"])
+        return led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error
+    
+    def _get_framenumber_of_synchronized_files(self, synchronize_only: bool, synchronized_video_filepath: Path, marker_detection_filepath: Path)->None:
+        if synchronize_only:
+            self.video_metadata.framenum_synchronized = iio.v2.get_reader(synchronized_video_filepath).count_frames()
+        else:
+            self.video_metadata.framenum_synchronized = pd.read_hdf(marker_detection_filepath).shape[0]
+            
+        print(f"{self.video_metadata.cam_id} Frames after synchronization: {self.video_metadata.framenum_synchronized}")
+        
+        self.video_metadata.duration_synchronized = (self.video_metadata.framenum_synchronized / self.video_metadata.target_fps)
 
+    def _handle_synchro_fails(self)->Tuple[str]:
+        if self.synchro_metadata["handle_synchro_fails"]=="repeat":
+            led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._run_synchro_marker_detection_and_get_offsets()
+        elif self.synchro_metadata["handle_synchro_fails"]=="default":
+            alignment_error = 0
+            led_center_coordinates = Coordinates(0, 0)
+            default_offset = self.synchro_metadata["default_offset_ms"]
+            default_start_idx = self._get_frame_index_closest_to_time(time=default_offset)
+            offset_adjusted_start_idx, remaining_offset = self._adjust_start_idx_and_offset(start_frame_idx=default_start_idx, offset=default_offset, fps=self.video_metadata.fps)
+        elif self.synchro_metadata["handle_synchro_fails"]=="manual":
+            self.video_metadata.led_extraction_type = "manual"
+            led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._run_synchro_marker_detection_and_get_offsets()
+        elif self.synchro_metadata["handle_synchro_fails"]=="error":
+            raise ValueError(
+                "Could not synchronize the video. \n"
+                "Make sure, that you chose the right synchronization pattern, \n"
+                "that the LED is visible during the pattern\n"
+                "and that you chose a proper alignment threshold!")
+        else:
+            raise ValueError("project_config key handle_synchro_fails has to be in ['error', 'manual', 'repeat', 'default']")
+        return led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error
+    
+    def _get_output_filepath(self)->Path:
+        if type(self) == CharucoVideoSynchronizer:
+            output_file = self._construct_video_filepath()
+        elif type(self) == RecordingVideoUpSynchronizer:
+            output_file = self._create_h5_filepath(tag=f"_upsampled{self.target_fps}fps_synchronized")
+        elif type(self) == RecordingVideoDownSynchronizer:
+            output_file = self._create_h5_filepath(tag = f"_downsampled{self.target_fps}fps_synchronized")
+        return output_file
+    
+    def _get_synchro_filepath(self)->Path:
+        return self.output_directory.joinpath(f"synchro_{self.video_metadata.recording_date}_{self.video_metadata.cam_id}.p")
+        
     def _construct_template_motif(
         self, blinking_patterns_metadata: Dict
     ) -> Union[MotifTemplate, MultiMotifTemplate]:
@@ -329,9 +319,9 @@ class Synchronizer(ABC):
 
             df = pd.read_hdf(dlc_filepath_out)
             x_key, y_key, likelihood_key = (
-                [key for key in df.keys() if "LED5" in key and "x" in key],
-                [key for key in df.keys() if "LED5" in key and "y" in key],
-                [key for key in df.keys() if "LED5" in key and "likelihood" in key],
+                [key for key in df.keys() if self.synchro_metadata["synchro_marker"] in key and "x" in key],
+                [key for key in df.keys() if self.synchro_metadata["synchro_marker"] in key and "y" in key],
+                [key for key in df.keys() if self.synchro_metadata["synchro_marker"] in key and "likelihood" in key],
             )
             x = int(df.loc[df[likelihood_key].idxmax(), x_key].values)
             y = int(df.loc[df[likelihood_key].idxmax(), y_key].values)
@@ -361,13 +351,13 @@ class Synchronizer(ABC):
                 marker_detection_directory=config_filepath,
             )
             manual_interface.analyze_objects(
-                filepath=manual_filepath_out, labels=["LED5"], only_first_frame=True
+                filepath=manual_filepath_out, labels=[self.synchro_metadata["synchro_marker"]], only_first_frame=True
             )
 
             df = pd.read_hdf(manual_filepath_out)
             x_key, y_key = (
-                [key for key in df.keys() if "LED5" in key and "x" in key],
-                [key for key in df.keys() if "LED5" in key and "y" in key],
+                [key for key in df.keys() if self.synchro_metadata["synchro_marker"] in key and "x" in key],
+                [key for key in df.keys() if self.synchro_metadata["synchro_marker"] in key and "y" in key],
             )
             x = int(df.loc[0, x_key].values)
             y = int(df.loc[0, y_key].values)
@@ -420,7 +410,10 @@ class Synchronizer(ABC):
             fps=self.video_metadata.fps
         )
         start_frame_idx = self._get_frame_index_closest_to_time(time=start_time)
-        end_frame_idx = self._get_frame_index_closest_to_time(time=end_time)
+        try:
+            end_frame_idx = self._get_frame_index_closest_to_time(time=end_time)
+        except ValueError:
+            end_frame_idx=-1 # if the given end_time is larger than the length of the corresponding video, its set to the last frame of the video
         (
             best_match_start_frame_idx,
             best_match_offset,
@@ -460,7 +453,7 @@ class Synchronizer(ABC):
         else:
             if time < 0:
                 raise ValueError(time_error_message)
-            framerate = 1000 / self.video_metadata.fps  # adapt
+            framerate = 1000 / self.video_metadata.fps
             closest_frame_idx = round(time / framerate)
             if closest_frame_idx >= self.led_timeseries.shape[0]:
                 raise ValueError(time_error_message)
@@ -472,7 +465,6 @@ class Synchronizer(ABC):
         start_frame_idx: int,
         end_frame_idx: int,
     ) -> Tuple[int, int]:
-        # ToDo - check if error is within range to automatically accept as good match, otherwise report file & save plots for inspection
         lowest_sum_of_squared_error_per_template = []
         for template_timeseries, _ in adjusted_templates:
             alignment_results = self._run_alignment(
