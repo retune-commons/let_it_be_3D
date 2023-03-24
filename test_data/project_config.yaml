@@ -77,7 +77,7 @@ valid_cam_IDs:
 - Ground2
 - Front
 calibration_tag: Charuco
-# every tag is valid except "calvin" or "CALVIN"
+# every tag is valid except "calvin" or "cAlViN"
 # calvin is the abbreviation for calibration_validation used in the repository
 # using it as calibration_validation_tag or calibration_tag can lead to issues with file detection
 calibration_validation_tag: Position
@@ -87,7 +87,15 @@ intrinsic_calibration_directory: test_data/intrinsic_calibrations/
 # load calibration=True means, that you use previously recorded checkerboard calibrations to set the intrinsics of the cameras instead of calibrating on charuco videos (which is currently not possible)
 load_calibration: True
 
-# for 8GB RAM 3000 works nicely, on the server with big RAM, you can increase the number to increase performance speed
+# repeat, default, manual, error
+handle_synchro_fails: manual
+default_offset_ms: 7000
+start_pattern_match_ms: 0
+end_pattern_match_ms: 120000
+synchro_error_threshold: 100
+synchro_marker: LED5
+
+# for 8GB RAM 3000 works nicely, on big RAM, you can increase the number to increase performance speed
 max_ram_digestible_frames: 3000
 max_cpu_cores_to_pool: 0
 # 300 is default and works well if you use a good CPU, for slow CPUs you should decrease
