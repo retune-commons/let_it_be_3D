@@ -995,8 +995,7 @@ class Triangulation_Recordings(Triangulation):
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
         
-        # ToDo: define a function to get the frame, in which the maze angles and lengths match as best as possible
-        best_frame = 0
+        best_frame = self._get_best_frame_for_normalisation(config=config, df=self.df)
         
         x, y, z = get_3D_array(self.df, config['center'], best_frame)
         for key in self.df.keys():
@@ -1037,6 +1036,24 @@ class Triangulation_Recordings(Triangulation):
         self.rotated_filepath = self._create_csv_filepath(flag="rotated")
         self._save_dataframe_as_csv(filepath = self.rotated_filepath, df = rotated)
         Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = self.rotated_filepath, rotation_error = self.rotation_error)
+        
+    def _get_best_frame_for_normalisation(self, config: Dict, df: pd.DataFrame)->int:
+        all_normalization_markers = [config['center']]
+        for marker in config["ReferenceLengthMarkers"]:
+            all_normalization_markers.append(marker)
+        for marker in config["ReferenceRotationMarkers"]:
+            all_normalization_markers.append(marker)
+        all_normalization_markers = set(all_normalization_markers)
+        
+        normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
+        normalization_keys = list(set(chain(*normalization_keys_nested)))
+        df_normalization_keys = df.loc[:, normalization_keys]
+        valid_frames_for_normalization = list(df_normalization_keys.dropna(axis=0).index)
+        
+        if len(valid_frames_for_normalization) > 0:
+            return valid_frames_for_normalization[0]
+        else:
+            raise ValueError ("Could not normalize the dataframe!")
         
     def _get_triangulated_plots(self, idx: int) -> np.ndarray:
         idx = int(
