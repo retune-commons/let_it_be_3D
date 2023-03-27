@@ -1046,7 +1046,7 @@ class Triangulation_Recordings(Triangulation):
         all_normalization_markers = set(all_normalization_markers)
         
         normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
-        normalization_keys = list(set(chain(*normalization_keys_nested)))
+        normalization_keys = list(set(it.chain(*normalization_keys_nested)))
         df_normalization_keys = df.loc[:, normalization_keys]
         valid_frames_for_normalization = list(df_normalization_keys.dropna(axis=0).index)
         
