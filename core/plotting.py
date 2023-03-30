@@ -87,7 +87,6 @@ class Plot3D(Plotting):
         filepath = self.output_directory.joinpath(filename)
         return str(filepath)
 
-
 class Triangulation_Visualization(Plot3D):
     def __init__(
         self,
@@ -152,10 +151,11 @@ class Triangulation_Visualization(Plot3D):
         all_markers: Dict,
         group: Dict
     ) -> None:
-        x = [all_markers[marker]['x'] for marker in group['markers']]
-        y = [all_markers[marker]['y'] for marker in group['markers']]
-        z = [all_markers[marker]['z'] for marker in group['markers']]
-        ax.plot(x, y, z, alpha = group['alpha'], c = group['color'])
+        if all(x in list(all_markers.keys()) for x in group['markers']):
+            x = [all_markers[marker]['x'] for marker in group['markers']]
+            y = [all_markers[marker]['y'] for marker in group['markers']]
+            z = [all_markers[marker]['z'] for marker in group['markers']]
+            ax.plot(x, y, z, alpha = group['alpha'], c = group['color'])
         
     def _fill_one_set_of_markers(
         self, 
@@ -163,11 +163,12 @@ class Triangulation_Visualization(Plot3D):
         all_markers: Dict, 
         group: Dict
     ) -> None:
-        points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
-        z = [all_markers[marker]['z'] for marker in group['markers']]
-        artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
-        ax.add_patch(artist)
-        art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
+        if all(x in list(all_markers.keys()) for x in group['markers']):
+            points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
+            z = [all_markers[marker]['z'] for marker in group['markers']]
+            artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
+            ax.add_patch(artist)
+            art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
     
         
     def plot(self) -> None:

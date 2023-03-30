@@ -147,29 +147,33 @@ class Synchronizer(ABC):
         output_file = self._get_output_filepath()
         synchro_file = self._get_synchro_filepath()
             
-        if (not test_mode) or (test_mode and not output_file.exists()):
-            led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._run_synchro_marker_detection_and_get_offsets()
-
-            if alignment_error > self.synchro_metadata["synchro_error_threshold"]:
-                led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._handle_synchro_fails()
-
-            self.led_detection = LED_Marker_Plot(
-                image=iio.v3.imread(self.video_metadata.filepath, index=0),
-                led_center_coordinates=led_center_coordinates,
-                box_size=self.box_size,
-                video_metadata=self.video_metadata,
-                output_directory=self.output_directory,
-            )
-            
-            self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx=offset_adjusted_start_idx, offset=remaining_offset)
-            
-            self._save_synchro(filepath = synchro_file, led_center_coordinates = led_center_coordinates, offset_adjusted_start_idx = offset_adjusted_start_idx, remaining_offset = remaining_offset, alignment_error = alignment_error)
+        if test_mode and output_file.exists():
+            if output_file.suffix == ".h5":
+                marker_detection_filepath, synchronized_video_filepath = output_file, None
+            elif output_file.suffix == ".mp4":
+                synchronized_video_filepath, marker_detection_filepath = output_file, None
         else:
-            offset_adjusted_start_idx, remaining_offset = 0, 0
-            if synchro_file.exists():
+            if test_mode and synchro_file.exists():
                 led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._load_synchro(filepath=synchro_file)
+            else:
+                led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._run_synchro_marker_detection_and_get_offsets()
 
-        marker_detection_filepath, synchronized_video_filepath = self._adjust_video_to_target_fps_and_run_marker_detection(target_fps=self.target_fps, start_idx=offset_adjusted_start_idx, offset=remaining_offset, synchronize_only=synchronize_only, test_mode=test_mode)
+                if alignment_error > self.synchro_metadata["synchro_error_threshold"]:
+                    led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._handle_synchro_fails()
+
+                self.led_detection = LED_Marker_Plot(
+                    image=iio.v3.imread(self.video_metadata.filepath, index=0),
+                    led_center_coordinates=led_center_coordinates,
+                    box_size=self.box_size,
+                    video_metadata=self.video_metadata,
+                    output_directory=self.output_directory,
+                )
+            
+                self.led_timeseries_for_cross_video_validation = self._adjust_led_timeseries_for_cross_validation(start_idx=offset_adjusted_start_idx, offset=remaining_offset)
+
+                self._save_synchro(filepath = synchro_file, led_center_coordinates = led_center_coordinates, offset_adjusted_start_idx = offset_adjusted_start_idx, remaining_offset = remaining_offset, alignment_error = alignment_error)
+                
+            marker_detection_filepath, synchronized_video_filepath = self._adjust_video_to_target_fps_and_run_marker_detection(target_fps=self.target_fps, start_idx=offset_adjusted_start_idx, offset=remaining_offset, synchronize_only=synchronize_only, test_mode=test_mode)
         
         self._get_framenumber_of_synchronized_files(synchronize_only = synchronize_only, synchronized_video_filepath=synchronized_video_filepath, marker_detection_filepath=marker_detection_filepath)
         
@@ -238,9 +242,9 @@ class Synchronizer(ABC):
         if type(self) == CharucoVideoSynchronizer:
             output_file = self._construct_video_filepath()
         elif type(self) == RecordingVideoUpSynchronizer:
-            output_file = self._create_h5_filepath(tag=f"_upsampled{self.target_fps}fps_synchronized")
+            output_file = self._create_h5_filepath(tag=f"_upsampled{self.target_fps}fps_synchronized", filtered = self.synchro_metadata['use_2D_filter'])
         elif type(self) == RecordingVideoDownSynchronizer:
-            output_file = self._create_h5_filepath(tag = f"_downsampled{self.target_fps}fps_synchronized")
+            output_file = self._create_h5_filepath(tag = f"_downsampled{self.target_fps}fps_synchronized", filtered = self.synchro_metadata['use_2D_filter'])
         return output_file
     
     def _get_synchro_filepath(self)->Path:
@@ -269,15 +273,15 @@ class Synchronizer(ABC):
             for template in motif_templates:
                 template_motif.add_motif_template(motif_template=template)
         return template_motif
-
+    
     def _get_LED_center_coordinates(self) -> Coordinates:
+        temp_folder = self.output_directory.joinpath("temp")
+        Path.mkdir(temp_folder, exist_ok=True)
+            
         if self.video_metadata.led_extraction_type == "DLC":
-            temp_folder = self.output_directory.joinpath("temp")
-            Path.mkdir(temp_folder, exist_ok=True)
             video_filepath_out = temp_folder.joinpath(
                 f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4"
             )
-            config_filepath = self.video_metadata.led_extraction_filepath
             if self.video_metadata.charuco_video:
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5"
@@ -286,29 +290,23 @@ class Synchronizer(ABC):
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
-
-            num_frames_to_pick = 100
+                
+            num_frames_to_pick = self.synchro_metadata['num_frames_to_pick']
             if num_frames_to_pick > self.video_metadata.framenum:
                 num_frames_to_pick = int(self.video_metadata.framenum / 2)
-            sample_frame_idxs = random.sample(
-                range(self.video_metadata.framenum),
-                num_frames_to_pick,
-            )
-
+            sample_frame_idxs = random.sample(range(self.video_metadata.framenum), num_frames_to_pick,)
             selected_frames = []
             for idx in sample_frame_idxs:
                 selected_frames.append(
                     iio.v3.imread(self.video_metadata.filepath, index=idx)
                 )
             video_array = np.asarray(selected_frames)
-            iio.v3.imwrite(
-                str(video_filepath_out), video_array, fps=1, macro_block_size=1
-            )
-
+            iio.v3.imwrite(str(video_filepath_out), video_array, fps=1, macro_block_size=1)
+            
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=str(video_filepath_out),
                 output_directory=temp_folder,
-                marker_detection_directory=config_filepath,
+                marker_detection_directory=self.video_metadata.led_extraction_filepath,
             )
             dlc_filepath_out = dlc_interface.analyze_objects(
                 filtering=False, use_gpu=self.use_gpu, filepath=dlc_filepath_out
@@ -328,13 +326,8 @@ class Synchronizer(ABC):
             video_filepath_out.unlink()
             dlc_filepath_out.unlink()
             dlc_created_picklefile.unlink()
-            temp_folder.rmdir()
-            return Coordinates(y_or_row=y, x_or_column=x)
 
         elif self.video_metadata.led_extraction_type == "manual":
-            temp_folder = self.output_directory.joinpath("temp")
-            Path.mkdir(temp_folder, exist_ok=True)
-
             config_filepath = self.video_metadata.led_extraction_filepath
             if self.video_metadata.charuco_video:
                 manual_filepath_out = temp_folder.joinpath(
@@ -363,9 +356,10 @@ class Synchronizer(ABC):
             y = int(df.loc[0, y_key].values)
 
             manual_filepath_out.unlink()
-            return Coordinates(y_or_row=y, x_or_column=x)
         else:
-            print("Template Matching is not yet implemented!")
+            raise ValueError("For LED extraction only DLC and manual are supported!")
+        temp_folder.rmdir()
+        return Coordinates(y_or_row=y, x_or_column=x)
 
     def _extract_led_pixel_intensities(
         self, led_center_coords: Coordinates
@@ -681,7 +675,7 @@ class Synchronizer(ABC):
     def _get_sampling_frame_idxs(
         self, start_idx: int, offset: float, target_fps: int
     ) -> List[int]:
-        original_n_frames = self.led_timeseries[start_idx:].shape[0]
+        original_n_frames = self.video_metadata.framenum - start_idx
         n_frames_after_downsampling = self._compute_fps_adjusted_frame_count(
             original_n_frames=original_n_frames,
             original_fps=self.video_metadata.fps,
@@ -901,49 +895,6 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
     @property
     def target_fps(self) -> int:
         return self.video_metadata.target_fps
-
-    """
-    def _adjust_video_to_target_fps_and_run_marker_detection(
-        self,
-        target_fps: int,
-        start_idx: int,
-        offset: float,
-        synchronize_only: bool,
-        test_mode: bool,
-    ) -> Tuple[Path]:
-        downsampled_video_filepath = self._downsample_video(
-            start_idx=start_idx,
-            offset=offset,
-            target_fps=self.target_fps,
-            test_mode=test_mode,
-        )
-        if not synchronize_only:
-            if self.video_metadata.processing_type == "DLC":
-                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
-                    video_filepath=downsampled_video_filepath, test_mode=test_mode
-                )
-            elif self.video_metadata.processing_type == "manual":
-                detected_markers_filepath = self._run_manual_marker_detection(
-                    video_filepath=downsampled_video_filepath, test_mode=test_mode
-                )
-            else:
-                print("TemplateMatching is not yet implemented!")
-            return detected_markers_filepath, downsampled_video_filepath
-        else:
-            return None, downsampled_video_filepath
-
-    def _create_h5_filepath(self, filtered: bool = False) -> Path:
-        if not filtered:
-            h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_downsampled{self.target_fps}fps_synchronized.h5"
-            )
-        else:
-            h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_downsampled{self.target_fps}fps_synchronized_filtered.h5"
-            )
-        return h5_filepath
-    """
-
         
     def _adjust_video_to_target_fps_and_run_marker_detection(
         self,
@@ -954,40 +905,36 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
         synchronize_only: bool = False
     ) -> Path:
         
-        downsynchronized_filepath = self._create_h5_filepath(
-            tag=f"_downsampled{self.target_fps}fps_synchronized"
-        )
+        downsynchronized_filepath = self._create_h5_filepath(tag=f"_temp")
         
-        if (not test_mode) or (test_mode and not downsynchronized_filepath.exists()):
-        
-            if self.video_metadata.processing_type == "DLC":
-                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
-                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
-                )
-            elif self.video_metadata.processing_type == "manual":
-                detected_markers_filepath = self._run_manual_marker_detection(
-                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
-                )
-            else:
-                print("TemplateMatching is not yet implemented!")
-            
-            filtered_filepath = self._create_h5_filepath(filtered=True)
-            
-            df = pd.read_hdf(filtered_filepath)
-            frame_idxs_to_sample = self._get_sampling_frame_idxs(start_idx=start_idx, offset=offset, target_fps=target_fps)
-            new_df = df.loc[frame_idxs_to_sample, :]
-            new_df.to_hdf(downsynchronized_filepath, "key")
+        if self.video_metadata.processing_type == "DLC":
+            full_h5_filepath = self._run_deep_lab_cut_for_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+            if self.synchro_metadata["use_2D_filter"]:
+                full_h5_filepath = self._create_h5_filepath(filtered=True)
+        elif self.video_metadata.processing_type == "manual":
+            full_h5_filepath = self._run_manual_marker_detection(
+                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+            )
+        else:
+            raise ValueError("For processing only DLC and manual are supported!")
+
+        df = pd.read_hdf(full_h5_filepath)
+        frame_idxs_to_sample = self._get_sampling_frame_idxs(start_idx=start_idx, offset=offset, target_fps=target_fps)
+        new_df = df.loc[frame_idxs_to_sample, :]
+        new_df.to_hdf(downsynchronized_filepath, "key")
         return downsynchronized_filepath, None
         
         
     def _create_h5_filepath(self, tag: str = "_rawfps_unsynchronized", filtered: bool = False) -> Path:
-        if not filtered:
+        if filtered:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
             )
         else:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
             )
         return h5_filepath
 
@@ -1004,27 +951,26 @@ class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
         offset: float,
         test_mode: bool,
         synchronize_only: bool = False,
-    ):
+    ) -> Path:
         
-        
-        upsynchronized_filepath = self._create_h5_filepath(
-            tag=f"_upsampled{self.target_fps}fps_synchronized"
-        )
+        upsynchronized_filepath = self._create_h5_filepath(tag=f"_temp")
+                                                           
         if (not test_mode) or (test_mode and not upsynchronized_filepath.exists()):
             
             if self.video_metadata.processing_type == "DLC":
-                detected_markers_filepath = self._run_deep_lab_cut_for_marker_detection(
+                full_h5_filepath = self._run_deep_lab_cut_for_marker_detection(
                     video_filepath=self.video_metadata.filepath, test_mode=test_mode
                 )
+                if self.synchro_metadata["use_2D_filter"]:
+                    full_h5_filepath = self._create_h5_filepath(filtered=True)
             elif self.video_metadata.processing_type == "manual":
-                detected_markers_filepath = self._run_manual_marker_detection(
+                full_h5_filepath = self._run_manual_marker_detection(
                     video_filepath=self.video_metadata.filepath, test_mode=test_mode
                 )
             else:
-                print("TemplateMatching is not yet implemented!")
+                raise ValueError("For processing only DLC and manual are supported!")
 
-            filtered_filepath = self._create_h5_filepath(filtered=True)
-            df = pd.read_hdf(filtered_filepath)
+            df = pd.read_hdf(full_h5_filepath)
             len_frame_in_ms = 1 / self.video_metadata.fps * 1000
             len_targetframe_in_ms = 1 / self.target_fps * 1000
             total_offset_in_ms = start_idx * len_frame_in_ms + offset
@@ -1042,12 +988,12 @@ class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
     def _create_h5_filepath(
         self, tag: str = "_rawfps_unsynchronized", filtered: bool = False
     ) -> Path:
-        if not filtered:
+        if filtered:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
             )
         else:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
             )
         return h5_filepath
