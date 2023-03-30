@@ -101,9 +101,7 @@ class meta_interface(ABC):
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
         file = convert_to_path(file)
         if not file.is_dir() or recording_day not in self.meta["recording_days"].keys():
-            raise FileNotFoundError(
-                f"couldn't add recording directory! \nCheck your filepath and make sure the recording_day is in {self.meta['recording_days'].keys()}!"
-            )
+            raise FileNotFoundError(f"couldn't add recording directory! \nCheck your filepath and make sure the recording_day is in {self.meta['recording_days'].keys()}!")
         else:
             self.meta["recording_days"][recording_day]["recording_directories"].append(
                 str(file)

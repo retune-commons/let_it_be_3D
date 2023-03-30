@@ -46,6 +46,18 @@ from .angles_and_distances import (
 )
 
 
+def exclude_by_framenum(metadata_from_videos: Dict, target_fps: int, allowed_num_diverging_frames: int) -> None:
+    synch_framenum_median = np.median([video_metadata.framenum_synchronized for video_metadata in metadata_from_videos.values()])
+    
+    videos_to_exclude = []
+    for video_metadata in metadata_from_videos.values():
+        if video_metadata.framenum_synchronized < (synch_framenum_median - allowed_num_diverging_frames) or video_metadata.framenum_synchronized > (synch_framenum_median + allowed_num_diverging_frames):
+            video_metadata.exclusion_state = "exclude"
+            videos_to_exclude.append(video_metadata.cam_id)
+    if len(videos_to_exclude) > 0:
+        print(f"{videos_to_exclude} were excluded!")
+    return videos_to_exclude
+
 
 class Triangulation_Calibration(ABC):
     @abstractmethod
@@ -199,7 +211,14 @@ class Calibration(Triangulation_Calibration):
                 output_directory=self.output_directory,
             )
         self._validate_unique_cam_ids()
-        self.initialize_camera_group()
+        cams_to_exclude = exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps, allowed_num_diverging_frames=self.allowed_num_diverging_frames)
+        self.valid_videos = []
+        for cam in self.camera_objects:
+            if cam.name in cams_to_exclude:
+                self.camera_objects.remove(cam)
+            else:
+                self.valid_videos.append(cam.name)
+        self.initialize_camera_group(camera_objects=self.camera_objects)
 
     def run_calibration(
         self,
@@ -209,8 +228,7 @@ class Calibration(Triangulation_Calibration):
         test_mode: bool = False,
         iteration: Optional[int] = None,
     ) -> None:
-        cams = list(self.metadata_from_videos.keys())
-        filename = f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index, iteration = iteration)}.toml"
+        filename = f"{create_calibration_key(videos = self.valid_videos, recording_date = self.recording_date, calibration_index = self.calibration_index, iteration = iteration)}.toml"
 
         calibration_filepath = self.output_directory.joinpath(filename)
         if (not test_mode) or (
@@ -242,8 +260,8 @@ class Calibration(Triangulation_Calibration):
             self.reprojerr = 0
         return calibration_filepath
 
-    def initialize_camera_group(self) -> None:
-        self.camera_group = ap_lib.cameras.CameraGroup(self.camera_objects)
+    def initialize_camera_group(self, camera_objects: List) -> None:
+        self.camera_group = ap_lib.cameras.CameraGroup(camera_objects)
 
     def _validate_and_save_metadata_for_recording(self) -> None:
         recording_dates = set(
@@ -279,6 +297,7 @@ class Calibration(Triangulation_Calibration):
             "load_calibration",
             "calibration_tag",
             "calibration_validation_tag",
+            "allowed_num_diverging_frames",
             "handle_synchro_fails",
             "default_offset_ms",
             "start_pattern_match_ms",
@@ -322,10 +341,9 @@ class Calibration(Triangulation_Calibration):
         self.led_pattern = recording_config_dict["led_pattern"]
         self.calibration_index = recording_config_dict["calibration_index"]
         self.calibration_tag = project_config_dict["calibration_tag"]
-        self.calibration_validation_tag = project_config_dict[
-            "calibration_validation_tag"
-        ]
-
+        self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
+        self.allowed_num_diverging_frames = project_config_dict["allowed_num_diverging_frames"]
+        
         self.cameras_missing_in_recording_config = check_keys(
             dictionary=recording_config_dict, list_of_keys=self.valid_cam_ids
         )
@@ -380,8 +398,7 @@ class Calibration(Triangulation_Calibration):
         
         report = pd.DataFrame()
         calibration_found = False
-        cams = list(self.metadata_from_videos.keys())
-        good_calibration_filepath = self.output_directory.joinpath(f"{create_calibration_key(videos = cams, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml")
+        good_calibration_filepath = self.output_directory.joinpath(f"{create_calibration_key(videos = self.valid_videos, recording_date = self.recording_date, calibration_index = self.calibration_index)}.toml")
 
         for cal in range(max_iters):
             if good_calibration_filepath.exists() and test_mode:
@@ -496,7 +513,7 @@ class Triangulation(Triangulation_Calibration):
         if (not test_mode) or (test_mode and not self.csv_output_filepath.exists()):
             self._save_dataframe_as_csv(filepath = self.csv_output_filepath, df = self.df)
         for path in self.triangulation_dlc_cams_filepaths.values():
-            if "temp" in path.name:
+            if "_temp" in path.name:
                 path.unlink()
             
     def exclude_markers(self, all_markers_to_exclude_config_path: Path, verbose: bool=True):
@@ -545,6 +562,7 @@ class Triangulation(Triangulation_Calibration):
             "use_gpu",
             "calibration_tag",
             "calibration_validation_tag",
+            "allowed_num_diverging_frames",
             "handle_synchro_fails",
             "default_offset_ms",
             "start_pattern_match_ms",
@@ -593,6 +611,7 @@ class Triangulation(Triangulation_Calibration):
         self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
         self.score_threshold = project_config_dict["score_threshold"]
         self.triangulation_type = project_config_dict["triangulation_type"]
+        self.allowed_num_diverging_frames = project_config_dict["allowed_num_diverging_frames"]
 
         for dictionary_key in [
             "processing_type",
@@ -893,6 +912,11 @@ class Triangulation_Recordings(Triangulation):
             self.markers = list(pd.read_hdf(list(self.triangulation_dlc_cams_filepaths.values())[0]).columns.levels[1])
         except IndexError:
             pass
+        
+        cams_to_exclude = exclude_by_framenum(metadata_from_videos=self.metadata_from_videos, target_fps=self.target_fps, allowed_num_diverging_frames= self.allowed_num_diverging_frames)
+        for cam in self.metadata_from_videos:
+            if cam in cams_to_exclude:
+                self.triangulation_dlc_cams_filepaths.pop(cam)
 
     def _create_csv_filepath(self) -> None:
         filepath_out = self.output_directory.joinpath(

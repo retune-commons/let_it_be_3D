@@ -88,6 +88,7 @@ intrinsic_calibration_directory: test_data/intrinsic_calibrations/
 load_calibration: True
 # triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False 
 triangulation_type: triangulate
+allowed_num_diverging_frames: 20
 
 # repeat, default, manual, error
 handle_synchro_fails: manual
@@ -96,7 +97,7 @@ start_pattern_match_ms: 0
 end_pattern_match_ms: 120000
 synchro_error_threshold: 100
 synchro_marker: LED5
-use_2D_filter: True
+use_2D_filter: False
 score_threshold: 0.9
 num_frames_to_pick: 5
 
