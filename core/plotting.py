@@ -4,15 +4,17 @@ from pathlib import Path
 import math
 
 import matplotlib.pyplot as plt
-
+from moviepy.video.io.bindings import mplfig_to_npimage
 from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Polygon
+import mpl_toolkits.mplot3d.art3d as art3d
 import numpy as np
 import cv2
 import pandas as pd
 import imageio as iio
 
 from .video_metadata import VideoMetadata
-from .utils import Coordinates, load_single_frame_of_video, convert_to_path
+from .utils import Coordinates, load_single_frame_of_video, convert_to_path, get_3D_df_keys
 
 
 class Plotting(ABC):
@@ -89,91 +91,52 @@ class Plot3D(Plotting):
 class Triangulation_Visualization(Plot3D):
     def __init__(
         self,
-        triangulation_object: "Triangulation",
+        df_filepath: Path, 
+        output_directory: Path, 
+        config: Dict,
         plot: bool = False,
         save: bool = True,
-        idx: int = 0,
-        likelihood_threshold: float = 0.6,
+        idx: int = 0
     ) -> None:
-        self.p3d = triangulation_object.anipose_io["p3ds"][idx]
+        self.df_3D = pd.read_csv(df_filepath)
         self.idx = idx
-        self.likelihood_threshold = likelihood_threshold
-        self.bodyparts = triangulation_object.anipose_io["bodyparts"]
-        self.filename_tag = triangulation_object.csv_output_filepath.stem
-        self.output_directory = triangulation_object.output_directory
-        self.triangulation_dlc_cams_filepaths = (
-            triangulation_object.triangulation_dlc_cams_filepaths
-        )
-        self.videos_cams_filepaths = {
-            video_metadata.cam_id: video_metadata.filepath
-            for video_metadata in triangulation_object.metadata_from_videos.values()
-        }
+        self.config = config
+        self.filename_tag = ""
+        self.output_directory = output_directory
+        self.bodyparts = list(set(key.split('_')[0] for key in self.df_3D.keys() if not any([label in key for label in self.config["markers_to_exclude"]])))
+        
         self.filepath = self._create_filepath()
 
         self._create_plot(plot=plot, save=save)
 
     def _create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> None:
-        ncols = len(self.triangulation_dlc_cams_filepaths.keys())
-        nrows = 2
-        grid = GridSpec(
-            nrows,
-            ncols,
-            left=0.1,
-            bottom=0.15,
-            right=0.94,
-            top=0.94,
-            wspace=0.3,
-            hspace=0.3,
-        )
-
         fig = plt.figure(figsize=(15, 15))
         fig.clf()
+        ax_3d = fig.add_subplot(111, projection='3d')
+            
+        all_markers = {marker['name']: marker for marker in self.config["additional_markers_to_plot"]}
+        for bodypart in self.bodyparts:
+                x, y, z = get_3D_df_keys(bodypart)
+                if not math.isnan(self.df_3D.loc[self.idx, x]):
+                    all_markers[bodypart] = {'name': bodypart, 
+                                        'x': self.df_3D.loc[self.idx, x], 
+                                        'y': self.df_3D.loc[self.idx, y], 
+                                        'z': self.df_3D.loc[self.idx, z],
+                                        'alpha': self.config["body_marker_alpha"],
+                                        'color': self.config["body_marker_color"],
+                                        'size': self.config["body_marker_size"]}
 
-        ax_3d = fig.add_subplot(grid[0, 0 : ncols - 1], projection="3d")
-        ax_3d.scatter(self.p3d[:, 0], self.p3d[:, 1], self.p3d[:, 2], s=15, c="blue")
-        for i in range(len(self.bodyparts)):
-            if not math.isnan(self.p3d[i, 0]):
-                ax_3d.text(
-                    self.p3d[i, 0],
-                    self.p3d[i, 1] + 0.01,
-                    self.p3d[i, 2],
-                    self.bodyparts[i],
-                    size=5,
-                    alpha=0.5,
-                )
-        for n, cam in enumerate(self.triangulation_dlc_cams_filepaths.keys()):
-            df = pd.read_hdf(self.triangulation_dlc_cams_filepaths[cam])
-            ax_2d = fig.add_subplot(grid[1, n])
-            image = iio.v3.imread(self.videos_cams_filepaths[cam], index=self.idx)
-            ax_2d.imshow(image)
-            for scorer, marker, _ in df.columns:
-                idx = df.index[self.idx]
-                try:
-                    if (
-                        df.loc[idx, (scorer, marker, "likelihood")]
-                        > self.likelihood_threshold
-                    ):
-                        x, y = (
-                            df.loc[idx, (scorer, marker, "x")],
-                            df.loc[idx, (scorer, marker, "y")],
-                        )
-                        ax_2d.scatter(x, y, s=10, c="blue")
-                except ValueError:
-                    if (
-                        df.loc[idx, (scorer, marker, "likelihood")].values[0]
-                        > self.likelihood_threshold
-                    ):
-                        x, y = (
-                            df.loc[idx, (scorer, marker, "x")].values[0],
-                            df.loc[idx, (scorer, marker, "y")].values[0],
-                        )
-                        ax_2d.scatter(x, y, s=10, c="blue")
-            ax_2d.set_title(f"{cam}")
-        fig.suptitle("3D_Plot_with_2D_Plots")
-
+        for marker in all_markers.values():
+            ax_3d.text(marker['x'], marker['y'], marker['z'], marker['name'], size = self.config["body_label_size"], alpha = self.config["body_label_alpha"], c = self.config["body_label_color"])
+            ax_3d.scatter(marker['x'], marker['y'], marker['z'], s=marker['size'], alpha =marker['alpha'], c = marker['color'])
+            
+        for group in self.config['markers_to_connect']:
+            self._connect_one_set_of_markers(ax = ax_3d, all_markers=all_markers, group=group)
+        
+        for group in self.config["markers_to_fill"]:
+            self._fill_one_set_of_markers(ax = ax_3d, all_markers=all_markers, group=group)
+                
         if return_fig:
-            from moviepy.video.io.bindings import mplfig_to_npimage
-
             npimage = mplfig_to_npimage(fig)
             plt.close()
             return npimage
@@ -183,6 +146,30 @@ class Triangulation_Visualization(Plot3D):
             plt.show()
         plt.close()
 
+    def _connect_one_set_of_markers(
+        self,
+        ax: plt.Figure,
+        all_markers: Dict,
+        group: Dict
+    ) -> None:
+        x = [all_markers[marker]['x'] for marker in group['markers']]
+        y = [all_markers[marker]['y'] for marker in group['markers']]
+        z = [all_markers[marker]['z'] for marker in group['markers']]
+        ax.plot(x, y, z, alpha = group['alpha'], c = group['color'])
+        
+    def _fill_one_set_of_markers(
+        self, 
+        ax: plt.Figure, 
+        all_markers: Dict, 
+        group: Dict
+    ) -> None:
+        points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
+        z = [all_markers[marker]['z'] for marker in group['markers']]
+        artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
+        ax.add_patch(artist)
+        art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
+    
+        
     def plot(self) -> None:
         self._create_plot(plot=True, save=False)
 

@@ -4,13 +4,14 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import itertools as it
 import math
-from scipy.spatial.transform import Rotation
 
+from scipy.spatial.transform import Rotation
 import aniposelib as ap_lib
 import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from moviepy.editor import VideoClip
 
 from .video_metadata import VideoMetadata
 from .video_interface import VideoInterface
@@ -513,8 +514,6 @@ class Triangulation(Triangulation_Calibration):
         if not test_mode:
             self._get_dataframe_of_triangulated_points()
             self._save_dataframe_as_csv(filepath = self.csv_output_filepath, df = self.df)
-        if save_first_frame:
-            self.visualisation_3D = Triangulation_Visualization(self, plot=True, save=True)
             
     def exclude_markers(self, all_markers_to_exclude_config_path: Path, verbose: bool=True):
         all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
@@ -968,29 +967,6 @@ class Triangulation_Recordings(Triangulation):
             if camera not in filepath_keys:
                 print(f"Creating empty .h5 file for {camera}!")
 
-    def create_triangulated_video(
-        self,
-        filename: str,
-        start_s: int = 0,
-        end_s: int = 5,
-        output_fps: int = 24,
-        speed: int = 1,
-    ) -> None:
-        from moviepy.editor import VideoClip
-
-        self.created_video_start_s = start_s
-        self.created_video_output_fps = output_fps
-        self.created_video_speed = speed
-        self.created_video_end_s = end_s
-        triangulated_video = VideoClip(
-            self._get_triangulated_plots,
-            duration=(self.created_video_end_s - self.created_video_start_s)
-            / self.created_video_speed,
-        )
-        triangulated_video.write_videofile(
-            f"{filename}.mp4", fps=self.created_video_output_fps, logger=None
-        )
-
     def normalize(self, normalization_config_path: Path)->None:
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
@@ -1054,13 +1030,27 @@ class Triangulation_Recordings(Triangulation):
             return valid_frames_for_normalization[0]
         else:
             raise ValueError ("Could not normalize the dataframe!")
+            
+    def create_triangulated_video(
+        self,
+        filename: str,
+        config_path: Path
+    ) -> None:
+        config_path = convert_to_path(config_path)
+        self.video_plotting_config = read_config(config_path)
+        triangulated_video = VideoClip(
+            self._get_triangulated_plots,
+            duration=(self.video_plotting_config["end_s"] - self.video_plotting_config["start_s"]),
+        )
+        triangulated_video.write_videofile(
+            f"{filename}.mp4", fps=self.target_fps, logger=None
+        )
         
     def _get_triangulated_plots(self, idx: int) -> np.ndarray:
         idx = int(
-            (self.created_video_start_s + idx * self.created_video_speed)
-            * self.target_fps
-        )
-        t = Triangulation_Visualization(self, plot=False, save=False, idx=idx)
+            (self.video_plotting_config["start_s"] + idx) * self.target_fps)
+        
+        t = Triangulation_Visualization(df_filepath = self.rotated_filepath, output_directory=self.output_directory, idx=idx, config=self.video_plotting_config, plot=False, save=False)
         return t.return_fig()
 
 
