@@ -477,27 +477,23 @@ class Triangulation(Triangulation_Calibration):
         framenum = min(framenums)
         cams_in_calibration = self.camera_group.get_names()
         markers = self.markers
-        self._fake_missing_files(
-            cams_in_calibration=cams_in_calibration, framenum=framenum, markers=markers
-        )
+        self._fake_missing_files(cams_in_calibration=cams_in_calibration, framenum=framenum, markers=markers)
 
         self._preprocess_dlc_predictions_for_anipose(test_mode=test_mode)
-        p3ds_flat = self.camera_group.triangulate(
-            self.anipose_io["points_flat"], progress=True
-        )
         
-        """
-        #alternative, but reprojerr not working in this case, so will throw Error before creating a new 3Ddf:
-        p3ds_flat = self.camera_group.triangulate_optim(
-            self.anipose_io["points"], init_ransac = False, init_progress=True
-        ).reshape(self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
-        """
+        if self.triangulation_type == "triangulate":
+            p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
+        elif self.triangulation_type == "triangulate_optim_ransac_False":
+            p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"], init_ransac = False, init_progress=True).reshape(self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+        elif self.triangulation_type == "triangulate_optim_ransac_True":
+            p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"], init_ransac = True, init_progress=True).reshape(self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+        else:
+            raise ValueError("Supported methods for triangulation are triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False!")
         
-        self._postprocess_triangulations_and_calculate_reprojection_error(
-            p3ds_flat=p3ds_flat
-        )
-        if not test_mode:
-            self._get_dataframe_of_triangulated_points()
+        self._postprocess_triangulations_and_calculate_reprojection_error(p3ds_flat=p3ds_flat)
+        
+        self._get_dataframe_of_triangulated_points()
+        if (not test_mode) or (test_mode and not self.csv_output_filepath.exists()):
             self._save_dataframe_as_csv(filepath = self.csv_output_filepath, df = self.df)
         for path in self.triangulation_dlc_cams_filepaths.values():
             if "temp" in path.name:
@@ -526,7 +522,7 @@ class Triangulation(Triangulation_Calibration):
                     a, b, c = keys
                     if b in existing_markers_to_exclude and c == "likelihood":
                         df.isetitem(i, 0)
-                df.to_hdf(h5_file, key="dlc", mode="w")
+                df.to_hdf(h5_file, key="key", mode="w")
         
         self.markers_excluded_manually = True
 
@@ -557,7 +553,8 @@ class Triangulation(Triangulation_Calibration):
             "synchro_marker",
             "use_2D_filter",
             "score_threshold",
-            'num_frames_to_pick'
+            'num_frames_to_pick',
+            "triangulation_type",
         ]
         missing_keys = check_keys(
             dictionary=project_config_dict, list_of_keys=keys_to_check_project
@@ -595,6 +592,7 @@ class Triangulation(Triangulation_Calibration):
         self.calibration_tag = project_config_dict["calibration_tag"]
         self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
         self.score_threshold = project_config_dict["score_threshold"]
+        self.triangulation_type = project_config_dict["triangulation_type"]
 
         for dictionary_key in [
             "processing_type",
@@ -642,14 +640,7 @@ class Triangulation(Triangulation_Calibration):
         defined_marker_ids = self.markers
         calibration_validation_markers_df = pd.read_hdf(calibration_validation_markers_df_filepath)
 
-        prediction_marker_ids = list(
-            set(
-                [
-                    marker_id
-                    for scorer, marker_id, key in calibration_validation_markers_df.columns
-                ]
-            )
-        )
+        prediction_marker_ids = list(set([marker_id for scorer, marker_id, key in calibration_validation_markers_df.columns]))
 
         marker_ids_not_in_ground_truth = self._find_non_matching_marker_ids(
             prediction_marker_ids, defined_marker_ids
@@ -734,13 +725,12 @@ class Triangulation(Triangulation_Calibration):
     def _add_additional_information_and_continue_preprocessing(
         self, anipose_io: Dict, test_mode: bool = False
     ) -> Dict:
-        n_cams, anipose_io["n_points"], anipose_io["n_joints"], _ = anipose_io[
-            "points"
-        ].shape
+        n_cams, anipose_io["n_points"], anipose_io["n_joints"], _ = anipose_io["points"].shape
         if test_mode:
-            anipose_io["points"] = anipose_io["points"][:, 0, :, :]
-            anipose_io["n_points"] = 1
-            anipose_io["scores"] = anipose_io["scores"][:, 0, :]
+            a, b = 0, 2
+            anipose_io["points"] = anipose_io["points"][:, a:b, :, :]
+            anipose_io["n_points"] = b-a
+            anipose_io["scores"] = anipose_io["scores"][:, a:b, :]
         anipose_io["points"][anipose_io["scores"] < self.score_threshold] = np.nan
 
         anipose_io["points_flat"] = anipose_io["points"].reshape(n_cams, -1, 2)
@@ -750,16 +740,12 @@ class Triangulation(Triangulation_Calibration):
     def _postprocess_triangulations_and_calculate_reprojection_error(
         self, p3ds_flat: np.array
     ) -> None:
-        self.reprojerr_flat = self.camera_group.reprojection_error(
-            p3ds_flat, self.anipose_io["points_flat"], mean=True
-        )
-        self.p3ds = p3ds_flat.reshape(
-            self.anipose_io["n_points"], self.anipose_io["n_joints"], 3
-        )
+        self.reprojerr_flat = self.camera_group.reprojection_error(p3ds_flat, self.anipose_io["points_flat"], mean=True)
+        self.p3ds = p3ds_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"], 3)
+        
         self.anipose_io["p3ds"] = self.p3ds
-        self.reprojerr = self.reprojerr_flat.reshape(
-            self.anipose_io["n_points"], self.anipose_io["n_joints"]
-        )
+        self.reprojerr = self.reprojerr_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"])
+        
         self.reprojerr_nonan = self.reprojerr[np.logical_not(np.isnan(self.reprojerr))]
         self.anipose_io["reproj_nonan"] = self.reprojerr_nonan
 
@@ -904,17 +890,13 @@ class Triangulation_Recordings(Triangulation):
             }
 
         try:
-            self.markers = list(
-                pd.read_hdf(
-                    list(self.triangulation_dlc_cams_filepaths.values())[0]
-                ).columns.levels[1]
-            )
+            self.markers = list(pd.read_hdf(list(self.triangulation_dlc_cams_filepaths.values())[0]).columns.levels[1])
         except IndexError:
             pass
 
     def _create_csv_filepath(self) -> None:
         filepath_out = self.output_directory.joinpath(
-                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}.csv"
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}_{self.triangulation_type}.csv"
             )
         return filepath_out
 
@@ -956,7 +938,7 @@ class Triangulation_Recordings(Triangulation):
             if camera not in filepath_keys:
                 print(f"Creating empty .h5 file for {camera}!")
 
-    def normalize(self, normalization_config_path: Path)->None:
+    def normalize(self, normalization_config_path: Path, test_mode: bool=False)->None:
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
         
@@ -1000,7 +982,8 @@ class Triangulation_Recordings(Triangulation):
         
         self.normalised_dataframe = True
         self.rotated_filepath = self._create_csv_filepath()
-        self._save_dataframe_as_csv(filepath = self.rotated_filepath, df = rotated)
+        if (not test_mode) or (test_mode and not self.rotated_filepath.exists()):
+            self._save_dataframe_as_csv(filepath = self.rotated_filepath, df = rotated)
         Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = self.rotated_filepath, rotation_error = self.rotation_error)
         
     def _get_best_frame_for_normalisation(self, config: Dict, df: pd.DataFrame)->int:
@@ -1196,5 +1179,5 @@ class Calibration_Validation(Triangulation):
             )
 
     def _create_csv_filepath(self) -> None:
-        filepath_out = self.output_directory.joinpath(f"{self.recording_date}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}.csv")
+        filepath_out = self.output_directory.joinpath(f"{self.recording_date}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}_{self.triangulation_type}.csv")
         return filepath_out
