@@ -560,6 +560,12 @@ class Triangulation(Triangulation_Calibration):
             "use_gpu",
             "calibration_tag",
             "calibration_validation_tag",
+            "handle_synchro_fails",
+            "default_offset_ms",
+            "start_pattern_match_ms",
+            "end_pattern_match_ms",
+            "synchro_error_threshold",
+            "synchro_marker",
         ]
         missing_keys = check_keys(
             dictionary=project_config_dict, list_of_keys=keys_to_check_project
@@ -568,6 +574,8 @@ class Triangulation(Triangulation_Calibration):
             raise KeyError(
                 f"Missing metadata information in the project_config_file {project_config_filepath} for {missing_keys}."
             )
+            
+        self.synchro_metadata={key: project_config_dict[key] for key in ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms", "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker"]}
 
         keys_to_check_recording = [
             "led_pattern",
@@ -852,6 +860,7 @@ class Triangulation_Recordings(Triangulation):
                     output_directory=self.output_directory,
                     synchronize_only=synchronize_only,
                     test_mode=test_mode,
+                    synchro_metadata=self.synchro_metadata,
                 )
             else:
                 video_interface.run_synchronizer(
@@ -861,6 +870,7 @@ class Triangulation_Recordings(Triangulation):
                     output_directory=self.output_directory,
                     synchronize_only=synchronize_only,
                     test_mode=test_mode,
+                    synchro_metadata=self.synchro_metadata,
                 )
             self.synchronized_videos[
                 video_interface.video_metadata.cam_id
