@@ -90,7 +90,7 @@ class DeeplabcutInterface(MarkerDetection):
                         self.output_directory.joinpath(filepath.stem + "_filtered.h5")
                     )
                 else:
-                    print(f"{filtered_filepath} not found! Data was but not filtered.")
+                    print(f"{filtered_filepath} not found! Data was analysed but not filtered.")
 
         # unmute
         sys.stdout = old_stdout

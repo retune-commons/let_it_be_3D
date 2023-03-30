@@ -94,6 +94,9 @@ start_pattern_match_ms: 0
 end_pattern_match_ms: 120000
 synchro_error_threshold: 100
 synchro_marker: LED5
+use_2D_filter: True
+score_threshold: 0.9
+num_frames_to_pick: 5
 
 # for 8GB RAM 3000 works nicely, on big RAM, you can increase the number to increase performance speed
 max_ram_digestible_frames: 3000

@@ -43,10 +43,10 @@ class VideoMetadata:
         self._get_intrinsic_parameters(
             max_calibration_frames=self.max_calibration_frames,
         )
-        try:
+        if self.calvin:
+            self.framenum = 1
+        else:
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
-        except:
-            self.framenum = 0
 
     def _check_filepaths(
         self,

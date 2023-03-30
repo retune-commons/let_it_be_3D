@@ -152,12 +152,7 @@ class Calibration(Triangulation_Calibration):
             filename_tag=self.calibration_tag,
             test_mode=test_mode,
         )
-        self.target_fps = min(
-            [
-                video_metadata.fps
-                for video_metadata in self.metadata_from_videos.values()
-            ]
-        )
+        self.target_fps = min([video_metadata.fps for video_metadata in self.metadata_from_videos.values()])
         for video_metadata in self.metadata_from_videos.values():
             video_metadata.target_fps = self.target_fps
 
@@ -179,26 +174,17 @@ class Calibration(Triangulation_Calibration):
             )
             self.synchronized_charuco_videofiles[
                 video_interface.video_metadata.cam_id
-            ] = str(video_interface.synchronized_video_filepath)
+            ] = str(video_interface.synchronized_video_filepath) 
             self.camera_objects.append(video_interface.export_for_aniposelib())
 
-        template = list(self.video_interfaces.values())[
-            0
-        ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
-            fps=self.target_fps
-        )[
-            0
-        ][
-            0
-        ]
+        template = list(self.video_interfaces.values())[0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
+            fps=self.target_fps)[0][0]
         led_timeseries_crossvalidation = {}
         for video_interface in self.video_interfaces.values():
             try:
                 led_timeseries_crossvalidation[
                     video_interface.video_metadata.cam_id
-                ] = (
-                    video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-                )
+                ] = (video_interface.synchronizer_object.led_timeseries_for_cross_video_validation)
             except:
                 pass
         if len(led_timeseries_crossvalidation.keys()) > 0:
@@ -299,6 +285,9 @@ class Calibration(Triangulation_Calibration):
             "end_pattern_match_ms",
             "synchro_error_threshold",
             "synchro_marker",
+            "use_2D_filter",
+            "score_threshold",
+            'num_frames_to_pick'
         ]
         missing_keys = check_keys(
             dictionary=project_config_dict, list_of_keys=keys_to_check_project
@@ -308,7 +297,7 @@ class Calibration(Triangulation_Calibration):
                 f"Missing metadata information in the project_config_file {project_config_filepath} for {missing_keys}."
             )
             
-        self.synchro_metadata={key: project_config_dict[key] for key in ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms", "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker"]}
+        self.synchro_metadata={key: project_config_dict[key] for key in ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms", "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker", 'num_frames_to_pick']}
 
         keys_to_check_recording = [
             "led_pattern",
@@ -464,10 +453,6 @@ class Calibration(Triangulation_Calibration):
 
 
 class Triangulation(Triangulation_Calibration):
-    @property
-    def score_threshold(self) -> float:
-        return 0.5
-
     @abstractmethod
     def _create_csv_filepath(self) -> Path:
         pass
@@ -514,6 +499,9 @@ class Triangulation(Triangulation_Calibration):
         if not test_mode:
             self._get_dataframe_of_triangulated_points()
             self._save_dataframe_as_csv(filepath = self.csv_output_filepath, df = self.df)
+        for path in self.triangulation_dlc_cams_filepaths.values():
+            if "temp" in path.name:
+                path.unlink()
             
     def exclude_markers(self, all_markers_to_exclude_config_path: Path, verbose: bool=True):
         all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
@@ -539,7 +527,8 @@ class Triangulation(Triangulation_Calibration):
                     if b in existing_markers_to_exclude and c == "likelihood":
                         df.isetitem(i, 0)
                 df.to_hdf(h5_file, key="dlc", mode="w")
-            # do not replace, but create new file and give it to triangulation_dlc_cams_filepaths!
+        
+        self.markers_excluded_manually = True
 
     def _get_metadata_from_configs(
         self, recording_config_filepath: Path, project_config_filepath: Path
@@ -566,6 +555,9 @@ class Triangulation(Triangulation_Calibration):
             "end_pattern_match_ms",
             "synchro_error_threshold",
             "synchro_marker",
+            "use_2D_filter",
+            "score_threshold",
+            'num_frames_to_pick'
         ]
         missing_keys = check_keys(
             dictionary=project_config_dict, list_of_keys=keys_to_check_project
@@ -575,7 +567,7 @@ class Triangulation(Triangulation_Calibration):
                 f"Missing metadata information in the project_config_file {project_config_filepath} for {missing_keys}."
             )
             
-        self.synchro_metadata={key: project_config_dict[key] for key in ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms", "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker"]}
+        self.synchro_metadata={key: project_config_dict[key] for key in ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms", "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker", "use_2D_filter", 'num_frames_to_pick']}
 
         keys_to_check_recording = [
             "led_pattern",
@@ -601,9 +593,8 @@ class Triangulation(Triangulation_Calibration):
         self.calibration_index = recording_config_dict["calibration_index"]
         self.target_fps = recording_config_dict["target_fps"]
         self.calibration_tag = project_config_dict["calibration_tag"]
-        self.calibration_validation_tag = project_config_dict[
-            "calibration_validation_tag"
-        ]
+        self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
+        self.score_threshold = project_config_dict["score_threshold"]
 
         for dictionary_key in [
             "processing_type",
@@ -751,7 +742,6 @@ class Triangulation(Triangulation_Calibration):
             anipose_io["n_points"] = 1
             anipose_io["scores"] = anipose_io["scores"][:, 0, :]
         anipose_io["points"][anipose_io["scores"] < self.score_threshold] = np.nan
-        # ??? possibility to weigh cameras differently
 
         anipose_io["points_flat"] = anipose_io["points"].reshape(n_cams, -1, 2)
         anipose_io["scores_flat"] = anipose_io["scores"].reshape(n_cams, -1)
@@ -827,6 +817,7 @@ class Triangulation_Recordings(Triangulation):
         recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
         self._check_output_directory(output_directory=output_directory)
+        self.normalised_dataframe = False
 
         recording_config_dict, project_config_dict = self._get_metadata_from_configs(
             recording_config_filepath=recording_config_filepath,
@@ -847,6 +838,7 @@ class Triangulation_Recordings(Triangulation):
         self.synchronization_individuals = []
         self.led_detection_individuals = []
         self.synchronized_videos = {}
+        self.markers_excluded_manually = False
 
         for video_interface in self.video_interfaces.values():
             if (
@@ -876,15 +868,7 @@ class Triangulation_Recordings(Triangulation):
                 video_interface.video_metadata.cam_id
             ] = video_interface.synchronized_video_filepath
 
-        template = list(self.video_interfaces.values())[
-            0
-        ].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
-            fps=self.target_fps
-        )[
-            0
-        ][
-            0
-        ]
+        template = list(self.video_interfaces.values())[0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(fps=self.target_fps)[0][0]
 
         led_timeseries_crossvalidation = {}
         for video_interface in self.video_interfaces.values():
@@ -928,14 +912,9 @@ class Triangulation_Recordings(Triangulation):
         except IndexError:
             pass
 
-    def _create_csv_filepath(self, flag: Optional[str]=None) -> None:
-        if flag == None:
-            filepath_out = self.output_directory.joinpath(
-                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps.csv"
-            )
-        else:
-            filepath_out = self.output_directory.joinpath(
-                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps_{flag}.csv"
+    def _create_csv_filepath(self) -> None:
+        filepath_out = self.output_directory.joinpath(
+                f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}.csv"
             )
         return filepath_out
 
@@ -1019,7 +998,8 @@ class Triangulation_Recordings(Triangulation):
         for marker in config['ReferenceRotationMarkers']:
             rotated_markers.append(get_3D_array(rotated, marker, best_frame))
         
-        self.rotated_filepath = self._create_csv_filepath(flag="rotated")
+        self.normalised_dataframe = True
+        self.rotated_filepath = self._create_csv_filepath()
         self._save_dataframe_as_csv(filepath = self.rotated_filepath, df = rotated)
         Rotation_Visualization(rotated_markers = rotated_markers, config = config, filepath = self.rotated_filepath, rotation_error = self.rotation_error)
         
@@ -1130,6 +1110,7 @@ class Calibration_Validation(Triangulation):
                 print(f"Creating empty .h5 file for {camera}!")
 
     def get_marker_predictions(self) -> None:
+        self.markers_excluded_manually = False
         self.csv_output_filepath = self._create_csv_filepath()
         self.triangulation_dlc_cams_filepaths = {}
         for cam in self.metadata_from_videos.values():
@@ -1215,5 +1196,5 @@ class Calibration_Validation(Triangulation):
             )
 
     def _create_csv_filepath(self) -> None:
-        filepath_out = self.output_directory.joinpath(f"{self.recording_date}_{self.target_fps}fps.csv")
+        filepath_out = self.output_directory.joinpath(f"{self.recording_date}_{self.target_fps}fps_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}.csv")
         return filepath_out
