@@ -347,13 +347,13 @@ class meta_interface(ABC):
                 recording_day['calibrations']['calibration_key']
             ].exclude_markers(all_markers_to_exclude_config_path=all_markers_to_exclude_config_path, verbose=verbose)
         
-    def normalize_recordings(self, normalization_config_path: Path)->None:
+    def normalize_recordings(self, normalization_config_path: Path, test_mode: bool = False)->None:
         normalization_config_path = convert_to_path(normalization_config_path)
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 self.objects["triangulation_recordings_objects"][
                     recording
-                ].normalize(normalization_config_path=normalization_config_path)
+                ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode)
                 recording_day["recordings"][recording]["normalised_3D_csv"] = self.objects["triangulation_recordings_objects"][recording].rotated_filepath
                 recording_day["recordings"][recording]["normalisation_rotation_error"] = self.objects["triangulation_recordings_objects"][recording].rotation_error
         self.meta["meta_step"] = 8

@@ -86,6 +86,8 @@ use_gpu: ""
 intrinsic_calibration_directory: test_data/intrinsic_calibrations/
 # load calibration=True means, that you use previously recorded checkerboard calibrations to set the intrinsics of the cameras instead of calibrating on charuco videos (which is currently not possible)
 load_calibration: True
+# triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False 
+triangulation_type: triangulate
 
 # repeat, default, manual, error
 handle_synchro_fails: manual
