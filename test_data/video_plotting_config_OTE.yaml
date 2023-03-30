@@ -1,0 +1,293 @@
+start_s: 1
+end_s: 20
+
+body_marker_size: 5
+body_marker_color: blue
+body_marker_alpha: 1
+body_label_size: 1
+body_label_color: black
+body_label_alpha: 0.2
+2D_likelihood_threshold: 0.6
+
+markers_to_exclude:
+- LED5
+- M_
+- center_
+- fnum
+- Unnamed
+
+markers_to_connect:
+- 
+   markers:
+     - Snout
+     - EarRight
+     - EarLeft
+   color: red
+   alpha: 1
+-
+   markers:
+     - TailBase
+     - TailQuarterAnt
+     - TaiMiddle
+     - TailQuarterPost
+     - TailEnd
+   color: red
+   alpha: 1
+
+markers_to_fill:
+- 
+   markers:
+    - MCL
+    - MCR
+    - MOR
+    - MOL
+   color: grey
+   alpha: 0.2
+- 
+  markers:
+   - MCL
+   - WallTopLeft
+   - WallTopRight
+   - MCR
+  color: white
+  alpha: 1
+- 
+  markers:
+   - MCL
+   - WallTopLeft
+   - WallLeft1
+   - WallLeft2
+   - WallLeft3
+   - WallLeft4
+   - WallLeft5
+   - WallLeft6
+   - WallLeft7
+   - WallEndLeft
+  color: red
+  alpha: 0.4
+- 
+  markers:
+   - MCR
+   - WallTopRight
+   - WallRight1
+   - WallRight2
+   - WallRight3
+   - WallRight4
+   - WallRight5
+   - WallRight6
+   - WallRight7
+   - WallEndRight
+  color: red
+  alpha: 0.4
+
+   
+additional_markers_to_plot:
+- 
+  name: MCL
+  x: 0
+  y: 0
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+-
+  name: MCR
+  x: 0
+  y: 5
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+-
+  name: MOL
+  x: 50
+  y: 0
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: MOR
+  x: 50
+  y: 5
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: min
+  x: -5
+  y: -5
+  z: -5
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: max_x
+  x: 55
+  y: -5
+  z: -5
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: max_z
+  x: -5
+  y: -5
+  z: 55
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: max_y
+  x: -5
+  y: 55
+  z: -5
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallTopLeft
+  x: 0
+  y: 0
+  z: 30
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallTopRight
+  x: 0
+  y: 5
+  z: 30
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallEndLeft
+  x: 35
+  y: 0
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallEndRight
+  x: 35
+  y: 5
+  z: 0
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight1
+  x: 5
+  y: 5
+  z: 18.45
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight2
+  x: 10
+  y: 5
+  z: 11.35
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight3
+  x: 15
+  y: 5
+  z: 6.98
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight4
+  x: 20
+  y: 5
+  z: 4.3
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight5
+  x: 25
+  y: 5
+  z: 2.64
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight6
+  x: 30
+  y: 5
+  z: 1.63
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallRight7
+  x: 35
+  y: 5
+  z: 1
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft1
+  x: 5
+  y: 0
+  z: 18.45
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft2
+  x: 10
+  y: 0
+  z: 11.35
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft3
+  x: 15
+  y: 0
+  z: 6.98
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft4
+  x: 20
+  y: 0
+  z: 4.3
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft5
+  x: 25
+  y: 0
+  z: 2.64
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft6
+  x: 30
+  y: 0
+  z: 1.63
+  alpha: 0
+  size: 1
+  color: red
+- 
+  name: WallLeft7
+  x: 35
+  y: 0
+  z: 1
+  alpha: 0
+  size: 1
+  color: red
+  
