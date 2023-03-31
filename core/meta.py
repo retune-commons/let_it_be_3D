@@ -6,14 +6,13 @@ import time
 import yaml
 from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
-import imageio as iio
 import pandas as pd
 
-from .utils import convert_to_path, create_calibration_key, check_keys, read_config
+from .utils import convert_to_path, check_keys, read_config
 from .triangulation_calibration_module import (
     Calibration,
-    Calibration_Validation,
-    Triangulation_Recordings,
+    CalibrationValidation,
+    TriangulationRecordings,
 )
 from .video_metadata import VideoMetadata
 
@@ -118,14 +117,15 @@ class meta_interface(ABC):
             for recording in self.meta["recording_days"][recording_day][
                 "recording_directories"
             ]:
-                triangulation_recordings_object = Triangulation_Recordings(
-                    recording_directory=Path(recording),
+                triangulation_recordings_object = TriangulationRecordings(
+                    directory=Path(recording),
                     recording_config_filepath=self.meta["recording_days"][
                         recording_day
                     ]["recording_config_filepath"],
                     project_config_filepath=self.meta["project_config_filepath"],
                     output_directory=recording,
                     test_mode=test_mode,
+                    videometadata_tag="recording",
                 )
                 individual_key = f"{triangulation_recordings_object.mouse_id}_{triangulation_recordings_object.recording_date}_{triangulation_recordings_object.paradigm}"
                 videos = {
@@ -237,13 +237,14 @@ class meta_interface(ABC):
             ] = calibration_object.led_pattern
             recording_day["calibrations"]["videos"] = video_dict
 
-            calibration_validation_object = Calibration_Validation(
+            calibration_validation_object = CalibrationValidation(
                 calibration_validation_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
                 ground_truth_config_filepath=ground_truth_config_filepath,
                 test_mode=test_mode,
+                videometadata_tag="calvin",
             )
             self.objects["calibration_validation_objects"][
                 unique_calibration_key
@@ -284,7 +285,7 @@ class meta_interface(ABC):
                         "calibration_validation_marker_detection_filepath"
                     ] = str(
                         self.objects["calibration_validation_objects"][
-                            calibration
+                            recording_day["calibrations"]["calibration_key"]
                         ].triangulation_dlc_cams_filepaths[video]
                     )
                 except:
@@ -321,7 +322,6 @@ class meta_interface(ABC):
                     recording
                 ].run_triangulation(
                     calibration_toml_filepath=toml_filepath,
-                    save_first_frame=True,
                     test_mode=test_mode,
                 )
                 recording_day["recordings"][recording]["3D_csv"] = str(
@@ -485,20 +485,20 @@ class meta_interface(ABC):
     def _read_project_config(self) -> None:
         project_config = read_config(self.project_config_filepath)
         missing_keys = check_keys(project_config, ["paradigms"])
-        if len(missing_keys) > 0:
+        if missing_keys:
             raise KeyError(
-                f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
+                f"Missing metadata information in the project_config_file {self.project_config_filepath} for {missing_keys}."
             )
         self.paradigms = project_config["paradigms"]
 
-    def _read_recording_config(self, recording_config_filepath: Path) -> str:
+    def _read_recording_config(self, recording_config_filepath: Path) -> Tuple[str, str]:
         recording_config = read_config(recording_config_filepath)
         missing_keys = check_keys(
             recording_config, ["recording_date", "calibration_index"]
         )
-        if len(missing_keys) > 0:
+        if missing_keys:
             raise KeyError(
-                f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
+                f"Missing metadata information in the recording_config_file {recording_config_filepath} for {missing_keys}."
             )
         recording_date = str(recording_config["recording_date"])
         if recording_date not in self.recording_dates:
@@ -522,7 +522,7 @@ class meta_interface(ABC):
         return dictionary
 
     def _create_standard_yaml_filepath(self, project_name: str, overwrite: bool):
-        if project_name == None:
+        if project_name is None:
             project_name = "My_project"
         self.project_name = project_name
         self.standard_yaml_filepath = self.project_config_filepath.parent.joinpath(

@@ -5,7 +5,6 @@ import math
 
 import matplotlib.pyplot as plt
 from moviepy.video.io.bindings import mplfig_to_npimage
-from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Polygon
 import mpl_toolkits.mplot3d.art3d as art3d
 import numpy as np
@@ -34,107 +33,113 @@ class Plotting(ABC):
     def _zscore(self, array: np.ndarray) -> np.ndarray:
         return (array - np.mean(array)) / np.std(array, ddof=0)
 
-class Rotation_Visualization(Plotting):
+
+class RotationVisualization(Plotting):
     def __init__(
-        self,
-        rotated_markers: List,
-        config: Dict,
-        filepath: Path,
-        rotation_error: float,
-        plot: bool = False,
-        save: bool = True):
+            self,
+            rotated_markers: List,
+            config: Dict,
+            filepath: Path,
+            rotation_error: float,
+            plot: bool = False,
+            save: bool = True):
         self.rotated_markers = rotated_markers
         self.config = config
         self.rotation_error = rotation_error
-        self.filepath=self._create_filepath(filepath=filepath)
+        self.filepath = self._create_filepath(filepath=filepath)
         self._create_plot(plot=plot, save=save)
-    
-    def _create_plot(self, plot: bool, save: bool)->None:
+
+    def _create_plot(self, plot: bool, save: bool) -> None:
         # plots the 4 rotated corners (yellow) compared to the reference space (blue)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         for elem in self.rotated_markers:
-            ax.scatter(elem[0], elem[1], elem[2], color = 'orange', alpha=0.5)
+            ax.scatter(elem[0], elem[1], elem[2], color='orange', alpha=0.5)
 
         for elem in self.config["ReferenceRotationCoords"]:
-            ax.scatter(elem[0], elem[1], elem[2], color = 'blue', alpha=0.5)
+            ax.scatter(elem[0], elem[1], elem[2], color='blue', alpha=0.5)
 
         x = [point[0] for point in self.rotated_markers]
         y = [point[1] for point in self.rotated_markers]
         z = [point[2] for point in self.rotated_markers]
         ax.plot(x, y, z, c="blue")
 
-        ax.scatter(self.config["InvisibleMarkers"]["x"], self.config["InvisibleMarkers"]["y"], self.config["InvisibleMarkers"]["z"], alpha = 0)
-        
+        ax.scatter(self.config["InvisibleMarkers"]["x"], self.config["InvisibleMarkers"]["y"],
+                   self.config["InvisibleMarkers"]["z"], alpha=0)
+
         fig.suptitle(f"Rotation Error: {self.rotation_error}")
-        
+
         if save:
             self._save(filepath=self.filepath)
         if plot:
             plt.show()
         plt.close()
-    
+
     def plot(self) -> None:
         self._create_plot(plot=True, save=False)
-        
+
     def _create_filepath(self, filepath):
         return Path(filepath.parent.joinpath(filepath.stem + ".png"))
-    
-    
+
+
 class Plot3D(Plotting):
     def _create_filepath(self) -> str:
         filename = f"3D_plot_{self.filename_tag}"
         filepath = self.output_directory.joinpath(filename)
         return str(filepath)
 
-class Triangulation_Visualization(Plot3D):
+
+class TriangulationVisualization(Plot3D):
     def __init__(
-        self,
-        df_filepath: Path, 
-        output_directory: Path, 
-        config: Dict,
-        plot: bool = False,
-        save: bool = True,
-        idx: int = 0
+            self,
+            df_filepath: Path,
+            output_directory: Path,
+            config: Dict,
+            plot: bool = False,
+            save: bool = True,
+            idx: int = 0
     ) -> None:
         self.df_3D = pd.read_csv(df_filepath)
         self.idx = idx
         self.config = config
         self.filename_tag = ""
         self.output_directory = output_directory
-        self.bodyparts = list(set(key.split('_')[0] for key in self.df_3D.keys() if not any([label in key for label in self.config["markers_to_exclude"]])))
-        
+        self.bodyparts = list(set(key.split('_')[0] for key in self.df_3D.keys() if
+                                  not any([label in key for label in self.config["markers_to_exclude"]])))
+
         self.filepath = self._create_filepath()
 
         self._create_plot(plot=plot, save=save)
 
-    def _create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> None:
+    def _create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> Optional[np.ndarray]:
         fig = plt.figure(figsize=(15, 15))
         fig.clf()
         ax_3d = fig.add_subplot(111, projection='3d')
-            
+
         all_markers = {marker['name']: marker for marker in self.config["additional_markers_to_plot"]}
         for bodypart in self.bodyparts:
-                x, y, z = get_3D_df_keys(bodypart)
-                if not math.isnan(self.df_3D.loc[self.idx, x]):
-                    all_markers[bodypart] = {'name': bodypart, 
-                                        'x': self.df_3D.loc[self.idx, x], 
-                                        'y': self.df_3D.loc[self.idx, y], 
-                                        'z': self.df_3D.loc[self.idx, z],
-                                        'alpha': self.config["body_marker_alpha"],
-                                        'color': self.config["body_marker_color"],
-                                        'size': self.config["body_marker_size"]}
+            x, y, z = get_3D_df_keys(bodypart)
+            if not math.isnan(self.df_3D.loc[self.idx, x]):
+                all_markers[bodypart] = {'name': bodypart,
+                                         'x': self.df_3D.loc[self.idx, x],
+                                         'y': self.df_3D.loc[self.idx, y],
+                                         'z': self.df_3D.loc[self.idx, z],
+                                         'alpha': self.config["body_marker_alpha"],
+                                         'color': self.config["body_marker_color"],
+                                         'size': self.config["body_marker_size"]}
 
         for marker in all_markers.values():
-            ax_3d.text(marker['x'], marker['y'], marker['z'], marker['name'], size = self.config["body_label_size"], alpha = self.config["body_label_alpha"], c = self.config["body_label_color"])
-            ax_3d.scatter(marker['x'], marker['y'], marker['z'], s=marker['size'], alpha =marker['alpha'], c = marker['color'])
-            
+            ax_3d.text(marker['x'], marker['y'], marker['z'], marker['name'], size=self.config["body_label_size"],
+                       alpha=self.config["body_label_alpha"], c=self.config["body_label_color"])
+            ax_3d.scatter(marker['x'], marker['y'], marker['z'], s=marker['size'], alpha=marker['alpha'],
+                          c=marker['color'])
+
         for group in self.config['markers_to_connect']:
-            self._connect_one_set_of_markers(ax = ax_3d, all_markers=all_markers, group=group)
-        
+            self._connect_one_set_of_markers(ax=ax_3d, all_markers=all_markers, group=group)
+
         for group in self.config["markers_to_fill"]:
-            self._fill_one_set_of_markers(ax = ax_3d, all_markers=all_markers, group=group)
-                
+            self._fill_one_set_of_markers(ax=ax_3d, all_markers=all_markers, group=group)
+
         if return_fig:
             npimage = mplfig_to_npimage(fig)
             plt.close()
@@ -146,22 +151,22 @@ class Triangulation_Visualization(Plot3D):
         plt.close()
 
     def _connect_one_set_of_markers(
-        self,
-        ax: plt.Figure,
-        all_markers: Dict,
-        group: Dict
+            self,
+            ax: plt.Figure,
+            all_markers: Dict,
+            group: Dict
     ) -> None:
         if all(x in list(all_markers.keys()) for x in group['markers']):
             x = [all_markers[marker]['x'] for marker in group['markers']]
             y = [all_markers[marker]['y'] for marker in group['markers']]
             z = [all_markers[marker]['z'] for marker in group['markers']]
-            ax.plot(x, y, z, alpha = group['alpha'], c = group['color'])
-        
+            ax.plot(x, y, z, alpha=group['alpha'], c=group['color'])
+
     def _fill_one_set_of_markers(
-        self, 
-        ax: plt.Figure, 
-        all_markers: Dict, 
-        group: Dict
+            self,
+            ax: plt.Figure,
+            all_markers: Dict,
+            group: Dict
     ) -> None:
         if all(x in list(all_markers.keys()) for x in group['markers']):
             points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
@@ -169,24 +174,23 @@ class Triangulation_Visualization(Plot3D):
             artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
             ax.add_patch(artist)
             art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
-    
-        
+
     def plot(self) -> None:
         self._create_plot(plot=True, save=False)
 
-    def return_fig(self) -> None:
+    def return_fig(self) -> np.ndarray:
         return self._create_plot(plot=False, save=False, return_fig=True)
 
 
-class Calibration_Validation_Plot(Plot3D):
+class CalibrationValidationPlot(Plot3D):
     def __init__(
-        self,
-        p3d: Dict,
-        bodyparts: List[str],
-        output_directory: Path,
-        marker_ids_to_connect: List[str] = [],
-        plot: bool = False,
-        save: bool = True,
+            self,
+            p3d: Dict,
+            bodyparts: List[str],
+            output_directory: Path,
+            marker_ids_to_connect: List[str] = [],
+            plot: bool = False,
+            save: bool = True,
     ) -> None:
         self.p3d = p3d
         self.bodyparts = bodyparts
@@ -226,11 +230,11 @@ class Calibration_Validation_Plot(Plot3D):
         self._create_plot(plot=True, save=False)
 
     def _connect_all_marker_ids(
-        self,
-        ax: plt.Figure,
-        points: np.ndarray,
-        scheme: List[Tuple[str]],
-        bodyparts: List[str],
+            self,
+            ax: plt.Figure,
+            points: np.ndarray,
+            scheme: List[Tuple[str]],
+            bodyparts: List[str],
     ) -> List[plt.Figure]:
         # ToDo: correct type hints
         cmap = plt.get_cmap("tab10")
@@ -244,27 +248,27 @@ class Calibration_Validation_Plot(Plot3D):
         return lines  # return neccessary?
 
     def _connect_one_set_of_marker_ids(
-        self,
-        ax: plt.Figure,
-        points: np.ndarray,
-        bps: List[str],
-        bp_dict: Dict,
-        color: np.ndarray,
+            self,
+            ax: plt.Figure,
+            points: np.ndarray,
+            bps: List[str],
+            bp_dict: Dict,
+            color: np.ndarray,
     ) -> plt.Figure:
         # ToDo: correct type hints
         ixs = [bp_dict[bp] for bp in bps]
         return ax.plot(points[ixs, 0], points[ixs, 1], points[ixs, 2], color=color)
 
 
-class Predictions_Plot(Plotting):
+class PredictionsPlot(Plotting):
     def __init__(
-        self,
-        image: Path,
-        predictions: Path,
-        cam_id: str,
-        plot: bool = False,
-        save: bool = True,
-        output_directory: Optional[Path] = None,
+            self,
+            image: Path,
+            predictions: Path,
+            cam_id: str,
+            plot: bool = False,
+            save: bool = True,
+            output_directory: Optional[Path] = None,
     ) -> None:
         self.predictions = predictions
         self.image = image
@@ -304,17 +308,17 @@ class Predictions_Plot(Plotting):
         self._create_plot(plot=True, save=False)
 
 
-class Alignment_Plot_Individual(Plotting):
+class AlignmentPlotIndividual(Plotting):
     def __init__(
-        self,
-        template: np.ndarray,
-        led_timeseries: np.ndarray,
-        video_metadata: VideoMetadata,
-        output_directory: Path,
-        led_box_size: int,
-        alignment_error: int,
-        plot: bool = False,
-        save: bool = True,
+            self,
+            template: np.ndarray,
+            led_timeseries: np.ndarray,
+            video_metadata: VideoMetadata,
+            output_directory: Path,
+            led_box_size: int,
+            alignment_error: int,
+            plot: bool = False,
+            save: bool = True,
     ) -> None:
         self.template = template
         self.led_timeseries = led_timeseries
@@ -357,15 +361,15 @@ class Alignment_Plot_Individual(Plotting):
         plt.close()
 
 
-class Alignment_Plot_Crossvalidation(Plotting):
+class AlignmentPlotCrossvalidation(Plotting):
     def __init__(
-        self,
-        template: np.ndarray,
-        led_timeseries: Dict,
-        metadata: Dict,
-        output_directory: Path,
-        plot: bool = False,
-        save: bool = True,
+            self,
+            template: np.ndarray,
+            led_timeseries: Dict,
+            metadata: Dict,
+            output_directory: Path,
+            plot: bool = False,
+            save: bool = True,
     ):
         self.template = template
         self.led_timeseries = led_timeseries
@@ -400,16 +404,16 @@ class Alignment_Plot_Crossvalidation(Plotting):
         plt.close()
 
 
-class LED_Marker_Plot(Plotting):
+class LEDMarkerPlot(Plotting):
     def __init__(
-        self,
-        image: np.ndarray,
-        led_center_coordinates: Coordinates,
-        box_size: int,
-        video_metadata: VideoMetadata,
-        output_directory: Path,
-        plot: bool = False,
-        save: bool = True,
+            self,
+            image: np.ndarray,
+            led_center_coordinates: Coordinates,
+            box_size: int,
+            video_metadata: VideoMetadata,
+            output_directory: Path,
+            plot: bool = False,
+            save: bool = True,
     ) -> None:
         self.image = image
         self.led_center_coordinates = led_center_coordinates
@@ -437,11 +441,11 @@ class LED_Marker_Plot(Plotting):
 
         x_start_index = self.led_center_coordinates.x - (self.box_size // 2)
         x_end_index = self.led_center_coordinates.x + (
-            self.box_size - (self.box_size // 2)
+                self.box_size - (self.box_size // 2)
         )
         y_start_index = self.led_center_coordinates.y - (self.box_size // 2)
         y_end_index = self.led_center_coordinates.y + (
-            self.box_size - (self.box_size // 2)
+                self.box_size - (self.box_size // 2)
         )
         plt.plot(
             [x_start_index, x_start_index, x_end_index, x_end_index, x_start_index],
@@ -460,11 +464,11 @@ class LED_Marker_Plot(Plotting):
 
 class Intrinsics(Plotting):
     def __init__(
-        self,
-        video_metadata: VideoMetadata,
-        output_dir: Path = "",
-        plot: bool = False,
-        save: bool = True,
+            self,
+            video_metadata: VideoMetadata,
+            output_dir: Path = "",
+            plot: bool = False,
+            save: bool = True,
     ) -> None:
         self.video_metadata = video_metadata
         self._create_all_images(frame_idx=0)

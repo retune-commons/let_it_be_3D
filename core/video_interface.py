@@ -1,16 +1,9 @@
-from typing import List, Tuple, Optional, Union, Dict
-from abc import ABC, abstractmethod
-import datetime
+from typing import List, Tuple, Optional, Union, Dict, Type
 from pathlib import Path
 
-import pickle
-import imageio.v3 as iio
-import numpy as np
 import aniposelib as ap_lib
-import cv2
-import matplotlib.pyplot as plt
 
-from .video_synchronization import Synchronizer
+from .video_synchronization import Synchronizer, RecordingVideoUpSynchronizer, RecordingVideoDownSynchronizer, CharucoVideoSynchronizer
 from .video_metadata import VideoMetadata
 from .plotting import Intrinsics
 
@@ -29,7 +22,7 @@ class VideoInterface:
 
     def run_synchronizer(
         self,
-        synchronizer: Synchronizer,
+        synchronizer: Type,
         rapid_aligner_path: Path,
         output_directory: Path,
         use_gpu: str,
@@ -55,12 +48,12 @@ class VideoInterface:
         if not self.video_metadata.charuco_video:
             return self.marker_detection_filepath
         else:
-            return self._export_as_aniposelib_Camera_object()
+            return self._export_as_aniposelib_camera_object()
 
     def inspect_intrinsic_calibration(self) -> None:
-        self.plot_camera_intrinsics.plot(plot=True, save=False)
+        self.plot_camera_intrinsics.plot()
 
-    def _export_as_aniposelib_Camera_object(self):
+    def _export_as_aniposelib_camera_object(self):
         if self.video_metadata.fisheye:
             camera = ap_lib.cameras.FisheyeCamera(
                 name=self.video_metadata.cam_id,

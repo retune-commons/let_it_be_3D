@@ -1,15 +1,15 @@
-from typing import List, Tuple, Dict, Union, Optional
 from pathlib import Path
+from tkinter import Tk
+from tkinter.filedialog import askopenfilenames
+from typing import Tuple
 
 import yaml
-import matplotlib.pyplot as plt
-import imageio.v3 as iio
 
 from .utils import convert_to_path, create_calibration_key
-from .checker_objects import Check_Recording, Check_Calibration, Check_Calibration_Validation
+from .checker_objects import CheckRecording, CheckCalibration, CheckCalibrationValidation
 
 
-class filename_checker_interface:
+class FilenameCheckerInterface:
     def __init__(self, project_config_filepath: Path) -> None:
         self.project_config_filepath = convert_to_path(project_config_filepath)
         if not self.project_config_filepath.exists():
@@ -72,7 +72,7 @@ class filename_checker_interface:
                 )
         self.paradigms = project_config["paradigms"]
 
-    def _read_recording_config(self, recording_config_filepath: Path) -> str:
+    def _read_recording_config(self, recording_config_filepath: Path) -> Tuple[str, str]:
         if recording_config_filepath.exists():
             with open(recording_config_filepath, "r") as ymlfile:
                 recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
@@ -129,7 +129,7 @@ class filename_checker_interface:
             for recording in self.meta["recording_days"][recording_day][
                 "recording_directories"
             ]:
-                check_recordings_object = Check_Recording(
+                check_recordings_object = CheckRecording(
                     recording_directory=Path(recording),
                     recording_config_filepath=self.meta["recording_days"][
                         recording_day
@@ -149,7 +149,7 @@ class filename_checker_interface:
         for recording_day in self.meta["recording_days"].values():
             recording_day["calibrations"]["calibration_keys"] = {}
 
-            calibration_object = Check_Calibration(
+            calibration_object = CheckCalibration(
                 calibration_directory=recording_day["calibration_directory"],
                 project_config_filepath=self.project_config_filepath,
                 recording_config_filepath=recording_day["recording_config_filepath"],
@@ -164,7 +164,7 @@ class filename_checker_interface:
 
             self.objects["calibration_objects"][all_cams_key] = calibration_object
 
-            calibration_validation_object = Check_Calibration_Validation(
+            calibration_validation_object = CheckCalibrationValidation(
                 calibration_validation_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,

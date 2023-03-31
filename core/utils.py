@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 import yaml
 
 
-def get_3D_df_keys(key: str)->Tuple[str]:
+def get_3D_df_keys(key: str)-> Tuple[str, str, str]:
         return key + "_x", key + "_y", key + "_z"
 
 def get_3D_array(df: pd.DataFrame, key: str, index: Optional[int]=None)->np.array:
     x, y, z = get_3D_df_keys(key)
-    if index==None:
+    if index is None:
         return np.array([df[x], df[y], df[z]])
     else:
         return np.array([df[x][index], df[y][index], df[z][index]])
@@ -27,6 +27,19 @@ def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
             missing_keys.append(key)
     return missing_keys
 
+def get_subsets_of_two_lists(list1, list2)->Tuple[List, List, List, List]:
+    individual_elems, duplicate_elems, missing_elems_in_list1, missing_elems_in_list2 = [], [], [], []
+    for elem in list1:
+        if elem not in list2:
+            missing_elems_in_list2.append(elem)
+        if elem not in individual_elems:
+            individual_elems.append(elem)
+        else:
+            duplicate_elems.append(elem)
+    for elem in list2:
+        if elem not in list1:
+            missing_elems_in_list1.append(elem)
+    return individual_elems, duplicate_elems, missing_elems_in_list1, missing_elems_in_list2
 
 def read_config(path: Path) -> Dict:
     """
@@ -117,8 +130,8 @@ def create_calibration_key(
     videos.sort()
     for elem in videos:
         key = key + "_" + elem
-    if iteration==None:
-        calibration_key =  recording_date + "_" + str(calibration_index) + key
+    if iteration is None:
+        calibration_key = recording_date + "_" + str(calibration_index) + key
     else:
-        calibration_key =  recording_date + "_" + str(calibration_index) + key + "_" + str(iteration)
+        calibration_key = recording_date + "_" + str(calibration_index) + key + "_" + str(iteration)
     return calibration_key

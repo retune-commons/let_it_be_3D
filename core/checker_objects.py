@@ -1,5 +1,4 @@
 from typing import List, Tuple, Dict, Union, Optional
-import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -24,7 +23,7 @@ class Check(ABC):
 
     def _get_metadata_from_configs(
         self, recording_config_filepath: Path, project_config_filepath: Path
-    ) -> Tuple[Dict]:
+    ) -> Tuple[dict, dict]:
         project_config_dict = read_config(path=project_config_filepath)
         recording_config_dict = read_config(path=recording_config_filepath)
         keys_to_check_project = [
@@ -135,7 +134,7 @@ class Check(ABC):
                 pass
 
 
-class Check_Calibration(Check):
+class CheckCalibration(Check):
     def __init__(
         self,
         calibration_directory: Path,
@@ -238,7 +237,7 @@ class Check_Calibration(Check):
         self.recording_date = list(recording_dates)[0]
 
 
-class Check_Recording(Check):
+class CheckRecording(Check):
     def __init__(
         self,
         recording_directory: Path,
@@ -348,7 +347,7 @@ class Check_Recording(Check):
         self.mouse_id = list(mouse_ids)[0]
 
 
-class Check_Calibration_Validation(Check):
+class CheckCalibrationValidation(Check):
     def __init__(
         self,
         calibration_validation_directory: Path,

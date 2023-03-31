@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Union, Optional, OrderedDict
+from typing import List, Tuple, Dict, Union, Optional, OrderedDict, Any
 import math
 import itertools as it
 
@@ -131,7 +131,7 @@ def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Di
 
 def _compute_differences_between_triangulated_and_gt_distances(
     triangulated_distances: Dict, gt_distances: Dict
-) -> List[Tuple[str, str, float]]:
+) -> List[Tuple[Any, Any, Any, Any]]:
     marker_ids_with_distance_error = []
     for marker_id_a in triangulated_distances.keys():
         for marker_id_b in triangulated_distances[marker_id_a].keys():
@@ -241,8 +241,8 @@ def _computes_angles(angles_to_compute, anipose_io) -> Dict[str, float]:
 def _set_angles_to_plane(angles_to_compute, anipose_io):
     """
     Sets the angles between the screws and the plane
-    :param self:
-    :param angles_dict:
+    :param angles_to_compute:
+    :param anipose_io:
     :return:
     """
     anipose_io["angles_to_plane"] = _computes_angles(angles_to_compute, anipose_io)
@@ -252,8 +252,6 @@ def _set_angles_to_plane(angles_to_compute, anipose_io):
 def set_angles_error_between_screws_and_plane(gt_angles, anipose_io):
     """
     Sets the angles between the screws and the plane
-    :param self:
-    :param angles_dict:
     :return:
     """
     anipose_io[

@@ -5,10 +5,8 @@ import sys
 import io
 import warnings
 
-import yaml
 import imageio.v3 as iio
 import matplotlib.pyplot as plt
-import pandas as pd
 
 
 from .utils import (
@@ -21,19 +19,19 @@ from .utils import (
 class MarkerDetection(ABC):
     def __init__(
         self,
-        object_to_analyse: Path,
-        output_directory: Path,
-        marker_detection_directory: Optional[Path] = None,
-    ):
+            object_to_analyse: Path,
+            output_directory: Path,
+            marker_detection_directory: Optional[Path] = None,
+    ) -> None:
         self.object_to_analyse = convert_to_path(object_to_analyse)
         self.output_directory = convert_to_path(output_directory)
-        if type(marker_detection_directory) != None:
+        if type(marker_detection_directory) is not None:
             self.marker_detection_directory = convert_to_path(
                 marker_detection_directory
             )
 
     @abstractmethod
-    def analyze_objects():
+    def analyze_objects(self):
         pass
 
 
@@ -105,7 +103,7 @@ class ManualAnnotation(MarkerDetection):
         labels: Optional[List[str]] = None,
         only_first_frame: bool = False,
     ) -> Path:
-        if labels == None:
+        if labels is None:
             list_of_labels = read_config(self.marker_detection_directory)
         else:
             list_of_labels = labels

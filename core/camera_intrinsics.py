@@ -4,8 +4,9 @@ from typing import List, Tuple, Optional, Union, Dict
 import imageio as iio
 import cv2
 import numpy as np
-import pickle
 from pathlib import Path
+
+from numpy import ndarray
 
 
 class IntrinsicCameraCalibrator(ABC):
@@ -224,7 +225,7 @@ class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator):
 class IntrinsicCalibratorFisheyeCamera(IntrinsicCameraCalibratorCheckerboard):
     def _compute_rvecs_and_tvecs(
         self, n_detected_boards: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[List[ndarray], List[ndarray]]:
         rvecs = [
             np.zeros((1, 1, 3), dtype=np.float64) for i in range(n_detected_boards)
         ]
