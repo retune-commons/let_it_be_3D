@@ -119,13 +119,10 @@ class meta_interface(ABC):
             ]:
                 triangulation_recordings_object = TriangulationRecordings(
                     directory=Path(recording),
-                    recording_config_filepath=self.meta["recording_days"][
-                        recording_day
-                    ]["recording_config_filepath"],
-                    project_config_filepath=self.meta["project_config_filepath"],
+                    recording_config_filepath=self.meta["recording_days"][recording_day]["recording_config_filepath"],
+                    project_config_filepath=Path(self.meta["project_config_filepath"]),
                     output_directory=recording,
                     test_mode=test_mode,
-                    videometadata_tag="recording",
                 )
                 individual_key = f"{triangulation_recordings_object.mouse_id}_{triangulation_recordings_object.recording_date}_{triangulation_recordings_object.paradigm}"
                 videos = {
@@ -238,14 +235,13 @@ class meta_interface(ABC):
             recording_day["calibrations"]["videos"] = video_dict
 
             calibration_validation_object = CalibrationValidation(
-                calibration_validation_directory=recording_day["calibration_directory"],
+                directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
-                ground_truth_config_filepath=ground_truth_config_filepath,
                 test_mode=test_mode,
-                videometadata_tag="calvin",
             )
+            calibration_validation_object.add_ground_truth_config(ground_truth_config_filepath = ground_truth_config_filepath)
             self.objects["calibration_validation_objects"][
                 unique_calibration_key
             ] = calibration_validation_object

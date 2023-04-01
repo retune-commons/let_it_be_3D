@@ -14,7 +14,7 @@ import scipy
 
 from .marker_detection import DeeplabcutInterface, ManualAnnotation
 from .plotting import AlignmentPlotIndividual, LEDMarkerPlot
-from .utils import Coordinates
+from .utils import Coordinates, convert_to_path
 from .video_metadata import VideoMetadata
 
 
@@ -253,10 +253,6 @@ def _delete_individual_video_parts(filepaths_of_video_parts: List[Path]
 
 class Synchronizer(ABC):
     @property
-    def box_size(self) -> int:
-        return 15
-
-    @property
     def target_fps(self) -> int:
         return self.video_metadata.target_fps
 
@@ -282,23 +278,20 @@ class Synchronizer(ABC):
     def __init__(
             self,
             video_metadata: VideoMetadata,
-            rapid_aligner_path: Path,
             output_directory: Path,
             synchro_metadata: Dict,
-            use_gpu: str = "",
     ) -> None:
         self.led_timeseries_for_cross_video_validation = None
         self.led_detection = None
         self.led_timeseries = None
         self.template_blinking_motif = None
         self.video_metadata = video_metadata
-        if rapid_aligner_path.name != "":
-            self.use_rapid_aligner = True
-            self.rapid_aligner_path = rapid_aligner_path
-        else:
-            self.use_rapid_aligner = False
+        self.use_rapid_aligner = bool(synchro_metadata["rapid_aligner_path"])
+        if self.use_rapid_aligner:
+            self.rapid_aligner_path = convert_to_path(synchro_metadata["rapid_aligner_path"])
         self.output_directory = output_directory
-        self.use_gpu = use_gpu
+        self.use_gpu = synchro_metadata["use_gpu"]
+        self.led_box_size = synchro_metadata["led_box_size"]
         self.synchro_metadata = synchro_metadata
 
     def run_synchronization(
@@ -372,6 +365,7 @@ class Synchronizer(ABC):
                         "time": time,
                         "scorer": self.video_metadata.led_extraction_filepath,
                         "synchro_marker": self.synchro_metadata["synchro_marker"],
+                        "led_box_size": self.led_box_size,
                         "method": self.video_metadata.led_extraction_type,
                         "pattern": self.video_metadata.led_pattern}
         with open(filepath, "wb") as file:

@@ -34,6 +34,12 @@ from .utils import (
     get_3D_df_keys,
     get_3D_array,
     get_subsets_of_two_lists,
+    KEYS_TO_CHECK_PROJECT,
+    KEYS_TO_CHECK_RECORDING,
+    KEYS_TO_CHECK_CAMERA,
+    STANDARD_ATTRIBUTES_TRIANGULATION,
+    STANDARD_ATTRIBUTES_CALIBRATION,
+    SYNCHRO_METADATA_KEYS
 )
 from .angles_and_distances import (
     add_reprojection_errors_of_all_calibration_validation_markers,
@@ -46,76 +52,35 @@ from .angles_and_distances import (
 def _get_metadata_from_configs(recording_config_filepath: Path, project_config_filepath: Path) -> Tuple[dict, dict]:
     project_config_dict = read_config(path=project_config_filepath)
     recording_config_dict = read_config(path=recording_config_filepath)
-    keys_to_check_project = [
-        "valid_cam_IDs",
-        "paradigms",
-        "animal_lines",
-        "led_extraction_type",
-        "led_extraction_filepath",
-        "max_calibration_frames",
-        "max_cpu_cores_to_pool",
-        "max_ram_digestible_frames",
-        "rapid_aligner_path",
-        "use_gpu",
-        "load_calibration",
-        "calibration_tag",
-        "calibration_validation_tag",
-        "allowed_num_diverging_frames",
-        "handle_synchro_fails",
-        "default_offset_ms",
-        "start_pattern_match_ms",
-        "end_pattern_match_ms",
-        "synchro_error_threshold",
-        "synchro_marker",
-        "use_2D_filter",
-        "score_threshold",
-        'num_frames_to_pick',
-        'triangulation_type'
-    ]
 
-    missing_keys = check_keys(
-        dictionary=project_config_dict, list_of_keys=keys_to_check_project
+    missing_keys_project = check_keys(
+        dictionary=project_config_dict, list_of_keys=KEYS_TO_CHECK_PROJECT
     )
-    if missing_keys:
+    if missing_keys_project:
         raise KeyError(
-            f"Missing metadata information in the project_config_file {project_config_filepath} for {missing_keys}."
+            f"Missing metadata information in the project_config_file {project_config_filepath} for {missing_keys_project}."
+        )
+    missing_keys_recording = check_keys(
+        dictionary=recording_config_dict, list_of_keys=KEYS_TO_CHECK_RECORDING
+    )
+    if missing_keys_recording:
+        raise KeyError(
+            f"Missing information for {missing_keys_recording} in the config_file {recording_config_filepath}!"
         )
 
-    keys_to_check_recording = [
-        "led_pattern",
-        "target_fps",
-        "calibration_index",
-        "recording_date",
-    ]
-    missing_keys = check_keys(
-        dictionary=recording_config_dict, list_of_keys=keys_to_check_recording
-    )
-    if missing_keys:
-        raise KeyError(
-            f"Missing information for {missing_keys} in the config_file {recording_config_filepath}!"
-        )
-
-    for dictionary_key in [
-        "processing_type",
-        "calibration_evaluation_type",
-        "processing_filepath",
-        "calibration_evaluation_filepath",
-        "led_extraction_type",
-        "led_extraction_filepath",
-    ]:
-        missing_keys = check_keys(
+    for dictionary_key in KEYS_TO_CHECK_CAMERA:
+        cameras_with_missing_keys = check_keys(
             dictionary=project_config_dict[dictionary_key],
             list_of_keys=project_config_dict["valid_cam_IDs"],
         )
-        if missing_keys:
+        if cameras_with_missing_keys:
             raise KeyError(
-                f"Missing information {dictionary_key} for cam {missing_keys} in the config_file {project_config_filepath}!"
+                f"Missing information {dictionary_key} for cam {cameras_with_missing_keys} in the config_file {project_config_filepath}!"
             )
-
     return recording_config_dict, project_config_dict
 
-def _validate_and_save_metadata_for_recording(metadata_from_videos: Dict,
-                                              attributes_to_check: List[str]) -> \
+def _validate_metadata(metadata_from_videos: Dict,
+                       attributes_to_check: List[str]) -> \
         Tuple[Any, ...]:
     sets_of_attributes = []
     for attribute_to_check in attributes_to_check:
@@ -150,7 +115,7 @@ def exclude_by_framenum(metadata_from_videos: Dict, allowed_num_diverging_frames
     return videos_to_exclude
 
 
-def _make_output_directory(project_config_filepath: Path) -> Path:
+def _create_output_directory(project_config_filepath: Path) -> Path:
     unnamed_idx = 0
     for file in project_config_filepath.parent.iterdir():
         if str(file.name).startswith("unnamed_calibration_"):
@@ -168,11 +133,11 @@ def _make_output_directory(project_config_filepath: Path) -> Path:
 def _check_output_directory(project_config_filepath: Path, output_directory: Optional[Path] = None) -> Path:
     if output_directory is not None:
         if not output_directory.exists():
-            output_directory = _make_output_directory(
+            output_directory = _create_output_directory(
                 project_config_filepath=project_config_filepath
             )
     else:
-        output_directory = _make_output_directory(
+        output_directory = _create_output_directory(
             project_config_filepath=project_config_filepath
         )
     return output_directory
@@ -184,11 +149,12 @@ def _create_video_objects(
         project_config_dict: Dict,
         videometadata_tag: str,
         output_directory: Path,
+        filetypes: List[str],
         filename_tag: str = "",
         test_mode: bool = False,
 ) -> Tuple[Dict, Dict]:
     videofiles = [file for file in directory.iterdir() if filename_tag.lower() in file.name.lower()
-                  and "synchronized" not in file.name]
+                  and "synchronized" not in file.name and file.suffix in filetypes]
 
     video_interfaces = {}
     metadata_from_videos = {}
@@ -217,42 +183,24 @@ class Calibration():
             output_directory: Optional[Path] = None,
             test_mode: bool = False,
     ) -> None:
-        self.camera_group = None
-        self.report_filepath = None
-        self.reprojerr = None
-        self.valid_videos = None
-        self.synchronized_charuco_videofiles = {}
-        self.camera_objects = []
-        self.synchronization_individuals = []
-        self.led_detection_individuals = []
-        self.project_config_filepath = None
-        self.output_directory = None
+        for attribute in STANDARD_ATTRIBUTES_CALIBRATION:
+            setattr(self, attribute, None)
         self.calibration_directory = convert_to_path(calibration_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
         self.output_directory = _check_output_directory(output_directory=output_directory, project_config_filepath=project_config_filepath)
-
         recording_config_dict, project_config_dict = _get_metadata_from_configs(
             recording_config_filepath=recording_config_filepath,
             project_config_filepath=project_config_filepath,
         )
-        self.synchro_metadata = {key: project_config_dict[key] for key in
-                                 ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms",
-                                  "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker", "use_2D_filter",
-                                  'num_frames_to_pick']}
-        self.use_gpu = project_config_dict["use_gpu"]
-        self.rapid_aligner_path = convert_to_path(project_config_dict["rapid_aligner_path"])
-        self.valid_cam_ids = project_config_dict["valid_cam_IDs"]
-        self.recording_date = recording_config_dict["recording_date"]
-        self.led_pattern = recording_config_dict["led_pattern"]
-        self.calibration_index = recording_config_dict["calibration_index"]
-        self.target_fps = recording_config_dict["target_fps"]
-        self.calibration_tag = project_config_dict["calibration_tag"]
-        self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
-        self.score_threshold = project_config_dict["score_threshold"]
-        self.triangulation_type = project_config_dict["triangulation_type"]
-        self.allowed_num_diverging_frames = project_config_dict["allowed_num_diverging_frames"]
+        self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
+        for attribute in ["valid_cam_IDs", "calibration_tag", "calibration_validation_tag",
+                          "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
+            setattr(self, attribute, project_config_dict[attribute])
+        for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
+            setattr(self, attribute, recording_config_dict[attribute])
+
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
             directory=self.calibration_directory,
             recording_config_dict=recording_config_dict,
@@ -260,9 +208,11 @@ class Calibration():
             videometadata_tag="calibration",
             output_directory=self.output_directory,
             filename_tag=self.calibration_tag,
+            filetypes=[".AVI", ".avi", ".mov", ".mp4"],
             test_mode=test_mode,
         )
-        self.recording_date, *_ = _validate_and_save_metadata_for_recording(metadata_from_videos=self.metadata_from_videos, attributes_to_check=['recording_date'])
+        self.recording_date, *_ = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
+                                                     attributes_to_check=['recording_date'])
         self.target_fps = min([video_metadata.fps for video_metadata in self.metadata_from_videos.values()])
         for video_metadata in self.metadata_from_videos.values():
             video_metadata.target_fps = self.target_fps
@@ -271,8 +221,6 @@ class Calibration():
         for video_interface in self.video_interfaces.values():
             video_interface.run_synchronizer(
                 synchronizer=CharucoVideoSynchronizer,
-                rapid_aligner_path=self.rapid_aligner_path,
-                use_gpu=self.use_gpu,
                 output_directory=self.output_directory,
                 synchronize_only=True,
                 test_mode=test_mode,
@@ -314,14 +262,12 @@ class Calibration():
         self.camera_objects.sort(key=lambda x: x.name, reverse=False)
         cams_to_exclude = exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
                                               allowed_num_diverging_frames=self.allowed_num_diverging_frames)
-        self.valid_videos = []
-        for cam in self.camera_objects:
-            if cam.name in cams_to_exclude:
-                self.camera_objects.remove(cam)
-            else:
-                self.valid_videos.append(cam.name)
+        self.valid_videos = [cam.name for cam in self.camera_objects if cam.name not in cams_to_exclude]
+        for cam in cams_to_exclude:
+            self.camera_objects.remove(cam)
         self.initialize_camera_group(camera_objects=self.camera_objects)
 
+    # STOPPED Function controlling here
     def run_calibration(
             self,
             use_own_intrinsic_calibration: bool = True,
@@ -502,83 +448,61 @@ class Triangulation(ABC):
     def _create_csv_filepath(self) -> Path:
         pass
 
+    @property
+    @abstractmethod
+    def _metadata_keys(self) -> List[str]:
+        pass
+
+    @property
+    @abstractmethod
+    def _allowed_filetypes(self) -> List[str]:
+        pass
+
+    @property
+    @abstractmethod
+    def _videometadata_tag(self) -> str:
+        pass
+
     def __init__(self,
                  project_config_filepath: Path,
                  directory: Path,
                  recording_config_filepath: Path,
-                 videometadata_tag: str,
                  test_mode: bool = False,
-                 output_directory: Optional[Path] = None,
-                 ground_truth_config_filepath: Optional[Path] = None):
-        self.all_cameras = None
-        self.markers_excluded_manually = None
-        self.calibration_toml_filepath = None
-        self.csv_output_filepath = None
-        self.markers = None
-        self.triangulation_dlc_cams_filepaths = None
-        self.project_config_filepath = None
-        self.output_directory = None
-        self.normalised_dataframe = False
-        self.anipose_io = {}
-
+                 output_directory: Optional[Path] = None):
+        for attribute in STANDARD_ATTRIBUTES_TRIANGULATION:
+            setattr(self, attribute, None)
         self.directory = convert_to_path(directory)
         project_config_filepath = convert_to_path(project_config_filepath)
         recording_config_filepath = convert_to_path(recording_config_filepath)
         output_directory = convert_to_path(output_directory)
         self.output_directory = _check_output_directory(output_directory=output_directory,
                                                         project_config_filepath=project_config_filepath)
-
         recording_config_dict, project_config_dict = _get_metadata_from_configs(
             recording_config_filepath=recording_config_filepath,
             project_config_filepath=project_config_filepath,
         )
-        
-        self.synchro_metadata = {key: project_config_dict[key] for key in
-                                 ["handle_synchro_fails", "default_offset_ms", "start_pattern_match_ms",
-                                  "end_pattern_match_ms", "synchro_error_threshold", "synchro_marker", "use_2D_filter",
-                                  'num_frames_to_pick']}
-        self.use_gpu = project_config_dict["use_gpu"]
-        self.rapid_aligner_path = convert_to_path(project_config_dict["rapid_aligner_path"])
-        self.valid_cam_ids = project_config_dict["valid_cam_IDs"]
-        self.recording_date = recording_config_dict["recording_date"]
-        self.led_pattern = recording_config_dict["led_pattern"]
-        self.calibration_index = recording_config_dict["calibration_index"]
-        self.target_fps = recording_config_dict["target_fps"]
-        self.calibration_tag = project_config_dict["calibration_tag"]
-        self.calibration_validation_tag = project_config_dict["calibration_validation_tag"]
-        self.score_threshold = project_config_dict["score_threshold"]
-        self.triangulation_type = project_config_dict["triangulation_type"]
-        self.allowed_num_diverging_frames = project_config_dict["allowed_num_diverging_frames"]
+        self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
+        for attribute in ["use_gpu", "valid_cam_IDs", "calibration_tag", "calibration_validation_tag",
+                          "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
+            setattr(self, attribute, project_config_dict[attribute])
+        for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
+            setattr(self, attribute, recording_config_dict[attribute])
 
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
             directory=self.directory,
             recording_config_dict=recording_config_dict,
             project_config_dict=project_config_dict,
-            videometadata_tag=videometadata_tag,
+            videometadata_tag=self._videometadata_tag,
             output_directory=self.output_directory,
-            filename_tag=self.calibration_validation_tag if videometadata_tag == "calvin" else "",
+            filename_tag=self.calibration_validation_tag if self._videometadata_tag == "calvin" else "",
             test_mode=test_mode,
         )
 
-        if videometadata_tag == "calvin":
-            self.recording_date, *_ = _validate_and_save_metadata_for_recording(
-                metadata_from_videos=self.metadata_from_videos, attributes_to_check=['recording_date'])
-            ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
-            self.ground_truth_config = read_config(ground_truth_config_filepath)
-            self.markers = self.ground_truth_config["unique_ids"]
-        elif videometadata_tag == "recording":
-            self.recording_date, self.paradigm, self.mouse_id = _validate_and_save_metadata_for_recording(
-                metadata_from_videos=self.metadata_from_videos,
-                attributes_to_check=["recording_date", "paradigm", "mouse_id"])
-            self.video_plotting_config = None
-            self.rotated_filepath = None
-            self.rotation_error = None
-            self.synchronization_individuals = []
-            self.led_detection_individuals = []
-            self.synchronized_videos = {}
-        else:
-            raise ValueError(f"Triangulation Objects take calvin or recording as videometadata_tag!")
-            
+        metadata = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
+                                      attributes_to_check=self._metadata_keys)
+        for attribute, value in zip(self._metadata_keys, metadata):
+            setattr(self, attribute, value)
+
         self.csv_output_filepath = self._create_csv_filepath()
 
     def run_triangulation(
@@ -812,6 +736,19 @@ def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
 
 
 class TriangulationRecordings(Triangulation):
+
+    @property
+    def _metadata_keys(self)->List[str]:
+        return ["recording_date", "paradigm", "mouse_id"]
+
+    @property
+    def _videometadata_tag(self) -> str:
+        return "recording"
+
+    @property
+    def _allowed_filetypes(self) -> List[str]:
+        return [".AVI", ".avi", ".mov", ".mp4"]
+
     def run_synchronization(
             self, synchronize_only: bool = False, test_mode: bool = False
     ) -> None:
@@ -822,8 +759,6 @@ class TriangulationRecordings(Triangulation):
             ):
                 video_interface.run_synchronizer(
                     synchronizer=RecordingVideoDownSynchronizer,
-                    rapid_aligner_path=self.rapid_aligner_path,
-                    use_gpu=self.use_gpu,
                     output_directory=self.output_directory,
                     synchronize_only=synchronize_only,
                     test_mode=test_mode,
@@ -832,8 +767,6 @@ class TriangulationRecordings(Triangulation):
             else:
                 video_interface.run_synchronizer(
                     synchronizer=RecordingVideoUpSynchronizer,
-                    rapid_aligner_path=self.rapid_aligner_path,
-                    use_gpu=self.use_gpu,
                     output_directory=self.output_directory,
                     synchronize_only=synchronize_only,
                     test_mode=test_mode,
@@ -965,6 +898,24 @@ class TriangulationRecordings(Triangulation):
 
 
 class CalibrationValidation(Triangulation):
+
+    @property
+    def _metadata_keys(self)->List[str]:
+        return ["recording_date"]
+
+    @property
+    def _videometadata_tag(self) -> str:
+        return "calvin"
+
+    @property
+    def _allowed_filetypes(self) -> List[str]:
+        return [".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"]
+
+    def add_ground_truth_config(self, ground_truth_config_filepath: Path) -> None:
+        ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
+        self.ground_truth_config = read_config(ground_truth_config_filepath)
+        self.markers = self.ground_truth_config["unique_ids"]
+
     def get_marker_predictions(self) -> None:
         self.markers_excluded_manually = False
         self.csv_output_filepath = self._create_csv_filepath()

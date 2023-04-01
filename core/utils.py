@@ -135,3 +135,89 @@ def create_calibration_key(
     else:
         calibration_key = recording_date + "_" + str(calibration_index) + key + "_" + str(iteration)
     return calibration_key
+
+
+KEYS_TO_CHECK_PROJECT = [
+        "valid_cam_IDs",
+        "paradigms",
+        "animal_lines",
+        "led_extraction_type",
+        "led_extraction_filepath",
+        "max_calibration_frames",
+        "max_cpu_cores_to_pool",
+        "max_ram_digestible_frames",
+        "rapid_aligner_path",
+        "use_gpu",
+        "load_calibration",
+        "calibration_tag",
+        "calibration_validation_tag",
+        "allowed_num_diverging_frames",
+        "handle_synchro_fails",
+        "default_offset_ms",
+        "start_pattern_match_ms",
+        "end_pattern_match_ms",
+        "synchro_error_threshold",
+        "synchro_marker",
+        "led_box_size",
+        "use_2D_filter",
+        "score_threshold",
+        'num_frames_to_pick',
+        'triangulation_type'
+    ]
+
+KEYS_TO_CHECK_RECORDING = [
+        "led_pattern",
+        "target_fps",
+        "calibration_index",
+        "recording_date",
+    ]
+
+
+KEYS_TO_CHECK_CAMERA = [
+        "processing_type",
+        "calibration_evaluation_type",
+        "processing_filepath",
+        "calibration_evaluation_filepath",
+        "led_extraction_type",
+        "led_extraction_filepath",
+    ]
+
+STANDARD_ATTRIBUTES_TRIANGULATION = ["all_cameras",
+                                     "markers_excluded_manually",
+                                     "calibration_toml_filepath",
+                                     "csv_output_filepath",
+                                     "markers",
+                                     "triangulation_dlc_cams_filepaths",
+                                     "project_config_filepath",
+                                     "output_directory",
+                                     "normalised_dataframe",
+                                     "anipose_io",
+                                     "video_plotting_config",
+                                     "rotated_filepath",
+                                     "rotation_error",
+                                     "synchronization_individuals",
+                                     "led_detection_individuals",
+                                     "ground_truth_config",
+                                     "synchronized_videos"]
+
+STANDARD_ATTRIBUTES_CALIBRATION = ["camera_group",
+                                   "report_filepath",
+                                   "reprojerr",
+                                   "valid_videos",
+                                   "synchronized_charuco_videofiles",
+                                   "camera_objects",
+                                   "synchronization_individuals",
+                                   "led_detection_individuals",
+                                   "project_config_filepath",
+                                   "output_directory"]
+
+SYNCHRO_METADATA_KEYS = ["handle_synchro_fails",
+                         "default_offset_ms",
+                         "start_pattern_match_ms",
+                          "end_pattern_match_ms",
+                         "synchro_error_threshold",
+                         "synchro_marker",
+                         "use_2D_filter",
+                         'num_frames_to_pick',
+                         "rapid_aligner_path",
+                         "use_gpu"]
