@@ -174,6 +174,11 @@ def _create_video_objects(
         metadata_from_videos[video_metadata.cam_id] = video_metadata
     return video_interfaces, metadata_from_videos
 
+
+def initialize_camera_group(camera_objects: List) -> ap_lib.cameras.CameraGroup:
+    return ap_lib.cameras.CameraGroup(camera_objects)
+
+
 class Calibration():
     def __init__(
             self,
@@ -265,18 +270,18 @@ class Calibration():
         self.valid_videos = [cam.name for cam in self.camera_objects if cam.name not in cams_to_exclude]
         for cam in cams_to_exclude:
             self.camera_objects.remove(cam)
-        self.initialize_camera_group(camera_objects=self.camera_objects)
+        self.camera_group = initialize_camera_group(camera_objects=self.camera_objects)
 
-    # STOPPED Function controlling here
     def run_calibration(
             self,
             use_own_intrinsic_calibration: bool = True,
             verbose: int = 0,
-            charuco_calibration_board: Optional = None,
+            charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
             test_mode: bool = False,
             iteration: Optional[int] = None,
     ) -> Path:
-        filename = f"{create_calibration_key(videos=self.valid_videos, recording_date=self.recording_date, calibration_index=self.calibration_index, iteration=iteration)}.toml"
+        calibration_key = create_calibration_key(videos=self.valid_videos, recording_date=self.recording_date, calibration_index=self.calibration_index, iteration=iteration)
+        filename = f"{calibration_key}.toml"
 
         calibration_filepath = self.output_directory.joinpath(filename)
         if (not test_mode) or (
@@ -301,31 +306,26 @@ class Calibration():
                 init_extrinsics=True,
                 verbose=verbose > 1,
             )
-            self._save_calibration(calibration_filepath=calibration_filepath)
+            self._save_calibration(calibration_filepath=calibration_filepath, camera_group=self.camera_group)
         else:
             self.reprojerr = 0
         return calibration_filepath
 
-    def initialize_camera_group(self, camera_objects: List) -> None:
-        self.camera_group = ap_lib.cameras.CameraGroup(camera_objects)
-
-    def _save_calibration(self, calibration_filepath: Path) -> None:
+    def _save_calibration(self, calibration_filepath: Path, camera_group: ap_lib.cameras.CameraGroup) -> None:
         if calibration_filepath.exists():
             calibration_filepath.unlink()
-        self.camera_group.dump(calibration_filepath)
+        camera_group.dump(calibration_filepath)
 
     def calibrate_optimal(
             self,
             calibration_validation: "CalibrationValidation",
             max_iters: int = 5,
             p_threshold: float = 0.1,
-            angle_threshold: int = 5,
+            angle_threshold: float = 5.,
             verbose: int = 1,
             test_mode: bool = False,
     ):
         """finds optimal calibration through repeated optimisations of anipose"""
-        # ToDo make max_iters and p_threshold adaptable?
-
         report = pd.DataFrame()
         calibration_found = False
         good_calibration_filepath = self.output_directory.joinpath(
@@ -339,62 +339,39 @@ class Calibration():
             else:
                 calibration_filepath = self.run_calibration(verbose=verbose, test_mode=test_mode, iteration=cal)
 
-            calibration_validation.run_triangulation(
-                calibration_toml_filepath=calibration_filepath
-            )
+            calibration_validation.run_triangulation(calibration_toml_filepath=calibration_filepath)
 
             calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
-            calibration_errors = calibration_validation.anipose_io[
-                "distance_errors_in_cm"
-            ]
-            calibration_angles_errors = calibration_validation.anipose_io[
-                "angles_error_screws_plan"
-            ]
+            calibration_errors = calibration_validation.anipose_io["distance_errors_in_cm"]
+            calibration_angles_errors = calibration_validation.anipose_io["angles_error_screws_plan"]
             reprojerr_nonan = calibration_validation.anipose_io["reproj_nonan"].mean()
 
+            all_angle_errors, all_percentage_errors = [], []
             for reference in calibration_errors.keys():
                 all_percentage_errors = [
                     percentage_error
                     for marker_id_a, marker_id_b, distance_error, percentage_error in calibration_errors[
-                        reference
-                    ][
-                        "individual_errors"
-                    ]
-                ]
-
-            all_angle_errors, all_percentage_errors = [], []
-            for reference in calibration_angles_errors.keys():
-                all_angle_errors = list(calibration_angles_errors.values())
+                        reference]["individual_errors"]]
+            all_angle_errors = list(calibration_angles_errors.values())
 
             mean_dist_err_percentage = np.nanmean(np.asarray(all_percentage_errors))
             mean_angle_err = np.nanmean(np.asarray(all_angle_errors))
 
             if verbose > 0:
-                print(
-                    f"Calibration {cal}"
-                    + "\n mean percentage error: "
-                    + str(mean_dist_err_percentage)
-                    + "\n mean angle error: "
-                    + str(mean_angle_err)
-                )
+                print(f"Calibration {cal}\n mean percentage error: {mean_dist_err_percentage}\n mean angle error: {mean_angle_err}")
 
             report.loc[cal, "mean_distance_error_percentage"] = mean_dist_err_percentage
             report.loc[cal, "mean_angle_error"] = mean_angle_err
             report.loc[cal, "reprojerror"] = reprojerr_nonan
 
-            if (
-                    mean_dist_err_percentage < p_threshold
-                    and mean_angle_err < angle_threshold
-            ):
+            if (mean_dist_err_percentage < p_threshold and mean_angle_err < angle_threshold):
                 calibration_found = True
                 calibration_filepath.rename(good_calibration_filepath)
                 calibration_filepath = good_calibration_filepath
                 print(f"Good Calibration reached at iteration {cal}! Named it {good_calibration_filepath}.")
                 break
 
-        self.report_filepath = self.output_directory.joinpath(
-            f"{self.recording_date}_calibration_report.csv"
-        )
+        self.report_filepath = self.output_directory.joinpath(f"{self.recording_date}_calibration_report.csv")
         report.to_csv(self.report_filepath, index=False)
 
         if not calibration_found:
@@ -411,13 +388,12 @@ def _add_missing_marker_ids_to_prediction(
         scorer = "zero_likelihood_fake_markers"
     for marker_id in missing_marker_ids:
         for key in ["x", "y", "likelihood"]:
-            for i in range(framenum):
-                df.loc[i, (scorer, marker_id, key)] = 0
+            df.loc[[i for i in range(framenum)], (scorer, marker_id, key)] = 0
 
 
 def _find_non_matching_marker_ids(
         marker_ids_to_match: List[str], template_marker_ids: List[str]
-) -> List:
+) -> List[str]:
     return [
         marker_id
         for marker_id in marker_ids_to_match
@@ -427,13 +403,9 @@ def _find_non_matching_marker_ids(
 
 def _remove_marker_ids_not_in_ground_truth(
         marker_ids_to_remove: List[str], df: pd.DataFrame()
-) -> None:
-    columns_to_remove = [
-        column_name
-        for column_name in df.columns
-        if column_name[1] in marker_ids_to_remove
-    ]
-    df.drop(columns=columns_to_remove, inplace=True)
+) -> pd.DataFrame():
+    columns_to_remove = [column_name for column_name in df.columns if column_name[1] in marker_ids_to_remove]
+    return df.drop(columns=columns_to_remove)
 
 
 def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
@@ -497,21 +469,19 @@ class Triangulation(ABC):
             filename_tag=self.calibration_validation_tag if self._videometadata_tag == "calvin" else "",
             test_mode=test_mode,
         )
-
         metadata = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
                                       attributes_to_check=self._metadata_keys)
         for attribute, value in zip(self._metadata_keys, metadata):
             setattr(self, attribute, value)
-
         self.csv_output_filepath = self._create_csv_filepath()
 
     def run_triangulation(
             self,
-            calibration_toml_filepath: Path,
+            calibration_toml_filepath: Union[Path, str],
             test_mode: bool = False,
     ):
-        self.calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
-        self._load_calibration(filepath=self.calibration_toml_filepath)
+        calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
+        self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
 
         filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
         filepath_keys.sort()
@@ -525,8 +495,7 @@ class Triangulation(ABC):
         for cam in missing_cams_in_all_cameras:
             self.triangulation_dlc_cams_filepaths.pop(cam)
 
-        self._preprocess_dlc_predictions_for_anipose(test_mode=test_mode)
-
+        self.anipose_io = self._preprocess_dlc_predictions_for_anipose(test_mode=test_mode)
         if self.triangulation_type == "triangulate":
             p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
         elif self.triangulation_type == "triangulate_optim_ransac_False":
@@ -540,13 +509,16 @@ class Triangulation(ABC):
         else:
             raise ValueError(
                 "Supported methods for triangulation are triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False!")
+        self.anipose_io["p3ds"] = p3ds_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"], 3)
 
-        self._postprocess_triangulations_and_calculate_reprojection_error(p3ds_flat=p3ds_flat)
+        self.anipose_io["reprojerr"], self.anipose_io["reproj_nonan"], self.anipose_io["reprojerr_flat"] = self._get_reprojection_errors(
+            p3ds_flat=p3ds_flat)
 
-        self._get_dataframe_of_triangulated_points()
+        self.df = self._get_dataframe_of_triangulated_points()
         if (not test_mode) or (test_mode and not self.csv_output_filepath.exists()):
             _save_dataframe_as_csv(filepath=self.csv_output_filepath, df=self.df)
-        for path in self.triangulation_dlc_cams_filepaths.values():
+        # STOPPED reworking functions here
+        for path in self.triangulation_dlc_cams_filepaths.values(): # make function out of it
             if "_temp" in path.name:
                 path.unlink()
 
@@ -591,6 +563,7 @@ class Triangulation(ABC):
             self._validate_calibration_validation_marker_ids(
                 calibration_validation_markers_df_filepath=h5_output_filepath,
                 framenum=framenum,
+                defined_marker_ids=markers
             )
             self.triangulation_dlc_cams_filepaths[cam] = h5_output_filepath
 
@@ -598,9 +571,9 @@ class Triangulation(ABC):
             self,
             calibration_validation_markers_df_filepath: Path,
             framenum: int,
+            defined_marker_ids: List[str],
             add_missing_marker_ids_with_0_likelihood: bool = True,
     ) -> None:
-        defined_marker_ids = self.markers
         calibration_validation_markers_df = pd.read_hdf(calibration_validation_markers_df_filepath)
 
         prediction_marker_ids = list(
@@ -625,7 +598,7 @@ class Triangulation(ABC):
                 f"likelihood of 0: {marker_ids_not_in_prediction}."
             )
         if marker_ids_not_in_ground_truth:
-            _remove_marker_ids_not_in_ground_truth(
+            calibration_validation_markers_df = _remove_marker_ids_not_in_ground_truth(
                 marker_ids_to_remove=marker_ids_not_in_ground_truth,
                 df=calibration_validation_markers_df,
             )
@@ -637,9 +610,9 @@ class Triangulation(ABC):
             calibration_validation_markers_df_filepath, "empty", mode="w"
         )
 
-    def _load_calibration(self, filepath: Path) -> None:
+    def _load_calibration(self, filepath: Path) -> ap_lib.cameras.CameraGroup():
         if filepath.name.endswith(".toml") and filepath.exists():
-            self.camera_group = ap_lib.cameras.CameraGroup.load(filepath)
+            return ap_lib.cameras.CameraGroup.load(filepath)
         else:
             raise FileNotFoundError(
                 f"The path, given as calibration_toml_filepath\n"
@@ -647,13 +620,11 @@ class Triangulation(ABC):
                 "Make sure, that you enter the correct path!"
             )
 
-    def _preprocess_dlc_predictions_for_anipose(self, test_mode: bool = False) -> None:
+    def _preprocess_dlc_predictions_for_anipose(self, test_mode: bool = False) -> Dict:
         anipose_io = ap_lib.utils.load_pose2d_fnames(
             fname_dict=self.triangulation_dlc_cams_filepaths
         )
-        self.anipose_io = self._add_additional_information_and_continue_preprocessing(
-            anipose_io=anipose_io, test_mode=test_mode
-        )
+        return self._add_additional_information_and_continue_preprocessing(anipose_io=anipose_io, test_mode=test_mode)
 
     def _add_additional_information_and_continue_preprocessing(
             self, anipose_io: Dict, test_mode: bool = False
@@ -670,26 +641,22 @@ class Triangulation(ABC):
         anipose_io["scores_flat"] = anipose_io["scores"].reshape(n_cams, -1)
         return anipose_io
 
-    def _postprocess_triangulations_and_calculate_reprojection_error(
+    def _get_reprojection_errors(
             self, p3ds_flat: np.array
-    ) -> None:
-        self.reprojerr_flat = self.camera_group.reprojection_error(p3ds_flat, self.anipose_io["points_flat"], mean=True)
-        self.p3ds = p3ds_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"], 3)
+    ) -> Tuple[np.array, np.array, np.array]:
+        reprojerr_flat = self.camera_group.reprojection_error(p3ds_flat, self.anipose_io["points_flat"], mean=True)
+        reprojerr = reprojerr_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"])
+        reprojerr_nonan = reprojerr[np.logical_not(np.isnan(reprojerr))]
+        return reprojerr, reprojerr_nonan, reprojerr_flat
 
-        self.anipose_io["p3ds"] = self.p3ds
-        self.reprojerr = self.reprojerr_flat.reshape(self.anipose_io["n_points"], self.anipose_io["n_joints"])
-
-        self.reprojerr_nonan = self.reprojerr[np.logical_not(np.isnan(self.reprojerr))]
-        self.anipose_io["reproj_nonan"] = self.reprojerr_nonan
-
-    def _get_dataframe_of_triangulated_points(self) -> None:
+    def _get_dataframe_of_triangulated_points(self) -> pd.DataFrame:
         all_points_raw = self.anipose_io["points"]
         all_scores = self.anipose_io["scores"]
         _cams, n_frames, n_joints, _ = all_points_raw.shape
         good_points = ~np.isnan(all_points_raw[:, :, :, 0])
         num_cams = np.sum(good_points, axis=0).astype("float")
-        all_points_3d = self.p3ds.reshape(n_frames, n_joints, 3)
-        all_errors = self.reprojerr_flat.reshape(n_frames, n_joints)
+        all_points_3d = self.anipose_io['p3ds'].reshape(n_frames, n_joints, 3)
+        all_errors = self.anipose_io['reprojerr_flat'].reshape(n_frames, n_joints)
         all_scores[~good_points] = 2
         scores_3d = np.min(all_scores, axis=0)
 
@@ -704,7 +671,7 @@ class Triangulation(ABC):
         for bp_num, bp in enumerate(self.anipose_io["bodyparts"]):
             for ax_num, axis in enumerate(["x", "y", "z"]):
                 df[bp + "_" + axis] = all_points_3d_adj[:, bp_num, ax_num]
-            df[bp + "_error"] = self.reprojerr[:, bp_num]
+            df[bp + "_error"] = self.anipose_io['reprojerr'][:, bp_num]
             df[bp + "_score"] = scores_3d[:, bp_num]
         for i in range(3):
             for j in range(3):
@@ -712,8 +679,7 @@ class Triangulation(ABC):
         for i in range(3):
             df["center_{}".format(i)] = center[i]
         df["fnum"] = np.arange(n_frames)
-        self.df = df
-        self.anipose_io["df_xyz"] = df
+        return df
 
 
 def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
@@ -952,7 +918,7 @@ class CalibrationValidation(Triangulation):
                     "Template Matching is not yet implemented for Marker Detection in Calvin!"
                 )
             self._validate_calibration_validation_marker_ids(
-                calibration_validation_markers_df_filepath=h5_output_filepath, framenum=1
+                calibration_validation_markers_df_filepath=h5_output_filepath, framenum=1, defined_marker_ids=self.markers
             )
             PredictionsPlot(
                 image=cam.filepath,

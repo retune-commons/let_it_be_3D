@@ -292,7 +292,7 @@ class meta_interface(ABC):
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
     def calibrate(
-        self, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool = False
+        self, p_threshold: float = 0.1, angle_threshold: float = 5., max_iters: int = 5, calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool = False
     ) -> None:
         for recording_day in self.meta["recording_days"].values():
             if calibrate_optimal:
@@ -302,7 +302,10 @@ class meta_interface(ABC):
                     ].calibrate_optimal(
                         calibration_validation=self.objects["calibration_validation_objects"][recording_day["calibrations"]["calibration_key"]],
                         verbose=verbose,
-                        test_mode=test_mode))
+                        test_mode=test_mode,
+                        max_iters=max_iters,
+                        p_threshold=p_threshold,
+                        angle_thresold=angle_threshold))
                 recording_day["calibrations"]['report'] = str(self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]].report_filepath)
             else:
                 recording_day["calibrations"]["toml_filepath"] = str(self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]].run_calibration(verbose=verbose, test_mode=test_mode))
