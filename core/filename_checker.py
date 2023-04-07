@@ -5,8 +5,8 @@ from typing import Tuple
 
 import yaml
 
-from .utils import convert_to_path, create_calibration_key
 from .checker_objects import CheckRecording, CheckCalibration, CheckCalibrationValidation
+from .utils import convert_to_path, create_calibration_key
 
 
 class FilenameCheckerInterface:
@@ -37,8 +37,8 @@ class FilenameCheckerInterface:
     def add_recording_config(self, filepath_to_recording_config: Path) -> None:
         filepath_to_recording_config = convert_to_path(filepath_to_recording_config)
         if (
-            filepath_to_recording_config.suffix == ".yaml"
-            and filepath_to_recording_config.exists()
+                filepath_to_recording_config.suffix == ".yaml"
+                and filepath_to_recording_config.exists()
         ):
             self.recording_configs.append(filepath_to_recording_config)
             recording_date, calibration_index = self._read_recording_config(
@@ -92,12 +92,12 @@ class FilenameCheckerInterface:
     def initialize_meta_config(self) -> None:
         for recording_day in self.meta["recording_days"].values():
             for file in Path(
-                recording_day["recording_config_filepath"]
+                    recording_day["recording_config_filepath"]
             ).parent.parent.parent.glob("**"):
                 if (
-                    file.name[: len(recording_day["recording_date"])]
-                    == recording_day["recording_date"]
-                    and file.name[-3:] in self.paradigms
+                        file.name[: len(recording_day["recording_date"])]
+                        == recording_day["recording_date"]
+                        and file.name[-3:] in self.paradigms
                 ):  # hardcoded length of paradigm and file structure
                     recording_day["recording_directories"].append(str(file))
             recording_day["num_recordings"] = len(

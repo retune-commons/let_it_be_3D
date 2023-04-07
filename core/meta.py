@@ -92,7 +92,8 @@ class MetaInterface(ABC):
                 recording_day["recording_directories"]
             )
             print(
-                f"Found {recording_day['num_recordings']} recordings at recording day {recording_day['recording_date']}!"
+                f"Found {recording_day['num_recordings']} recordings at "
+                f"recording day {recording_day['recording_date']}!"
             )
         self.meta["meta_step"] = 1
         self.export_meta_to_yaml(filepath=self.standard_yaml_filepath)
@@ -101,7 +102,9 @@ class MetaInterface(ABC):
         file = convert_to_path(file)
         if not file.is_dir() or recording_day not in self.meta["recording_days"].keys():
             raise FileNotFoundError(
-                f"couldn't add recording directory! \nCheck your filepath and make sure the recording_day is in {self.meta['recording_days'].keys()}!")
+                f"couldn't add recording directory! \n"
+                f"Check your filepath and make sure the recording_day is "
+                f"in {self.meta['recording_days'].keys()}!")
         else:
             self.meta["recording_days"][recording_day]["recording_directories"].append(
                 str(file)
@@ -124,7 +127,9 @@ class MetaInterface(ABC):
                     output_directory=recording,
                     test_mode=test_mode,
                 )
-                individual_key = f"{triangulation_recordings_object.mouse_id}_{triangulation_recordings_object.recording_date}_{triangulation_recordings_object.paradigm}"
+                individual_key = f"{triangulation_recordings_object.mouse_id}_" \
+                                 f"{triangulation_recordings_object.recording_date}_" \
+                                 f"{triangulation_recordings_object.paradigm}"
                 videos = {
                     video: self._create_video_dict(
                         video=triangulation_recordings_object.metadata_from_videos[
@@ -140,7 +145,8 @@ class MetaInterface(ABC):
                     "key": individual_key,
                     "target_fps": triangulation_recordings_object.target_fps,
                     "led_pattern": triangulation_recordings_object.led_pattern,
-                    "calibration_to_use": triangulation_recordings_object.recording_date + f'_{triangulation_recordings_object.calibration_index}',
+                    "calibration_to_use": f'{triangulation_recordings_object.recording_date}'
+                                          f'_{triangulation_recordings_object.calibration_index}',
                     "videos": videos,
                 }
                 self.objects["triangulation_recordings_objects"][
@@ -165,11 +171,13 @@ class MetaInterface(ABC):
                 )
                 for video in recording_meta["videos"]:
                     try:
-                        recording_meta["videos"][video]["synchronized_video"] = str(recording_object.synchronized_videos[video])
+                        recording_meta["videos"][video]["synchronized_video"] = str(
+                            recording_object.synchronized_videos[video])
                         recording_meta["videos"][video]["framenum_synchronized"] = (
                             recording_object.metadata_from_videos[video].framenum_synchronized
                         )
-                        recording_meta["videos"][video]["marker_detection_filepath"] = str(recording_object.triangulation_dlc_cams_filepaths[video])
+                        recording_meta["videos"][video]["marker_detection_filepath"] = str(
+                            recording_object.triangulation_dlc_cams_filepaths[video])
                     except:
                         pass
                 end_time_recording = time.time()
@@ -196,7 +204,8 @@ class MetaInterface(ABC):
                 test_mode=test_mode,
             )
 
-            unique_calibration_key = calibration_object.recording_date + f'_{calibration_object.calibration_index}'
+            unique_calibration_key = f'{calibration_object.recording_date}_' \
+                                     f'{calibration_object.calibration_index}'
 
             self.objects["calibration_objects"][unique_calibration_key] = calibration_object
 
@@ -237,8 +246,10 @@ class MetaInterface(ABC):
             calibration_object = self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]]
             calibration_object.run_synchronization(test_mode=test_mode)
             for video in recording_day["calibrations"]["videos"]:
-                recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(calibration_object.synchronized_charuco_videofiles[video])
-                recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = calibration_object.metadata_from_videos[video].framenum_synchronized
+                recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
+                    calibration_object.synchronized_charuco_videofiles[video])
+                recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = \
+                calibration_object.metadata_from_videos[video].framenum_synchronized
 
             self.objects["calibration_validation_objects"][
                 recording_day["calibrations"]["calibration_key"]
@@ -282,8 +293,8 @@ class MetaInterface(ABC):
                                                                       "calibration_key"]].report_filepath)
             else:
                 recording_day["calibrations"]["toml_filepath"] = str(self.objects["calibration_objects"][
-                                                                         recording_day["calibrations"][
-                                                                             "calibration_key"]].run_calibration(
+                    recording_day["calibrations"][
+                        "calibration_key"]].run_calibration(
                     verbose=verbose, test_mode=test_mode))
             recording_day["calibrations"]['reprojerr'] = self.objects["calibration_objects"][
                 recording_day["calibrations"]["calibration_key"]].reprojerr
@@ -303,7 +314,8 @@ class MetaInterface(ABC):
                         recording
                     ].csv_output_filepath
                 )
-                recording_day["recordings"][recording]["reprojerr_mean"] = self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
+                recording_day["recordings"][recording]["reprojerr_mean"] = \
+                self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
@@ -330,9 +342,9 @@ class MetaInterface(ABC):
                     recording
                 ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode)
                 recording_day["recordings"][recording]["normalised_3D_csv"] = \
-                self.objects["triangulation_recordings_objects"][recording].rotated_filepath
+                    self.objects["triangulation_recordings_objects"][recording].rotated_filepath
                 recording_day["recordings"][recording]["normalisation_rotation_error"] = \
-                self.objects["triangulation_recordings_objects"][recording].rotation_error
+                    self.objects["triangulation_recordings_objects"][recording].rotation_error
         self.meta["meta_step"] = 8
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
@@ -466,7 +478,8 @@ class MetaInterface(ABC):
         missing_keys = check_keys(project_config, ["paradigms"])
         if missing_keys:
             raise KeyError(
-                f"Missing metadata information in the project_config_file {self.project_config_filepath} for {missing_keys}."
+                f"Missing metadata information in the project_config_file "
+                f"{self.project_config_filepath} for {missing_keys}."
             )
         return project_config["paradigms"]
 
@@ -477,7 +490,8 @@ class MetaInterface(ABC):
         )
         if missing_keys:
             raise KeyError(
-                f"Missing metadata information in the recording_config_file {recording_config_filepath} for {missing_keys}."
+                f"Missing metadata information in the recording_config_file "
+                f"{recording_config_filepath} for {missing_keys}."
             )
         recording_date = str(recording_config["recording_date"])
         if recording_date not in self.recording_dates:

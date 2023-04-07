@@ -1,22 +1,24 @@
-from typing import List, Tuple, Dict, Optional, Union
 from pathlib import Path, PosixPath, WindowsPath
+from typing import List, Tuple, Dict, Optional, Union
 
-import pandas as pd
 import imageio as iio
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import yaml
 
 
-def get_3D_df_keys(key: str)-> Tuple[str, str, str]:
-        return key + "_x", key + "_y", key + "_z"
+def get_3D_df_keys(key: str) -> Tuple[str, str, str]:
+    return key + "_x", key + "_y", key + "_z"
 
-def get_3D_array(df: pd.DataFrame, key: str, index: Optional[int]=None)->np.array:
+
+def get_3D_array(df: pd.DataFrame, key: str, index: Optional[int] = None) -> np.array:
     x, y, z = get_3D_df_keys(key)
     if index is None:
         return np.array([df[x], df[y], df[z]])
     else:
         return np.array([df[x][index], df[y][index], df[z][index]])
+
 
 def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
     missing_keys = []
@@ -38,14 +40,15 @@ def read_config(path: Path) -> Dict:
             cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     else:
         raise FileNotFoundError(
-            f"Could not open the yaml file at {path}\n Please make sure the path is correct and the file exists!"
+            f"Could not open the yaml file at {path}\n"
+            f"Please make sure the path is correct and the file exists!"
         )
     return cfg
 
 
 class Coordinates:
     def __init__(
-        self, y_or_row: int, x_or_column: int, z: Optional[int] = None
+            self, y_or_row: int, x_or_column: int, z: Optional[int] = None
     ) -> None:
         self.y = y_or_row
         self.row = y_or_row
@@ -64,7 +67,7 @@ def load_single_frame_of_video(filepath: Path, frame_idx: int = 0) -> np.ndarray
 
 
 def plot_image(
-    filepath: Path, idx: int = 0, plot_size: Tuple[int, int] = (9, 6)
+        filepath: Path, idx: int = 0, plot_size: Tuple[int, int] = (9, 6)
 ) -> None:
     fig = plt.figure(figsize=plot_size, facecolor="white")
     image = load_image(filepath=filepath, idx=idx)
@@ -72,7 +75,7 @@ def plot_image(
 
 
 def plot_single_frame_of_video(
-    filepath: Path, frame_idx: int = 0, plot_size: Tuple[int, int] = (9, 6)
+        filepath: Path, frame_idx: int = 0, plot_size: Tuple[int, int] = (9, 6)
 ) -> None:
     plot_image(filepath=filepath, idx=frame_idx, plot_size=plot_size)
 
@@ -85,7 +88,7 @@ def convert_to_path(attribute: Union[str, Path]) -> Path:
 
 
 def construct_dlc_output_style_df_from_manual_marker_coords(
-    manual_annotated_marker_coords_pred: Dict,
+        manual_annotated_marker_coords_pred: Dict,
 ) -> pd.DataFrame:
     multi_index = get_multi_index(
         markers=manual_annotated_marker_coords_pred.keys()
@@ -111,7 +114,7 @@ def get_multi_index(markers: List) -> pd.MultiIndex:
 
 
 def create_calibration_key(
-    videos: List[str], recording_date: str, calibration_index: int, iteration: Optional[int]=None,
+        videos: List[str], recording_date: str, calibration_index: int, iteration: Optional[int] = None,
 ) -> str:
     key = ""
     videos.sort()
@@ -125,49 +128,48 @@ def create_calibration_key(
 
 
 KEYS_TO_CHECK_PROJECT = [
-        "valid_cam_ids",
-        "paradigms",
-        "animal_lines",
-        "led_extraction_type",
-        "led_extraction_filepath",
-        "max_calibration_frames",
-        "max_cpu_cores_to_pool",
-        "max_ram_digestible_frames",
-        "rapid_aligner_path",
-        "use_gpu",
-        "load_calibration",
-        "calibration_tag",
-        "calibration_validation_tag",
-        "allowed_num_diverging_frames",
-        "handle_synchro_fails",
-        "default_offset_ms",
-        "start_pattern_match_ms",
-        "end_pattern_match_ms",
-        "synchro_error_threshold",
-        "synchro_marker",
-        "led_box_size",
-        "use_2D_filter",
-        "score_threshold",
-        'num_frames_to_pick',
-        'triangulation_type'
-    ]
+    "valid_cam_ids",
+    "paradigms",
+    "animal_lines",
+    "led_extraction_type",
+    "led_extraction_filepath",
+    "max_calibration_frames",
+    "max_cpu_cores_to_pool",
+    "max_ram_digestible_frames",
+    "rapid_aligner_path",
+    "use_gpu",
+    "load_calibration",
+    "calibration_tag",
+    "calibration_validation_tag",
+    "allowed_num_diverging_frames",
+    "handle_synchro_fails",
+    "default_offset_ms",
+    "start_pattern_match_ms",
+    "end_pattern_match_ms",
+    "synchro_error_threshold",
+    "synchro_marker",
+    "led_box_size",
+    "use_2D_filter",
+    "score_threshold",
+    'num_frames_to_pick',
+    'triangulation_type'
+]
 
 KEYS_TO_CHECK_RECORDING = [
-        "led_pattern",
-        "target_fps",
-        "calibration_index",
-        "recording_date",
-    ]
-
+    "led_pattern",
+    "target_fps",
+    "calibration_index",
+    "recording_date",
+]
 
 KEYS_TO_CHECK_CAMERA = [
-        "processing_type",
-        "calibration_evaluation_type",
-        "processing_filepath",
-        "calibration_evaluation_filepath",
-        "led_extraction_type",
-        "led_extraction_filepath",
-    ]
+    "processing_type",
+    "calibration_evaluation_type",
+    "processing_filepath",
+    "calibration_evaluation_filepath",
+    "led_extraction_type",
+    "led_extraction_filepath",
+]
 
 STANDARD_ATTRIBUTES_TRIANGULATION = ["all_cameras",
                                      "markers_excluded_manually",
@@ -201,7 +203,7 @@ STANDARD_ATTRIBUTES_CALIBRATION = ["camera_group",
 SYNCHRO_METADATA_KEYS = ["handle_synchro_fails",
                          "default_offset_ms",
                          "start_pattern_match_ms",
-                          "end_pattern_match_ms",
+                         "end_pattern_match_ms",
                          "synchro_error_threshold",
                          "synchro_marker",
                          "use_2D_filter",

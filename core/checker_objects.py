@@ -1,13 +1,13 @@
-from typing import List, Tuple, Dict, Union, Optional
-from pathlib import Path
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Tuple, Dict
 
 import imageio as iio
 
-from .utils import convert_to_path, read_config, check_keys
-from .video_metadata import VideoMetadataChecker
 from .plotting import Intrinsics
 from .user_specific_rules import user_specific_rules_on_triangulation_calibration_videos
+from .utils import convert_to_path, read_config, check_keys
+from .video_metadata import VideoMetadataChecker
 
 
 class Check(ABC):
@@ -22,7 +22,7 @@ class Check(ABC):
         pass
 
     def _get_metadata_from_configs(
-        self, recording_config_filepath: Path, project_config_filepath: Path
+            self, recording_config_filepath: Path, project_config_filepath: Path
     ) -> Tuple[dict, dict]:
         project_config_dict = read_config(path=project_config_filepath)
         recording_config_dict = read_config(path=recording_config_filepath)
@@ -96,20 +96,20 @@ class Check(ABC):
         return recording_config_dict, project_config_dict
 
     def _create_video_objects(
-        self,
-        directory: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict,
-        videometadata_tag: str,
-        filetypes: [str],
-        filename_tag: str = "",
+            self,
+            directory: Path,
+            recording_config_dict: Dict,
+            project_config_dict: Dict,
+            videometadata_tag: str,
+            filetypes: [str],
+            filename_tag: str = "",
     ) -> None:
         videofiles = [
             file
             for file in directory.iterdir()
             if filename_tag.lower() in file.name.lower()
-            and file.suffix in filetypes
-            and "synchronized" not in file.name
+               and file.suffix in filetypes
+               and "synchronized" not in file.name
         ]
 
         self.metadata_from_videos = []
@@ -136,11 +136,11 @@ class Check(ABC):
 
 class CheckCalibration(Check):
     def __init__(
-        self,
-        calibration_directory: Path,
-        project_config_filepath: Path,
-        recording_config_filepath: Path,
-        plot: bool = True,
+            self,
+            calibration_directory: Path,
+            project_config_filepath: Path,
+            recording_config_filepath: Path,
+            plot: bool = True,
     ) -> None:
         self.calibration_directory = convert_to_path(calibration_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
@@ -167,7 +167,6 @@ class CheckCalibration(Check):
                                         intrinsic_calibration=video_metadata.intrinsic_calibration, filename="",
                                         fisheye=video_metadata.fisheye)
                 intrinsics.create_plot(plot=True, save=False)
-
 
         files_per_cam = {}
         cams_not_found = []
@@ -207,7 +206,7 @@ class CheckCalibration(Check):
                                 if video_metadata.filepath == file:
                                     self.metadata_from_videos.remove(video_metadata)
                             file.unlink()
-        
+
         for video_metadata in self.metadata_from_videos:
             user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 
@@ -243,11 +242,11 @@ class CheckCalibration(Check):
 
 class CheckRecording(Check):
     def __init__(
-        self,
-        recording_directory: Path,
-        recording_config_filepath: Path,
-        project_config_filepath: Path,
-        plot: bool = False,
+            self,
+            recording_directory: Path,
+            recording_config_filepath: Path,
+            project_config_filepath: Path,
+            plot: bool = False,
     ) -> None:
         self.recording_directory = convert_to_path(recording_directory)
         project_config_filepath = convert_to_path(project_config_filepath)
@@ -310,7 +309,7 @@ class CheckRecording(Check):
                                     self.metadata_from_videos.remove(video_metadata)
                             if file.exists():
                                 file.unlink()
-                                
+
         for video_metadata in self.metadata_from_videos:
             user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 
@@ -354,12 +353,12 @@ class CheckRecording(Check):
 
 class CheckCalibrationValidation(Check):
     def __init__(
-        self,
-        calibration_validation_directory: Path,
-        recording_config_filepath: Path,
-        ground_truth_config_filepath: Path,
-        project_config_filepath: Path,
-        plot: bool = True,
+            self,
+            calibration_validation_directory: Path,
+            recording_config_filepath: Path,
+            ground_truth_config_filepath: Path,
+            project_config_filepath: Path,
+            plot: bool = True,
     ) -> None:
         print("\n")
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
@@ -427,7 +426,7 @@ class CheckCalibrationValidation(Check):
                                 if video_metadata.filepath == file:
                                     self.metadata_from_videos.remove(video_metadata)
                             file.unlink()
-        
+
         for video_metadata in self.metadata_from_videos:
             user_specific_rules_on_triangulation_calibration_videos(video_metadata)
 

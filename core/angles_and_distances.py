@@ -1,6 +1,6 @@
-from typing import List, Tuple, Dict, Union, Optional, OrderedDict, Any
-import math
 import itertools as it
+import math
+from typing import List, Tuple, Dict, Union, Any
 
 import numpy as np
 import pandas as pd
@@ -26,14 +26,16 @@ def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict, 
         )
     else:
         print(
-            "WARNING: No distances were computed. If this is unexpected please edit the ground truth file accordingly"
+            "WARNING: No distances were computed. If this is unexpected, "
+            "please edit the ground truth file accordingly"
         )
 
     if "angles" in parameters:
         anipose_io = _set_angles_to_plane(parameters["angles"], anipose_io, df_xyz=df_xyz)
     else:
         print(
-            "WARNING: No angles were computed. If this is unexpected please edit the ground truth file accordingly"
+            "WARNING: No angles were computed. If this is unexpected, "
+            "please edit the ground truth file accordingly"
         )
 
     return anipose_io
@@ -48,7 +50,7 @@ def _set_distances_from_configuration(distances_to_compute: Dict, anipose_io: Di
 
 
 def add_all_real_distances_errors(
-    anipose_io: Dict, ground_truth_distances: Dict, df_xyz: pd.DataFrame
+        anipose_io: Dict, ground_truth_distances: Dict, df_xyz: pd.DataFrame
 ) -> Dict:
     all_distance_to_cm_conversion_factors = (
         _get_conversion_factors_from_different_references(
@@ -95,7 +97,7 @@ def _add_distance_errors(anipose_io: Dict, gt_distances: Dict) -> Dict:
 
 
 def _add_distances_in_cm_for_each_conversion_factor(
-    anipose_io: Dict, conversion_factors: Dict, df_xyz: pd.DataFrame
+        anipose_io: Dict, conversion_factors: Dict, df_xyz: pd.DataFrame
 ) -> Dict:
     anipose_io["distances_in_cm"] = {}
     for reference_distance_id, conversion_factor in conversion_factors.items():
@@ -130,13 +132,13 @@ def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Di
 
 
 def _compute_differences_between_triangulated_and_gt_distances(
-    triangulated_distances: Dict, gt_distances: Dict
+        triangulated_distances: Dict, gt_distances: Dict
 ) -> List[Tuple[Any, Any, Any, Any]]:
     marker_ids_with_distance_error = []
     for marker_id_a in triangulated_distances.keys():
         for marker_id_b in triangulated_distances[marker_id_a].keys():
             if (marker_id_a in gt_distances.keys()) & (
-                marker_id_b in gt_distances[marker_id_a].keys()
+                    marker_id_b in gt_distances[marker_id_a].keys()
             ):
                 ground_truth = gt_distances[marker_id_a][marker_id_b]
                 triangulated_distance = triangulated_distances[marker_id_a][marker_id_b]
@@ -159,10 +161,11 @@ def _wrap_angles_360(angle: float) -> float:
 
 
 def _compute_differences_between_triangulated_and_gt_angles(
-    gt_angles: Dict, anipose_io: Dict
+        gt_angles: Dict, anipose_io: Dict
 ) -> Dict[str, float]:
     """
-    Computes the difference between the triangulated screw angles and the provided ground truth ones.
+    Computes the difference between the triangulated screw angles
+    and the provided ground truth ones.
     :param gt_angles: ground truth angles
     :return: list with angle errors
     """
@@ -294,7 +297,7 @@ def _get_conversion_factors_from_different_references(
 
 
 def get_xyz_distance_in_triangulation_space(
-    marker_ids: Tuple[str, str], df_xyz: pd.DataFrame
+        marker_ids: Tuple[str, str], df_xyz: pd.DataFrame
 ) -> Union[pd.Series, float]:
     squared_differences = [
         (df_xyz[f"{marker_ids[0]}_{axis}"] - df_xyz[f"{marker_ids[1]}_{axis}"]) ** 2
@@ -304,9 +307,9 @@ def get_xyz_distance_in_triangulation_space(
 
 
 def _get_xyz_to_cm_conversion_factor(
-    reference_marker_ids: Tuple[str, str],
-    distance_in_cm: Union[int, float],
-    df_xyz: pd.DataFrame,
+        reference_marker_ids: Tuple[str, str],
+        distance_in_cm: Union[int, float],
+        df_xyz: pd.DataFrame,
 ) -> float:
     distance_in_triangulation_space = get_xyz_distance_in_triangulation_space(marker_ids=reference_marker_ids,
                                                                               df_xyz=df_xyz)
@@ -323,16 +326,16 @@ def _get_length_in_3d_space(PointA: np.array, PointB: np.array) -> float:
 
 
 def _get_angle_from_law_of_cosines(
-    length_a: float, length_b: float, length_c: float
+        length_a: float, length_b: float, length_c: float
 ) -> float:
-    cos_angle = (length_c**2 + length_b**2 - length_a**2) / (
-        2 * length_b * length_c
+    cos_angle = (length_c ** 2 + length_b ** 2 - length_a ** 2) / (
+            2 * length_b * length_c
     )
     return math.degrees(math.acos(cos_angle))
 
 
 def _get_angle_between_three_points_at_PointA(
-    PointA: np.array, PointB: np.array, PointC: np.array
+        PointA: np.array, PointB: np.array, PointC: np.array
 ) -> float:
     length_c = _get_length_in_3d_space(PointA, PointB)
     length_b = _get_length_in_3d_space(PointA, PointC)
@@ -341,7 +344,7 @@ def _get_angle_between_three_points_at_PointA(
 
 
 def _get_coordinates_plane_equation_from_three_points(
-    PointA: np.array, PointB: np.array, PointC: np.array
+        PointA: np.array, PointB: np.array, PointC: np.array
 ) -> np.array:
     R1 = _get_vector_from_two_points(PointA, PointB)
     R2 = _get_vector_from_two_points(PointA, PointC)
@@ -364,7 +367,7 @@ def _get_vector_product(A: np.array, B: np.array) -> np.array:
 
 
 def _get_vector_from_two_points(
-    PointA: np.array, PointB: np.array
+        PointA: np.array, PointB: np.array
 ) -> np.array:
     vector = np.asarray(
         [PointA[0] - PointB[0], PointA[1] - PointB[1], PointA[2] - PointB[2]]
@@ -385,7 +388,7 @@ def _get_angle_between_plane_and_line(N: np.array, R: np.array) -> float:
     :return:
     """
     cosphi = _get_vector_length(vector=_get_vector_product(A=N, B=R)) / (
-        _get_vector_length(N) * _get_vector_length(R)
+            _get_vector_length(N) * _get_vector_length(R)
     )
     phi = math.degrees(math.acos(cosphi))
     angle = 90 - phi
@@ -393,7 +396,7 @@ def _get_angle_between_plane_and_line(N: np.array, R: np.array) -> float:
 
 
 def _get_angle_between_two_points_and_plane(
-    PointA: np.array, PointB: np.array, N: np.array
+        PointA: np.array, PointB: np.array, N: np.array
 ) -> float:
     R = _get_vector_from_two_points(PointA, PointB)
     return _get_angle_between_plane_and_line(N=N, R=R)
@@ -410,7 +413,7 @@ def _get_vector_from_label(label: str, df_xyz: pd.DataFrame) -> np.array:
 
 
 def _get_distance_between_plane_and_point(
-    N: np.array, PointOnPlane: np.array, DistantPoint: np.array
+        N: np.array, PointOnPlane: np.array, DistantPoint: np.array
 ) -> float:
     a = N[0] * PointOnPlane[0] + N[1] * PointOnPlane[1] + N[2] * PointOnPlane[2]
     distance = abs(

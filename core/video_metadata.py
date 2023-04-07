@@ -67,8 +67,8 @@ class VideoMetadata:
             recording_config_dict: Dict,
             video_filepath: Path,
     ) -> str:
-        for attribute in ["valid_cam_ids", "paradigms", "animal_lines", "load_calibration", "max_calibration_frames",
-                          "max_ram_digestible_frames", "max_cpu_cores_to_pool"]:
+        for attribute in ["valid_cam_ids", "paradigms", "load_calibration", "max_calibration_frames",
+                          "max_ram_digestible_frames", "max_cpu_cores_to_pool", "animal_lines"]:
             setattr(self, attribute, project_config_dict[attribute])
         self.intrinsic_calibration_directory = Path(project_config_dict["intrinsic_calibration_directory"])
         while True:
@@ -90,7 +90,8 @@ class VideoMetadata:
             setattr(self, attribute, recording_config_dict[attribute])
         if self.recording_date != recording_config_dict["recording_date"]:
             raise ValueError(
-                f"The date of the recording_config_file and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
+                f"The date of the recording_config_file and the provided video {video_filepath} do not match! "
+                f"Did you pass the right config-file and check the filename carefully?"
             )
 
         metadata_dict = recording_config_dict[self.cam_id]
@@ -134,7 +135,8 @@ class VideoMetadata:
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(
-                        f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!"
+                        f"{attribute} was not found in {self.filepath}! "
+                        f"Rename the path manually or use the filename_checker!"
                     )
 
         elif self.calvin:
@@ -154,7 +156,8 @@ class VideoMetadata:
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(
-                        f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!"
+                        f"{attribute} was not found in {self.filepath}! "
+                        f"Rename the path manually or use the filename_checker!"
                     )
 
         elif self.recording:
@@ -192,7 +195,8 @@ class VideoMetadata:
             ]:
                 if not hasattr(self, attribute):
                     raise ValueError(
-                        f"{attribute} was not found in {self.filepath}! Rename the path manually or use the filename_checker!"
+                        f"{attribute} was not found in {self.filepath}! "
+                        f"Rename the path manually or use the filename_checker!"
                     )
         return []
 
@@ -234,7 +238,7 @@ class VideoMetadata:
                     intrinsic_calibration_checkerboard_video_filepath = [
                         file
                         for file in self.intrinsic_calibration_directory.iterdir()
-                        if file.suffix  in [".mp4", ".AVI", ".mov"]
+                        if file.suffix in [".mp4", ".AVI", ".mov"]
                            and "checkerboard" in file.stem
                            and self.cam_id in file.stem
                     ][0]
@@ -242,7 +246,8 @@ class VideoMetadata:
                     raise FileNotFoundError(
                         f"Could not find a file for a checkerboard video for {self.cam_id}.\n"
                         f"It is required having a checkerboard video .mp4 including checkerboard and cam_id\n"
-                        f"in the intrinsic_calibrations_directory ({self.intrinsic_calibration_directory}) if you use load_calibration = False!"
+                        f"in the intrinsic_calibrations_directory ({self.intrinsic_calibration_directory}) "
+                        f"if you use load_calibration = False!"
                     )
                 calibrator = IntrinsicCalibratorFisheyeCamera(
                     filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
@@ -273,17 +278,18 @@ class VideoMetadata:
             else:
                 try:
                     intrinsic_calibration_checkerboard_video_filepath = [
-                            file
-                            for file in self.intrinsic_calibration_directory.iterdir()
-                            if file.suffix in [".mp4", ".AVI", ".mov"]
-                               and "checkerboard" in file.stem
-                               and self.cam_id in file.stem
-                        ][0]
+                        file
+                        for file in self.intrinsic_calibration_directory.iterdir()
+                        if file.suffix in [".mp4", ".AVI", ".mov"]
+                           and "checkerboard" in file.stem
+                           and self.cam_id in file.stem
+                    ][0]
                 except IndexError:
                     raise FileNotFoundError(
                         f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\n"
                         f"It is required having a intrinsic_calibration .p file "
-                        f"or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibration_directory}) for a fisheye-camera!"
+                        f"or a checkerboard video in the intrinsic_calibrations_directory "
+                        f"({self.intrinsic_calibration_directory}) for a fisheye-camera!"
                     )
                 calibrator = IntrinsicCalibratorRegularCameraCheckerboard(
                     filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
@@ -464,27 +470,36 @@ class VideoMetadataChecker(VideoMetadata):
         for attribute in attributes:
             if attribute == "cam_id":
                 print(
-                    f"Cam_id was not found in filename or did not match any of the defined cam_ids. \nPlease include one of the following ids into the filename: {self.valid_cam_ids} or add the cam_id to valid_cam_ids!"
+                    f"Cam_id was not found in filename or did not match any of the defined cam_ids. \n"
+                    f"Please include one of the following ids into the filename: {self.valid_cam_ids} "
+                    f"or add the cam_id to valid_cam_ids!"
                 )
             elif attribute == "recording_date":
                 print(
-                    f"Recording_date was not found in filename or did not match the required structure for date. \nPlease include the date as YYMMDD , e.g., 220928, into the filename!"
+                    f"Recording_date was not found in filename or did not match the required structure for date. \n"
+                    f"Please include the date as YYMMDD , e.g., 220928, into the filename!"
                 )
             elif attribute == "paradigm":
-                f"Paradigm was not found in filename or did not match any of the defined paradigms. \nPlease Please include one of the following paradigms into the filename: {self.paradigms} or add the paradigm to paradigms!"
+                f"Paradigm was not found in filename or did not match any of the defined paradigms. \n" \
+                f"Please include one of the following paradigms into the filename: {self.paradigms} " \
+                f"or add the paradigm to paradigms!"
             elif attribute == "mouse_line":
                 print(
-                    f"Mouse_line was not found in filename or is not supported. \nPlease include one of the following lines into the filename: {self.animal_lines} or add the line to valid_mouse_lines!"
+                    f"Mouse_line was not found in filename or is not supported. \n"
+                    f"Please include one of the following lines into the filename: {self.animal_lines} "
+                    f"or add the line to valid_mouse_lines!"
                 )
             elif attribute == "mouse_number":
                 print(
-                    "Mouse_number was not found in filename or did not match the required structure for a mouse_number. \n Please include the mouse number as Generation-Number, e.g., F12-45, into the filename!"
+                    "Mouse_number was not found in filename or did not match the required structure for a mouse_number. \n "
+                    "Please include the mouse number as Generation-Number, e.g., F12-45, into the filename!"
                 )
 
     def _rename_file(self) -> bool:
         suffix = self.filepath.suffix
         new_filename = input(
-            f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/"
+            f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n "
+            f"If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/"
         )
         if new_filename == "y":
             print(f"{self.filepath} needs to be moved!")

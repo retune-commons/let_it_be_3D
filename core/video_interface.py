@@ -13,11 +13,14 @@ class VideoInterface:
     ) -> None:
         self.video_metadata = video_metadata
         if self.video_metadata.calibration:
-            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_undistorted_image"
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                       f"_charuco_undistorted_image"
         elif self.video_metadata.recording:
-            filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
+            filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
+                       f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
         elif self.video_metadata.calvin:
-            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_calvin_undistorted_image"
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                       f"_calvin_undistorted_image"
         self.plot_camera_intrinsics = Intrinsics(video_filepath=self.video_metadata.filepath,
                                                  intrinsic_calibration=self.video_metadata.intrinsic_calibration,
                                                  filename=filename, fisheye=self.video_metadata.fisheye,

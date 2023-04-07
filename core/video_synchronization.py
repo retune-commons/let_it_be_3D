@@ -212,7 +212,8 @@ def _fft_zdist(q: np.ndarray, s: np.ndarray, epsilon: float):
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at http: // www.apache.org / licenses / LICENSE - 2.0
 
-    This function and the local functions called in this function where taken from https://github.com/NVIDIA/rapidAligner.git.
+    This function and the local functions called in this function where taken from
+    https://github.com/NVIDIA/rapidAligner.git.
     Changes were made in a way, that this function is able to use numpy instead of cupy.
     """
     alignment, kahan = 10_000, 0
@@ -358,9 +359,11 @@ class Synchronizer(ABC):
 
     def _plot_led_marker(self, led_center_coordinates: Coordinates) -> None:
         if self.video_metadata.calibration:
-            led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_LED_marker"
+            led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                                f"_charuco_LED_marker"
         else:
-            led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
+            led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
+                                f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
         self.led_detection = LEDMarkerPlot(
             image=iio.v3.imread(self.video_metadata.filepath, index=0),
             led_center_coordinates=led_center_coordinates,
@@ -462,7 +465,8 @@ class Synchronizer(ABC):
                 )
             else:
                 dlc_filepath_out = temp_folder.joinpath(
-                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
+                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                    f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}.h5"
                 )
 
             num_frames_to_pick = self.synchro_metadata['num_frames_to_pick']
@@ -572,7 +576,9 @@ class Synchronizer(ABC):
         try:
             end_frame_idx = self._get_frame_index_closest_to_time(time=end_time)
         except ValueError:
-            end_frame_idx = -1  # if the given end_time is larger than the length of the corresponding video, its set to the last frame of the video
+            end_frame_idx = -1
+            # if the given end_time is larger than the length of the corresponding video,
+            # its set to the last frame of the video
         (
             best_match_start_frame_idx,
             best_match_offset,
@@ -593,14 +599,17 @@ class Synchronizer(ABC):
         else:
             tag = f"_upsampled{self.video_metadata.target_fps}"
         if self.video_metadata.calibration:
-            filename_individual = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_synchronization_individual{tag}"
+            filename_individual = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                                  f"_charuco_synchronization_individual{tag}"
         else:
-            filename_individual = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronization_individual{tag}"
+            filename_individual = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
+                                  f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}" \
+                                  f"_synchronization_individual{tag}"
         self.synchronization_individual = AlignmentPlotIndividual(
             template=adjusted_motif_timeseries[best_match_offset][0],
             led_timeseries=self.led_timeseries[best_match_start_frame_idx:],
-            filename = filename_individual,
-            cam_id= self.video_metadata.cam_id,
+            filename=filename_individual,
+            cam_id=self.video_metadata.cam_id,
             output_directory=self.output_directory,
             led_box_size=self.led_box_size,
             alignment_error=alignment_error,
@@ -842,21 +851,26 @@ class Synchronizer(ABC):
         if self.video_metadata.calibration:
             if part_id is None:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_downsampled{self.target_fps}fps.mp4"
+                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}"
+                    f"_synchronized_downsampled{self.target_fps}fps.mp4"
                 )
             else:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4"
+                    f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}"
+                    f"_synchronized_part_{part_id}.mp4"
                 )
 
         else:
             if part_id is None:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_downsampled{self.target_fps}fps.mp4"
+                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                    f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_downsampled"
+                    f"{self.target_fps}fps.mp4"
                 )
             else:
                 filepath = self.output_directory.joinpath(
-                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4"
+                    f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                    f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronized_part_{part_id}.mp4"
                 )
         return filepath
 
@@ -907,7 +921,8 @@ class CharucoVideoSynchronizer(Synchronizer):
 
 class RecordingVideoSynchronizer(Synchronizer):
     def _adjust_video_to_target_fps_and_run_marker_detection(self, target_fps: int, start_idx: int, offset: float,
-                                                             test_mode: bool, synchronize_only: bool) -> Tuple[Optional[Path], Optional[Path]]:
+                                                             test_mode: bool, synchronize_only: bool) -> Tuple[
+        Optional[Path], Optional[Path]]:
         pass
 
     def _create_h5_filepath(
@@ -915,11 +930,13 @@ class RecordingVideoSynchronizer(Synchronizer):
     ) -> Path:
         if filtered:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
             )
         else:
             h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
             )
         return h5_filepath
 

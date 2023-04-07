@@ -1,17 +1,18 @@
-from typing import List, Tuple, Optional, Union, Dict
-from pathlib import Path
 import math
+from pathlib import Path
+from typing import List, Optional, Union, Dict
 
+import cv2
+import imageio as iio
 import matplotlib.pyplot as plt
-from moviepy.video.io.bindings import mplfig_to_npimage
-from matplotlib.patches import Polygon
 import mpl_toolkits.mplot3d.art3d as art3d
 import numpy as np
-import cv2
 import pandas as pd
-import imageio as iio
+from matplotlib.patches import Polygon
+from moviepy.video.io.bindings import mplfig_to_npimage
 
 from .utils import Coordinates, load_single_frame_of_video, convert_to_path, get_3D_df_keys
+
 
 def _zscore(array: np.ndarray) -> np.ndarray:
     return (array - np.mean(array)) / np.std(array, ddof=0)
@@ -34,7 +35,8 @@ class RotationVisualization:
         self.rotated_markers = rotated_markers
         self.config = config
         self.rotation_error = rotation_error
-        self.output_filepath = self._create_filepath(filepath=convert_to_path(output_filepath)) if output_filepath is not None else ""
+        self.output_filepath = self._create_filepath(
+            filepath=convert_to_path(output_filepath)) if output_filepath is not None else ""
 
     def create_plot(self, plot: bool, save: bool) -> None:
         fig = plt.figure()
@@ -280,7 +282,7 @@ class AlignmentPlotIndividual:
         self.led_box_size = led_box_size
         self.alignment_error = alignment_error
         self.cam_id = cam_id
-        self.filepath = self._create_filepath(filename = filename)
+        self.filepath = self._create_filepath(filename=filename)
 
     def _create_filepath(self, filename: str) -> str:
         filepath = self.output_directory.joinpath(filename)
@@ -301,12 +303,13 @@ class AlignmentPlotIndividual:
             plt.show()
         plt.close()
 
+
 class AlignmentPlotCrossvalidation:
     def __init__(
             self,
             template: np.ndarray,
             led_timeseries: Dict,
-            filename: str="",
+            filename: str = "",
             output_directory: Optional[Union[str, Path]] = None,
     ):
         self.template = template
@@ -339,8 +342,8 @@ class LEDMarkerPlot:
             image: np.ndarray,
             led_center_coordinates: Coordinates,
             box_size: Optional[int] = None,
-            cam_id: str="",
-            filename: str="",
+            cam_id: str = "",
+            filename: str = "",
             output_directory: Optional[Union[str, Path]] = None,
     ) -> None:
         self.image = image

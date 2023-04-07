@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Union, Dict
-
-import imageio as iio
-import cv2
-import numpy as np
 from pathlib import Path
+from typing import List, Tuple, Dict
 
+import cv2
+import imageio as iio
+import numpy as np
 from numpy import ndarray
 
 
@@ -22,7 +21,7 @@ class IntrinsicCameraCalibrator(ABC):
 
     @abstractmethod
     def _run_camera_type_specific_calibration(
-        self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
+            self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
     ) -> Tuple:
         # wrapper to camera type specific calibration function
         # all remaining data is stored in attributes of the object
@@ -33,7 +32,7 @@ class IntrinsicCameraCalibrator(ABC):
         pass
 
     def __init__(
-        self, filepath_calibration_video: Path, max_calibration_frames: int
+            self, filepath_calibration_video: Path, max_calibration_frames: int
     ) -> None:
         self.video_filepath = filepath_calibration_video
         self.max_calibration_frames = max_calibration_frames
@@ -69,9 +68,9 @@ class IntrinsicCameraCalibrator(ABC):
             np.float32,
         )
         objp[0, :, :2] = np.mgrid[
-            0: self.checkerboard_rows_and_columns[0],
-            0: self.checkerboard_rows_and_columns[1],
-        ].T.reshape(-1, 2)
+                         0: self.checkerboard_rows_and_columns[0],
+                         0: self.checkerboard_rows_and_columns[1],
+                         ].T.reshape(-1, 2)
         return objp
 
     @property
@@ -104,9 +103,9 @@ class IntrinsicCameraCalibrator(ABC):
         return calibration_results
 
     def _attempt_to_match_max_frame_count(
-        self,
-        corners_per_image: List[np.ndarray],
-        already_selected_frame_idxs: List[int],
+            self,
+            corners_per_image: List[np.ndarray],
+            already_selected_frame_idxs: List[int],
     ) -> List[np.ndarray]:
         print(f"Frames with detected checkerboard: {len(corners_per_image)}.")
         if len(corners_per_image) < self.max_calibration_frames:
@@ -116,7 +115,8 @@ class IntrinsicCameraCalibrator(ABC):
                 already_selected_frame_idxs=already_selected_frame_idxs,
             )
             print(
-                f"Done. Now we are at a total of {len(corners_per_image)} frames in which I could detect a checkerboard."
+                f"Done. Now we are at a total of {len(corners_per_image)} "
+                f"frames in which I could detect a checkerboard."
             )
         elif len(corners_per_image) > self.max_calibration_frames:
             corners_per_image = self._limit_to_max_frame_count(
@@ -126,9 +126,9 @@ class IntrinsicCameraCalibrator(ABC):
         return corners_per_image
 
     def _attempt_to_reach_max_frame_count(
-        self,
-        corners_per_image: List[np.ndarray],
-        already_selected_frame_idxs: List[int],
+            self,
+            corners_per_image: List[np.ndarray],
+            already_selected_frame_idxs: List[int],
     ) -> List[np.ndarray]:
         # ToDo: limit time?
         total_frame_count = self.video_reader.count_frames()
@@ -177,7 +177,7 @@ class IntrinsicCameraCalibrator(ABC):
         )
 
     def _limit_to_max_frame_count(
-        self, all_detected_corners: List[np.ndarray]
+            self, all_detected_corners: List[np.ndarray]
     ) -> List[np.ndarray]:
         sampling_idxs = np.linspace(
             0,
@@ -220,7 +220,7 @@ class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator, ABC):
 
 class IntrinsicCalibratorFisheyeCamera(IntrinsicCameraCalibratorCheckerboard):
     def _compute_rvecs_and_tvecs(
-        self, n_detected_boards: int
+            self, n_detected_boards: int
     ) -> Tuple[List[ndarray], List[ndarray]]:
         rvecs = [
             np.zeros((1, 1, 3), dtype=np.float64) for i in range(n_detected_boards)
@@ -231,13 +231,13 @@ class IntrinsicCalibratorFisheyeCamera(IntrinsicCameraCalibratorCheckerboard):
         return rvecs, tvecs
 
     def _run_camera_type_specific_calibration(
-        self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
+            self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
     ) -> Tuple:
         rvecs, tvecs = self._compute_rvecs_and_tvecs(n_detected_boards=len(objpoints))
         calibration_flags = (
-            cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
-            + cv2.fisheye.CALIB_CHECK_COND
-            + cv2.fisheye.CALIB_FIX_SKEW
+                cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+                + cv2.fisheye.CALIB_CHECK_COND
+                + cv2.fisheye.CALIB_FIX_SKEW
         )
         new_subpixel_criteria = (
             cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
@@ -261,7 +261,7 @@ class IntrinsicCalibratorRegularCameraCheckerboard(
     IntrinsicCameraCalibratorCheckerboard
 ):
     def _run_camera_type_specific_calibration(
-        self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
+            self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
     ) -> Tuple:
         return cv2.calibrateCamera(objpoints, imgpoints, self.imsize, None, None)
 
