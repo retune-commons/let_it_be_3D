@@ -106,7 +106,7 @@ def _validate_metadata(metadata_from_videos: Dict,
     return tuple(list(set_of_attribute)[0] for set_of_attribute in sets_of_attributes)
 
 
-def exclude_by_framenum(metadata_from_videos: Dict, allowed_num_diverging_frames: int) -> List[Any]:
+def _exclude_by_framenum(metadata_from_videos: Dict[str, VideoMetadata], allowed_num_diverging_frames: int) -> List[Any]:
     synch_framenum_median = np.median(
         [video_metadata.framenum_synchronized for video_metadata in metadata_from_videos.values()])
 
@@ -183,19 +183,126 @@ def _create_video_objects(
     return video_interfaces, metadata_from_videos
 
 
-def initialize_camera_group(camera_objects: List) -> ap_lib.cameras.CameraGroup:
+def _initialize_camera_group(camera_objects: List) -> ap_lib.cameras.CameraGroup:
     return ap_lib.cameras.CameraGroup(camera_objects)
 
 
-class Calibration():
+class Calibration:
+    """
+    A class in which videos are calibrated to each other.
+
+    Temporal synchronization of the videos can be performed based on a pattern.
+    Spatial calibration is performed using aniposelib with additional methods
+    to validate the calibration based on known ground_truth.
+
+
+    Parameters
+    ----------
+    calibration_directory: Path or string
+        Directory, where the calibration videos are stored.
+    project_config_filepath: Path or string
+        Filepath to the project_config .yaml file.
+    recording_config_filepath: Path or string
+        Filepath to the recording_config .yaml file.
+    output_directory: Path or string, optional
+        Directory, in which the files created during the analysis are saved.
+        Per default it will be set the same as the calibration_directory.
+    test_mode: bool
+        If True, pre-existing files won't be overwritten during the analysis.
+
+    Attributes
+    __________
+    project_config_filepath: Path
+        Filepath to the project_config .yaml file.
+    output_directory: Path
+        Directory, in which the files created during the analysis are saved.
+    camera_group: ap_lib.cameras.CameraGroup
+        Group of ap_lib.cameras.Camera objects.
+    camera_objects:
+        List of ap_lib.cameras.Camera objects.
+    synchronized_charuco_videofiles: {str: Path}
+        Dict of synchronized calibration video per camera.
+    video_interfaces: {str: VideoInterface}
+        List of VideoInterface objects for all calibration videos.
+    metadata_from_videos: {str: VideoMetadata}
+        List of VideoMetadata objects for all calibration videos.
+    valid_videos: list of str
+        Videos, that were found in the calibration_directory and
+        not excluded due to synchronization issues.
+    recording_date: str
+        Date at which the calibration was done.
+    target_fps: int
+        Fps rate, to which the videos should be synchronized.
+    led_pattern: dict
+        Blinking pattern to use for temporal synchronisation.
+    calibration_index: int
+        Index of a calibration.
+        Together with recording_date, it creates a unique calibration key.
+    valid_cam_ids: list of str
+        All camera names to search for in the files in calibration_directory.
+    calibration_tag: str
+        Filename tag to search for in the files in calibration_directory.
+    reprojerr: float
+        Reprojection error (px) returned by ap_lib calibration.
+    report_filepath: Path
+        Filepath to the report .csv for calibration optimisation.
+    allowed_num_diverging_frames: int
+        Difference of framenumber to the framenumber median of all synchronised videos,
+        that is allowed before a video has to be excluded.
+    synchro_metadata: dict
+        Dictionary used as input for synchronizer objects.
+    synchronization_individuals: list of AlignmentPlotIndividual
+        Container for the AlignmentPlotIndividual objects of each synchronized video.
+    led_detection_individuals: list of LEDMarkerPlot
+        Container for the LEDMarkerPlot objects of each synchronized video.
+
+    Methods
+    _______
+    run_synchronization(test_mode)
+        Performs synchronization of all videos to the led_pattern and downsampling to target_fps.
+    run_calibration: use_own_intrinsic_calibration: bool = True,
+            verbose: int = 0,
+            charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
+            test_mode: bool = False,
+            iteration: Optional[int] = None,
+
+    calibrate_optimal: calibration_validation: "CalibrationValidation",
+            max_iters: int = 5,
+            p_threshold: float = 0.1,
+            angle_threshold: float = 5.,
+            verbose: int = 1,
+            test_mode: bool = False,
+
+    """
     def __init__(
             self,
-            calibration_directory: Path,
-            project_config_filepath: Path,
-            recording_config_filepath: Path,
-            output_directory: Optional[Path] = None,
+            calibration_directory: Union[Path, str],
+            project_config_filepath: Union[Path, str],
+            recording_config_filepath: Union[Path, str],
+            output_directory: Optional[Union[Path, str]] = None,
             test_mode: bool = False,
     ) -> None:
+        """
+        Constructs all necessary attributes for the Calibration Class.
+
+        Reads the metadata from project-/recording config.
+        Creates representations of the videos inside the given calibration_directory.
+        Reads metadata from the video filenames.
+
+        Parameters
+        ----------
+        calibration_directory: Path or string
+            Directory, where the calibration videos are stored.
+        project_config_filepath: Path or string
+            Filepath to the project_config .yaml file.
+        recording_config_filepath: Path or string
+            Filepath to the recording_config .yaml file.
+        output_directory: Path or string, optional
+            Directory, in which the files created during the analysis are saved.
+            Per default it will be set the same as the calibration_directory.
+        test_mode: bool
+            If True, pre-existing files won't be overwritten during the analysis.
+        """
         for attribute in STANDARD_ATTRIBUTES_CALIBRATION:
             setattr(self, attribute, None)
         self.calibration_directory = convert_to_path(calibration_directory)
@@ -209,8 +316,7 @@ class Calibration():
             project_config_filepath=project_config_filepath,
         )
         self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
-        for attribute in ["valid_cam_ids", "calibration_tag", "calibration_validation_tag",
-                          "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
+        for attribute in ["valid_cam_ids", "calibration_tag", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
             setattr(self, attribute, recording_config_dict[attribute])
@@ -229,6 +335,7 @@ class Calibration():
                                                      attributes_to_check=['recording_date'])
         self.target_fps = min(
             [video_metadata.fps for video_metadata in self.metadata_from_videos.values()])
+        # limits target_fps to fps of the slowest video
         for video_metadata in self.metadata_from_videos.values():
             video_metadata.target_fps = self.target_fps
 
@@ -275,13 +382,13 @@ class Calibration():
                 "in the calibration directory and rename them!"
             )
         self.camera_objects.sort(key=lambda x: x.name, reverse=False)
-        cams_to_exclude = exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
-                                              allowed_num_diverging_frames=self.allowed_num_diverging_frames)
+        cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
+                                               allowed_num_diverging_frames=self.allowed_num_diverging_frames)
         self.valid_videos = [cam.name for cam in self.camera_objects if
                              cam.name not in cams_to_exclude]
         for cam in cams_to_exclude:
             self.camera_objects.remove(cam)
-        self.camera_group = initialize_camera_group(camera_objects=self.camera_objects)
+        self.camera_group = _initialize_camera_group(camera_objects=self.camera_objects)
 
     def run_calibration(
             self,
@@ -822,8 +929,8 @@ class TriangulationRecordings(Triangulation):
             markers = list(df.columns.levels[1])
             all_markers = all_markers.union(markers)
         self.markers = list(all_markers)
-        cams_to_exclude = exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
-                                              allowed_num_diverging_frames=self.allowed_num_diverging_frames)
+        cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
+                                               allowed_num_diverging_frames=self.allowed_num_diverging_frames)
         for cam in self.metadata_from_videos:
             if cam in cams_to_exclude:
                 self.triangulation_dlc_cams_filepaths.pop(cam)
@@ -852,7 +959,9 @@ class TriangulationRecordings(Triangulation):
     def _create_csv_filepath(self) -> Path:
         filepath_out = self.output_directory.joinpath(
             f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps"
-            f"_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}_{self.triangulation_type}.csv"
+            f"_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_"
+            f"filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}_"
+            f"{self.triangulation_type}.csv"
         )
         return filepath_out
 
