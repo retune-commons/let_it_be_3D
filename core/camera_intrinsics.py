@@ -10,7 +10,15 @@ from numpy import ndarray
 
 
 class IntrinsicCameraCalibrator(ABC):
-    # https://medium.com/@kennethjiang/calibrate-fisheye-lens-using-opencv-333b05afa0b0
+    """
+    Copyright Kenneth Jiang.
+    This class and its subclasses use code taken from the article
+    “Calibrate fisheye lens using OpenCV”
+    published on medium.com on Sep 29, 2017 by Kenneth Jiang
+    (https://medium.com/@kennethjiang/calibrate-fisheye-lens-using-opencv-333b05afa0b0).
+
+    Changes were made to match our needs here.
+    """
 
     @abstractmethod
     def _run_camera_type_specific_calibration(

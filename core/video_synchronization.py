@@ -205,6 +205,16 @@ def _cumsum(x, kahan=0):
 
 
 def _fft_zdist(q: np.ndarray, s: np.ndarray, epsilon: float):
+    """
+    Copyright 2020 NVIDIA Corporation
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at http: // www.apache.org / licenses / LICENSE - 2.0
+
+    This function and the local functions called in this function where taken from https://github.com/NVIDIA/rapidAligner.git.
+    Changes were made in a way, that this function is able to use numpy instead of cupy.
+    """
     alignment, kahan = 10_000, 0
     m, q = len(q), _znorm(q, epsilon)
     n = (len(s) + alignment - 1) // alignment * alignment
@@ -227,7 +237,6 @@ def _fft_zdist(q: np.ndarray, s: np.ndarray, epsilon: float):
 
 
 def _run_cpu_aligner(query: np.ndarray, subject: np.ndarray) -> np.ndarray:
-    # same as rapidAligner, just using numpy instead of cupy
     return _fft_zdist(q=query, s=subject, epsilon=1e-6)
 
 
