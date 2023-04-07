@@ -33,7 +33,7 @@ class IntrinsicCameraCalibrator(ABC):
 
     @property
     def checkerboard_rows_and_columns(self) -> Tuple[int, int]:
-        return (5, 5)
+        return 5, 5
 
     @property
     def d(self) -> np.ndarray:
@@ -41,8 +41,6 @@ class IntrinsicCameraCalibrator(ABC):
 
     @property
     def imsize(self) -> Tuple[int, int]:
-        # ToDo:
-        # Check whether it has to be the shape of the grayscale image and what it actually looks like
         frame = np.asarray(self.video_reader.get_data(0))
         frame_in_gray_scale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         return frame_in_gray_scale.shape[::-1]
@@ -63,40 +61,37 @@ class IntrinsicCameraCalibrator(ABC):
             np.float32,
         )
         objp[0, :, :2] = np.mgrid[
-            0 : self.checkerboard_rows_and_columns[0],
-            0 : self.checkerboard_rows_and_columns[1],
+            0: self.checkerboard_rows_and_columns[0],
+            0: self.checkerboard_rows_and_columns[1],
         ].T.reshape(-1, 2)
         return objp
 
     @property
     def subpixel_criteria(self) -> Tuple:
-        return (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        return cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1
 
     def run(self) -> Dict:
         selected_frame_idxs = self._get_indices_of_selected_frames()
-        detected_checkerboard_corners_per_image = self._detect_board_corners(
+        detected_board_corners_per_image = self._detect_board_corners(
             frame_idxs=selected_frame_idxs
         )
 
-        # check, how the charuco calibration works and whether the following function calls are needed in the abstract class
-        # rename to board instead of checkerboard
-        if len(detected_checkerboard_corners_per_image) != self.max_calibration_frames:
-            detected_checkerboard_corners_per_image = (
+        if len(detected_board_corners_per_image) != self.max_calibration_frames:
+            detected_board_corners_per_image = (
                 self._attempt_to_match_max_frame_count(
-                    corners_per_image=detected_checkerboard_corners_per_image,
+                    corners_per_image=detected_board_corners_per_image,
                     already_selected_frame_idxs=selected_frame_idxs,
                 )
             )
         object_points = self._compute_object_points(
-            n_detected_boards=len(detected_checkerboard_corners_per_image)
+            n_detected_boards=len(detected_board_corners_per_image)
         )
-        #
 
         retval, K, D, rvec, tvec = self._run_camera_type_specific_calibration(
-            objpoints=object_points, imgpoints=detected_checkerboard_corners_per_image
+            objpoints=object_points, imgpoints=detected_board_corners_per_image
         )
         calibration_results = self._construct_calibration_results(
-            K=K, D=D, rvec=rvec, tvec=tvec
+            K=K, D=D
         )
         return calibration_results
 
@@ -127,8 +122,7 @@ class IntrinsicCameraCalibrator(ABC):
         corners_per_image: List[np.ndarray],
         already_selected_frame_idxs: List[int],
     ) -> List[np.ndarray]:
-        # ToDo
-        # limit time?
+        # ToDo: limit time?
         total_frame_count = self.video_reader.count_frames()
         for idx in range(total_frame_count):
             if len(corners_per_image) < self.max_calibration_frames:
@@ -143,11 +137,7 @@ class IntrinsicCameraCalibrator(ABC):
                 break
         return corners_per_image
 
-    def _construct_calibration_results(
-        self, K: np.ndarray, D: np.ndarray, rvec: np.ndarray, tvec: np.ndarray
-    ) -> Dict:
-        # ToDo:
-        # - confirm type hints
+    def _construct_calibration_results(self, K: np.ndarray, D: np.ndarray) -> Dict:
         calibration_results = {"K": K, "D": D, "size": self.imsize}
         setattr(self, "calibration_results", calibration_results)
         return calibration_results
@@ -192,12 +182,12 @@ class IntrinsicCameraCalibrator(ABC):
         return list(sampled_corners)
 
 
-class IntrinsicCameraCalibratorCharuco(IntrinsicCameraCalibrator):
+class IntrinsicCameraCalibratorCharuco(IntrinsicCameraCalibrator, ABC):
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         pass
 
 
-class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator):
+class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator, ABC):
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         detected_checkerboard_corners_per_image = []
         for idx in frame_idxs:
@@ -217,8 +207,6 @@ class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator):
             self.checkerboard_rows_and_columns,
             cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE,
         )
-        # if checkerboard_detected:
-        # predicted_corners = cv2.cornerSubPix(gray_scale_image, predicted_corners, (3,3), (-1,-1), self.subpixel_criteria)
         return checkerboard_detected, predicted_corners
 
 

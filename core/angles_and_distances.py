@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 
 
-def fill_in_distances(distances_dict):
+def fill_in_distances(distances: Dict) -> Dict:
     filled_d = {}
-    for key, value in distances_dict.items():
+    for key, value in distances.items():
         filled_d[key] = value
         for k, v in value.items():
             if k in filled_d.keys():
@@ -19,18 +19,18 @@ def fill_in_distances(distances_dict):
     return filled_d
 
 
-def set_distances_and_angles_for_evaluation(parameters_dict, anipose_io):
-    if "distances" in parameters_dict:
+def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict) -> Dict:
+    if "distances" in parameters:
         anipose_io = _set_distances_from_configuration(
-            parameters_dict["distances"], anipose_io
+            parameters["distances"], anipose_io
         )
     else:
         print(
             "WARNING: No distances were computed. If this is unexpected please edit the ground truth file accordingly"
         )
 
-    if "angles" in parameters_dict:
-        anipose_io = _set_angles_to_plane(parameters_dict["angles"], anipose_io)
+    if "angles" in parameters:
+        anipose_io = _set_angles_to_plane(parameters["angles"], anipose_io)
     else:
         print(
             "WARNING: No angles were computed. If this is unexpected please edit the ground truth file accordingly"
@@ -39,7 +39,7 @@ def set_distances_and_angles_for_evaluation(parameters_dict, anipose_io):
     return anipose_io
 
 
-def _set_distances_from_configuration(distances_to_compute, anipose_io):
+def _set_distances_from_configuration(distances_to_compute: Dict, anipose_io: Dict) -> Dict:
     conversion_factors = _get_conversion_factors_from_different_references(
         anipose_io, distances_to_compute
     )
@@ -116,7 +116,7 @@ def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Di
             marker_id = key[: key.find("_error")]
             anipose_io["reprojection_errors_calibration_validation_markers"][
                 marker_id
-            ] = reprojection_error  # since we only have a single image
+            ] = reprojection_error
             if type(reprojection_error) != np.nan:
                 # ToDo:
                 # confirm that it would actually be a numpy nan
@@ -149,7 +149,7 @@ def _compute_differences_between_triangulated_and_gt_distances(
     return marker_ids_with_distance_error
 
 
-def _wrap_angles_360(angle):
+def _wrap_angles_360(angle: float) -> float:
     """
     Wraps negative angle on 360 space
     :param angle: input angle
@@ -159,7 +159,7 @@ def _wrap_angles_360(angle):
 
 
 def _compute_differences_between_triangulated_and_gt_angles(
-    gt_angles: Dict, anipose_io
+    gt_angles: Dict, anipose_io: Dict
 ) -> Dict[str, float]:
     """
     Computes the difference between the triangulated screw angles and the provided ground truth ones.
@@ -186,7 +186,7 @@ def _compute_differences_between_triangulated_and_gt_angles(
     return marker_ids_with_angles_error
 
 
-def _computes_angles(angles_to_compute, anipose_io) -> Dict[str, float]:
+def _computes_angles(angles_to_compute: Dict, anipose_io: Dict) -> Dict[str, float]:
     """
     Computes the triangulated angles
     :return: dictionary of the angles computed
@@ -238,7 +238,7 @@ def _computes_angles(angles_to_compute, anipose_io) -> Dict[str, float]:
     return triangulated_angles
 
 
-def _set_angles_to_plane(angles_to_compute, anipose_io):
+def _set_angles_to_plane(angles_to_compute: Dict, anipose_io: Dict) -> Dict:
     """
     Sets the angles between the screws and the plane
     :param angles_to_compute:
@@ -249,7 +249,7 @@ def _set_angles_to_plane(angles_to_compute, anipose_io):
     return anipose_io
 
 
-def set_angles_error_between_screws_and_plane(gt_angles, anipose_io):
+def set_angles_error_between_screws_and_plane(gt_angles: Dict, anipose_io: Dict) -> Dict:
     """
     Sets the angles between the screws and the plane
     :return:
@@ -266,16 +266,15 @@ def _convert_all_xyz_distances(anipose_io: Dict, conversion_factor: float) -> Di
     for marker_id_a, marker_id_b in marker_id_combinations:
         if marker_id_a not in all_distances_in_cm.keys():
             all_distances_in_cm[marker_id_a] = {}
-        xyz_distance = _get_xyz_distance_in_triangulation_space(
-            marker_ids=(marker_id_a, marker_id_b), df_xyz=anipose_io["df_xyz"]
-        )
+        xyz_distance = get_xyz_distance_in_triangulation_space(marker_ids=(marker_id_a, marker_id_b),
+                                                               df_xyz=anipose_io["df_xyz"])
         all_distances_in_cm[marker_id_a][marker_id_b] = xyz_distance / conversion_factor
     return all_distances_in_cm
 
 
 def _get_conversion_factors_from_different_references(
     anipose_io: Dict, ground_truth_distances: Dict
-) -> Dict:  # Tuple? List?
+) -> Dict:
     all_conversion_factors = {}
     for reference, markers in ground_truth_distances.items():
         for m in markers:
@@ -294,7 +293,7 @@ def _get_conversion_factors_from_different_references(
     return all_conversion_factors
 
 
-def _get_xyz_distance_in_triangulation_space(
+def get_xyz_distance_in_triangulation_space(
     marker_ids: Tuple[str, str], df_xyz: pd.DataFrame
 ) -> float:
     squared_differences = [
@@ -309,9 +308,8 @@ def _get_xyz_to_cm_conversion_factor(
     distance_in_cm: Union[int, float],
     df_xyz: pd.DataFrame,
 ) -> float:
-    distance_in_triangulation_space = _get_xyz_distance_in_triangulation_space(
-        marker_ids=reference_marker_ids, df_xyz=df_xyz
-    )
+    distance_in_triangulation_space = get_xyz_distance_in_triangulation_space(marker_ids=reference_marker_ids,
+                                                                              df_xyz=df_xyz)
     return distance_in_triangulation_space / distance_in_cm
 
 
@@ -345,8 +343,8 @@ def _get_angle_between_three_points_at_PointA(
 def _get_coordinates_plane_equation_from_three_points(
     PointA: np.array, PointB: np.array, PointC: np.array
 ) -> np.array:
-    R1 = _get_Richtungsvektor_from_two_points(PointA, PointB)
-    R2 = _get_Richtungsvektor_from_two_points(PointA, PointC)
+    R1 = _get_vector_from_two_points(PointA, PointB)
+    R2 = _get_vector_from_two_points(PointA, PointC)
     # check for linear independency
     # np.solve: R2 * x != R1
     plane_equation_coordinates = np.asarray([PointA, R1, R2])
@@ -365,13 +363,13 @@ def _get_vector_product(A: np.array, B: np.array) -> np.array:
     return N
 
 
-def _get_Richtungsvektor_from_two_points(
+def _get_vector_from_two_points(
     PointA: np.array, PointB: np.array
 ) -> np.array:
-    R = np.asarray(
+    vector = np.asarray(
         [PointA[0] - PointB[0], PointA[1] - PointB[1], PointA[2] - PointB[2]]
     )
-    return R
+    return vector
 
 
 def _get_vector_length(vector: np.array) -> float:
@@ -397,7 +395,7 @@ def _get_angle_between_plane_and_line(N: np.array, R: np.array) -> float:
 def _get_angle_between_two_points_and_plane(
     PointA: np.array, PointB: np.array, N: np.array
 ) -> float:
-    R = _get_Richtungsvektor_from_two_points(PointA, PointB)
+    R = _get_vector_from_two_points(PointA, PointB)
     return _get_angle_between_plane_and_line(N=N, R=R)
 
 

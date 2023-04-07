@@ -27,19 +27,6 @@ def check_keys(dictionary: Dict, list_of_keys: List[str]) -> List:
             missing_keys.append(key)
     return missing_keys
 
-def get_subsets_of_two_lists(list1, list2)->Tuple[List, List, List, List]:
-    individual_elems, duplicate_elems, missing_elems_in_list1, missing_elems_in_list2 = [], [], [], []
-    for elem in list1:
-        if elem not in list2:
-            missing_elems_in_list2.append(elem)
-        if elem not in individual_elems:
-            individual_elems.append(elem)
-        else:
-            duplicate_elems.append(elem)
-    for elem in list2:
-        if elem not in list1:
-            missing_elems_in_list1.append(elem)
-    return individual_elems, duplicate_elems, missing_elems_in_list1, missing_elems_in_list2
 
 def read_config(path: Path) -> Dict:
     """

@@ -1,38 +1,35 @@
-from typing import List, Tuple, Optional, Union, Dict
-from abc import ABC, abstractmethod
-from pathlib import Path
 import datetime
-
 import pickle
+from pathlib import Path
+from typing import List, Tuple, Dict
+
 import imageio as iio
 import numpy as np
-import aniposelib as ap_lib
-import cv2
-import matplotlib.pyplot as plt
-import yaml
 
 from .camera_intrinsics import (
     IntrinsicCalibratorFisheyeCamera,
-    IntrinsicCalibratorRegularCameraCharuco,
+    IntrinsicCalibratorRegularCameraCheckerboard
 )
-from .utils import load_single_frame_of_video, convert_to_path, check_keys, read_config
 from .user_specific_rules import user_specific_rules_on_videometadata
+from .utils import check_keys
 
 
 class VideoMetadata:
     def __init__(
-        self,
-        video_filepath: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict,
-        tag: str,
+            self,
+            video_filepath: Path,
+            recording_config_dict: Dict,
+            project_config_dict: Dict,
+            tag: str,
     ) -> None:
-        self._get_video_identity(tag=tag)
+        self.calvin, self.recording, self.calibration = False, False, False
+        if tag in ["calvin", "recording", "calibration"]:
+            setattr(self, tag, True)
+        else:
+            raise KeyError(f"{tag} is not a valid tag for VideoMetadata!\n"
+                           f"Only [calvin, recording, calibration] are valid.")
         self.exclusion_state = "valid"
-
-        self._check_filepaths(
-            video_filepath=video_filepath,
-        )
+        self.filepath = self._check_filepaths(video_filepath=video_filepath)
 
         state = self._read_metadata(
             recording_config_dict=recording_config_dict,
@@ -40,63 +37,54 @@ class VideoMetadata:
             video_filepath=video_filepath,
         )
 
-        self._get_intrinsic_parameters(
-            max_calibration_frames=self.max_calibration_frames,
-        )
+        if state == "del":
+            raise TypeError("This video_metadata has problems. Use the filename checker to resolve!")
+        else:
+            self.intrinsic_calibration = self._get_intrinsic_parameters(
+                max_calibration_frames=self.max_calibration_frames,
+            )
         if self.calvin:
             self.framenum = 1
         else:
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
 
-    def _check_filepaths(
-        self,
-        video_filepath: Path,
-    ) -> None:
-        if (
-            video_filepath.suffix == ".mp4"
-            or video_filepath.suffix == ".mov"
-            or video_filepath.suffix == ".AVI"
-            or video_filepath.suffix == ".avi"
-            or video_filepath.suffix == ".jpg"
-            or video_filepath.suffix == ".png"
-            or video_filepath.suffix == ".tiff"
-            or video_filepath.suffix == ".bmp"
-        ) and video_filepath.exists():
-            self.filepath = video_filepath
+    def _print_message(self, attributes: List) -> None:
+        pass
+
+    def _rename_file(self) -> bool:
+        pass
+
+    def _check_filepaths(self, video_filepath: Path) -> Path:
+        if (video_filepath.suffix in [".mp4", ".mov", ".AVI", ".avi", ".jpg", ".png", ".tiff",
+                                      ".bmp"]) and video_filepath.exists():
+            return video_filepath
         else:
             raise ValueError("The filepath is not linked to a video or image.")
 
     def _read_metadata(
-        self,
-        project_config_dict: Dict,
-        recording_config_dict: Dict,
-        video_filepath: Path,
-    ) -> None:
-        self.valid_cam_ids = project_config_dict["valid_cam_IDs"]
-        self.valid_paradigms = project_config_dict["paradigms"]
-        self.valid_mouse_lines = project_config_dict["animal_lines"]
-        self.load_calibration = project_config_dict["load_calibration"]
+            self,
+            project_config_dict: Dict,
+            recording_config_dict: Dict,
+            video_filepath: Path,
+    ) -> str:
+        for attribute in ["valid_cam_IDs", "paradigms", "animal_lines", "load_calibration", "max_calibration_frames",
+                          "max_ram_digestible_frames", "max_cpu_cores_to_pool"]:
+            setattr(self, attribute, project_config_dict[attribute])
         if self.load_calibration:
-            try:
-                self.intrinsic_calibrations_directory = Path(
+            if "intrinsic_calibration_directory" in project_config_dict:
+                self.intrinsic_calibration_directory = Path(
                     project_config_dict["intrinsic_calibration_directory"]
                 )
-            except:
+            else:
                 raise ValueError(
                     "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
                 )
-        self.max_calibration_frames = project_config_dict["max_calibration_frames"]
-        self.max_ram_digestible_frames = project_config_dict[
-            "max_ram_digestible_frames"
-        ]
-        self.max_cpu_cores_to_pool = project_config_dict["max_cpu_cores_to_pool"]
-
         while True:
             undefined_attributes = self._extract_filepath_metadata()
-            if len(undefined_attributes) > 0:
+            if undefined_attributes:
                 self._print_message(attributes=undefined_attributes)
-                self._rename_file()
-                if self.filepath.stem == "x":
+                delete = self._rename_file()
+                if delete:
                     self.filepath.unlink()
                     return "del"
             else:
@@ -105,72 +93,39 @@ class VideoMetadata:
         if self.recording:
             self.mouse_id = self.mouse_line + "_" + self.mouse_number
 
-        self.led_pattern = recording_config_dict[
-            "led_pattern"
-        ]  # unnecessary if no synchronization needed
-        self.target_fps = recording_config_dict["target_fps"]
-        self.calibration_index = recording_config_dict["calibration_index"]
+        # led pattern not necessary if no synchronisation necessary
+        for attribute in ["led_pattern", "target_fps", "calibration_index"]:
+            setattr(self, attribute, recording_config_dict[attribute])
         if self.recording_date != recording_config_dict["recording_date"]:
             raise ValueError(
                 f"The date of the recording_config_file and the provided video {video_filepath} do not match! Did you pass the right config-file and check the filename carefully?"
             )
 
         metadata_dict = recording_config_dict[self.cam_id]
-        keys_to_check = [
-            "fps",
-            "offset_row_idx",
-            "offset_col_idx",
-            "flip_h",
-            "flip_v",
-            "fisheye",
-        ]
-        missing_keys = check_keys(dictionary=metadata_dict, list_of_keys=keys_to_check)
-        if len(missing_keys) > 0:
+        keys_per_cam = ["fps", "offset_row_idx", "offset_col_idx", "flip_h", "flip_v", "fisheye"]
+        missing_keys = check_keys(dictionary=metadata_dict, list_of_keys=keys_per_cam)
+        if missing_keys:
             raise KeyError(
                 f"Missing metadata information in the recording_config_file for {self.cam_id} for {missing_keys}."
             )
 
-        self.fps = metadata_dict["fps"]  # unnecessary if no fps change needed
-        self.offset_row_idx = metadata_dict[
-            "offset_row_idx"
-        ]  # unnecessary if no cropping was performed or use_intrinsic_calibration False
-        self.offset_col_idx = metadata_dict["offset_col_idx"]
-        self.flip_h = metadata_dict["flip_h"]
-        self.flip_v = metadata_dict["flip_v"]
-        self.fisheye = metadata_dict["fisheye"]  # unnecessary if no fisheye lens used
+        # fps not necessary if all cams have the same fps
+        # offsets not necessary if no cropping was performed or use_intrinsic_calibration False
+        # fisheye not necessary if no camera is fisheye
+        for attribute in keys_per_cam:
+            setattr(self, attribute, metadata_dict[attribute])
 
         self.processing_type = project_config_dict["processing_type"][self.cam_id]
-        self.calibration_evaluation_type = project_config_dict[
-            "calibration_evaluation_type"
-        ][self.cam_id]
-        self.processing_filepath = Path(
-            project_config_dict["processing_filepath"][self.cam_id]
-        )
-        self.calibration_evaluation_filepath = Path(
-            project_config_dict["calibration_evaluation_filepath"][self.cam_id]
-        )
-        self.led_extraction_type = project_config_dict["led_extraction_type"][
-            self.cam_id
-        ]
-        self.led_extraction_filepath = project_config_dict["led_extraction_filepath"][
-            self.cam_id
-        ]
+        self.calibration_evaluation_type = project_config_dict["calibration_evaluation_type"][self.cam_id]
+        self.processing_filepath = Path(project_config_dict["processing_filepath"][self.cam_id])
+        self.calibration_evaluation_filepath = Path(project_config_dict["calibration_evaluation_filepath"][self.cam_id])
+        self.led_extraction_type = project_config_dict["led_extraction_type"][self.cam_id]
+        self.led_extraction_filepath = project_config_dict["led_extraction_filepath"][self.cam_id]
         return "valid"
-
-    def _get_video_identity(self, tag: str) -> None:
-        self.charuco_video = False
-        self.calvin = False
-        self.recording = False
-        if tag == "calibration":
-            self.charuco_video = True
-        elif tag == "calvin":
-            self.calvin = True
-        elif tag == "recording":
-            self.recording = True
 
     def _extract_filepath_metadata(self) -> List:
         user_specific_rules_on_videometadata(videometadata=self)
-        if self.charuco_video:
+        if self.calibration:
             for piece in self.filepath.stem.split("_"):
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():
@@ -184,7 +139,6 @@ class VideoMetadata:
                             )
                         except ValueError:
                             pass
-
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(
@@ -205,7 +159,6 @@ class VideoMetadata:
                             )
                         except ValueError:
                             pass
-
             for attribute in ["cam_id", "recording_date"]:
                 if not hasattr(self, attribute):
                     raise ValueError(
@@ -238,7 +191,6 @@ class VideoMetadata:
                             )
                         except ValueError:
                             pass
-
             for attribute in [
                 "cam_id",
                 "recording_date",
@@ -253,105 +205,128 @@ class VideoMetadata:
         return []
 
     def _get_intrinsic_parameters(
-        self,
-        max_calibration_frames: int,
-    ) -> None:
+            self,
+            max_calibration_frames: int,
+    ) -> Dict:
+        intrinsic_calibration = self._get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration(
+            max_calibration_frames=max_calibration_frames)
+        adjusting_required = self._is_adjusting_of_intrinsic_calibration_required()
+        if adjusting_required:
+            intrinsic_calibration = self._adjust_intrinsic_calibration(
+                unadjusted_intrinsic_calibration=intrinsic_calibration
+            )
+        return intrinsic_calibration
+
+    def _get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration(self,
+                                                                              max_calibration_frames: int
+                                                                              ) -> Dict:
         if self.fisheye:
-            try:
-                intrinsic_calibration_filepath = [
-                    file
-                    for file in self.intrinsic_calibrations_directory.iterdir()
-                    if file.suffix == ".p" and self.cam_id in file.stem
-                ][0]
-                with open(intrinsic_calibration_filepath, "rb") as io:
-                    intrinsic_calibration = pickle.load(io)
-            except IndexError:
-                try:
-                    intrinsic_calibration_checkerboard_video_filepath = [
-                        file
-                        for file in self.intrinsic_calibrations_directory.iterdir()
-                        if file.suffix == ".mp4"
-                        and "checkerboard" in file.stem
-                        and self.cam_id in file.stem
-                    ][0]
-                    calibrator = IntrinsicCalibratorFisheyeCamera(
-                        filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
-                        max_calibration_frames=self.max_calibration_frames,
-                    )
-                    intrinsic_calibration = calibrator.run()
-                except IndexError:
-                    raise FileNotFoundError(
-                        f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\nIt is required having a intrinsic_calibration .p file or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibrations_directory}) for a fisheye-camera!"
-                    )
-        else:
             if self.load_calibration:
                 try:
                     intrinsic_calibration_filepath = [
                         file
-                        for file in self.intrinsic_calibrations_directory.iterdir()
+                        for file in self.intrinsic_calibration_directory.iterdir()
                         if file.suffix == ".p" and self.cam_id in file.stem
                     ][0]
                     with open(intrinsic_calibration_filepath, "rb") as io:
                         intrinsic_calibration = pickle.load(io)
                 except IndexError:
                     raise FileNotFoundError(
-                        f'Could not find an intrinsic calibration for {self.cam_id}! Use "load_calibration = False" in project_config to calibrate now!'
+                        f"Could not find a file for an intrinsic calibration .p file for {self.cam_id}.\n"
+                        f"It is required having a pickle file including came_id in the intrinsic_calibrations_directory\n"
+                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True"
+                        f"Use 'load_calibration = False' in project_config to calibrate now!"
                     )
             else:
-                raise NotImplementedError("currently not working!")
-                """
-                calibrator = IntrinsicCalibratorRegularCameraCharuco(
-                    filepath_calibration_video=self.filepath,
-                    max_calibration_frames=self.max_calibration_frames,
+                try:
+                    intrinsic_calibration_checkerboard_video_filepath = [
+                        file
+                        for file in self.intrinsic_calibration_directory.iterdir()
+                        if file.suffix == ".mp4"
+                           and "checkerboard" in file.stem
+                           and self.cam_id in file.stem
+                    ][0]
+                except IndexError:
+                    raise FileNotFoundError(
+                        f"Could not find a file for a checkerboard video for {self.cam_id}.\n"
+                        f"It is required having a checkerboard video .mp4 including checkerboard and cam_id\n"
+                        f"in the intrinsic_calibrations_directory ({self.intrinsic_calibration_directory}) if you use load_calibration = False!"
+                    )
+                calibrator = IntrinsicCalibratorFisheyeCamera(
+                    filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
+                    max_calibration_frames=max_calibration_frames,
                 )
                 intrinsic_calibration = calibrator.run()
-                with open(intrinsic_calibration_filepath, "rb") as io:
-                    intrinsic_calibration = pickle.load(io)
-                """
+                intrinsic_calibration_filepath = self.intrinsic_calibration_directory.joinpath(
+                    f"checkerboard_intrinsiccalibrationresultsfisheye_{self.cam_id}.p")
+                with open(intrinsic_calibration_filepath, "wb") as io:
+                    pickle.dump(intrinsic_calibration, io)
+        else:
+            if self.load_calibration:
+                try:
+                    intrinsic_calibration_filepath = [
+                        file
+                        for file in self.intrinsic_calibration_directory.iterdir()
+                        if file.suffix == ".p" and self.cam_id in file.stem
+                    ][0]
+                    with open(intrinsic_calibration_filepath, "rb") as io:
+                        intrinsic_calibration = pickle.load(io)
+                except IndexError:
+                    raise FileNotFoundError(
+                        f"Could not find a file for an intrinsic calibration .p file for {self.cam_id}.\n"
+                        f"It is required having a pickle file including came_id in the intrinsic_calibrations_directory\n"
+                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True"
+                        f'Use "load_calibration = False" in project_config to calibrate now!'
+                    )
+            else:
+                try:
+                    intrinsic_calibration_checkerboard_video_filepath = [
+                            file
+                            for file in self.intrinsic_calibration_directory.iterdir()
+                            if file.suffix == ".mp4"
+                               and "checkerboard" in file.stem
+                               and self.cam_id in file.stem
+                        ][0]
+                except IndexError:
+                    raise FileNotFoundError(
+                        f"Could not find a filepath for an intrinsic calibration or a checkerboard video for {self.cam_id}.\n"
+                        f"It is required having a intrinsic_calibration .p file "
+                        f"or a checkerboard video in the intrinsic_calibrations_directory ({self.intrinsic_calibration_directory}) for a fisheye-camera!"
+                    )
+                calibrator = IntrinsicCalibratorRegularCameraCheckerboard(
+                    filepath_calibration_video=intrinsic_calibration_checkerboard_video_filepath,
+                    max_calibration_frames=max_calibration_frames,
+                )
+                intrinsic_calibration = calibrator.run()
+                intrinsic_calibration_filepath = self.intrinsic_calibration_directory.joinpath(
+                    f"checkerboard_intrinsiccalibrationresults_{self.cam_id}.p")
+                with open(intrinsic_calibration_filepath, "wb") as io:
+                    pickle.dump(intrinsic_calibration, io)
+        return intrinsic_calibration
 
-        self.intrinsic_calibration_filepath = intrinsic_calibration_filepath
-
-        adjusting_required = self._is_adjusting_of_intrinsic_calibration_required(
-            unadjusted_intrinsic_calibration=intrinsic_calibration
-        )
-        self._set_intrinsic_calibration(
-            intrinsic_calibration=intrinsic_calibration,
-            adjusting_required=adjusting_required,
-        )
-
-    def _is_adjusting_of_intrinsic_calibration_required(
-        self, unadjusted_intrinsic_calibration: Dict
-    ) -> bool:
+    def _is_adjusting_of_intrinsic_calibration_required(self) -> bool:
         adjusting_required = False
         if any(
-            [
-                self.offset_col_idx != 0,
-                self.offset_row_idx != 0,
-                self.flip_h,
-                self.flip_v,
-            ]
+                [
+                    self.offset_col_idx != 0,
+                    self.offset_row_idx != 0,
+                    self.flip_h,
+                    self.flip_v,
+                ]
         ):
             adjusting_required = True
         return adjusting_required
 
-    def _set_intrinsic_calibration(
-        self, intrinsic_calibration: Dict, adjusting_required: bool
-    ) -> None:
-        if adjusting_required:
-            intrinsic_calibration = self._adjust_intrinsic_calibration(
-                unadjusted_intrinsic_calibration=intrinsic_calibration
-            )
-        setattr(self, "intrinsic_calibration", intrinsic_calibration)
-
     def _adjust_intrinsic_calibration(
-        self, unadjusted_intrinsic_calibration: Dict
+            self, unadjusted_intrinsic_calibration: Dict
     ) -> Dict:
-        adjusted_intrinsic_calibration = unadjusted_intrinsic_calibration.copy()
         intrinsic_calibration_video_size = unadjusted_intrinsic_calibration["size"]
         new_video_size = self._get_cropped_video_size()
-        self._get_correct_x_y_offsets(
+        self.offset_row_idx, self.offset_col_idx = self._get_correct_x_y_offsets(
             intrinsic_calibration_video_size=intrinsic_calibration_video_size,
             new_video_size=new_video_size,
+            offset_col_idx=self.offset_col_idx,
+            offset_row_idx=self.offset_row_idx
         )
         adjusted_K = self._get_adjusted_K(K=unadjusted_intrinsic_calibration["K"])
         adjusted_intrinsic_calibration = (
@@ -371,22 +346,25 @@ class VideoMetadata:
         return size
 
     def _get_correct_x_y_offsets(
-        self,
-        intrinsic_calibration_video_size: Tuple[int, int],
-        new_video_size: Tuple[int, int],
-    ) -> None:
+            self,
+            intrinsic_calibration_video_size: Tuple[int, int],
+            new_video_size: Tuple[int, int],
+            offset_row_idx: int,
+            offset_col_idx: int,
+    ) -> Tuple[int, int]:
         if self.flip_v:
-            self.offset_row_idx = (
-                intrinsic_calibration_video_size[1]
-                - new_video_size[0]
-                - self.offset_row_idx
+            offset_row_idx = (
+                    intrinsic_calibration_video_size[1]
+                    - new_video_size[0]
+                    - offset_row_idx
             )
         if self.flip_h:
-            self.offset_col_idx = (
-                intrinsic_calibration_video_size[0]
-                - new_video_size[1]
-                - self.offset_col_idx
+            offset_col_idx = (
+                    intrinsic_calibration_video_size[0]
+                    - new_video_size[1]
+                    - offset_col_idx
             )
+        return offset_row_idx, offset_col_idx
 
     def _get_adjusted_K(self, K: np.ndarray) -> np.ndarray:
         adjusted_K = K.copy()
@@ -395,10 +373,10 @@ class VideoMetadata:
         return adjusted_K
 
     def _incorporate_adjustments_in_intrinsic_calibration(
-        self,
-        intrinsic_calibration: Dict,
-        new_size: Tuple[int, int],
-        adjusted_K: np.ndarray,
+            self,
+            intrinsic_calibration: Dict,
+            new_size: Tuple[int, int],
+            adjusted_K: np.ndarray,
     ) -> Dict:
         intrinsic_calibration["size"] = new_size
         intrinsic_calibration["K"] = adjusted_K
@@ -406,33 +384,10 @@ class VideoMetadata:
 
 
 class VideoMetadataChecker(VideoMetadata):
-    def __init__(
-        self,
-        video_filepath: Path,
-        recording_config_dict: Dict,
-        project_config_dict: Dict,
-        tag: str,
-    ) -> None:
-        self._get_video_identity(tag=tag)
-        self._check_filepaths(video_filepath=video_filepath)
-
-        state = self._read_metadata(
-            recording_config_dict=recording_config_dict,
-            project_config_dict=project_config_dict,
-            video_filepath=video_filepath,
-        )
-
-        if state == "del":
-            return state
-        else:
-            self._get_intrinsic_parameters(
-                max_calibration_frames=self.max_calibration_frames,
-            )
-
     def _extract_filepath_metadata(self) -> List[str]:
         undefined_attributes = []
         user_specific_rules_on_videometadata(videometadata=self)
-        if self.charuco_video:
+        if self.calibration:
             for piece in self.filepath.stem.split("_"):
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():
@@ -534,7 +489,7 @@ class VideoMetadataChecker(VideoMetadata):
                     "Mouse_number was not found in filename or did not match the required structure for a mouse_number. \n Please include the mouse number as Generation-Number, e.g., F12-45, into the filename!"
                 )
 
-    def _rename_file(self) -> None:
+    def _rename_file(self) -> bool:
         suffix = self.filepath.suffix
         new_filename = input(
             f"Enter new filename! \nIf the video is invalid, enter x and it will be deleted!\n If the video belongs to another folder, enter y, and move it manually!\n{self.filepath.parent}/"
@@ -542,6 +497,8 @@ class VideoMetadataChecker(VideoMetadata):
         if new_filename == "y":
             print(f"{self.filepath} needs to be moved!")
             raise TypeError
+        if new_filename == "x":
+            return True
         new_filepath = self.filepath.parent.joinpath(
             Path(new_filename).with_suffix(suffix)
         )
@@ -554,3 +511,4 @@ class VideoMetadataChecker(VideoMetadata):
         else:
             self.filepath.rename(new_filepath)
             self.filepath = new_filepath
+        return False

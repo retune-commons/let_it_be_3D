@@ -58,7 +58,7 @@ class Check(ABC):
         missing_keys = check_keys(
             dictionary=recording_config_dict, list_of_keys=keys_to_check_recording
         )
-        if len(missing_keys) > 0:
+        if missing_keys:
             raise KeyError(
                 f"Missing information for {missing_keys} in the config_file {recording_config_filepath}!"
             )
@@ -89,7 +89,7 @@ class Check(ABC):
                 dictionary=project_config_dict[dictionary_key],
                 list_of_keys=self.valid_cam_ids,
             )
-            if len(missing_keys) > 0:
+            if missing_keys:
                 raise KeyError(
                     f"Missing information {dictionary_key} for cam {missing_keys} in the config_file {project_config_filepath}!"
                 )
@@ -163,7 +163,11 @@ class CheckCalibration(Check):
             print(f"Intrinsic calibrations for calibration of {self.recording_date}")
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
-                Intrinsics(video_metadata=video_metadata, plot=True, save=False)
+                intrinsics = Intrinsics(video_filepath=video_metadata.filepath,
+                                        intrinsic_calibration=video_metadata.intrinsic_calibration, filename="",
+                                        fisheye=video_metadata.fisheye)
+                intrinsics.create_plot(plot=True, save=False)
+
 
         files_per_cam = {}
         cams_not_found = []
@@ -264,8 +268,9 @@ class CheckRecording(Check):
             print(f"Intrinsic calibrations for {self.recording_date}")
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
-                Intrinsics(video_metadata=video_metadata, plot=True, save=False)
-
+                intrinsics = Intrinsics(video_filepath=video_metadata.filepath,
+                                        intrinsic_calibration=video_metadata.intrinsic_calibration, filename="",
+                                        fisheye=video_metadata.fisheye)
         files_per_cam = {}
         cams_not_found = []
         for cam in self.valid_cam_ids:
@@ -379,7 +384,10 @@ class CheckCalibrationValidation(Check):
             print(f"Intrinsic calibrations for calvin of {self.recording_date}")
             for video_metadata in self.metadata_from_videos:
                 print(video_metadata.cam_id)
-                Intrinsics(video_metadata=video_metadata, plot=True, save=False)
+                intrinsics = Intrinsics(video_filepath=video_metadata.filepath,
+                                        intrinsic_calibration=video_metadata.intrinsic_calibration, filename="",
+                                        fisheye=video_metadata.fisheye)
+                intrinsics.create_plot(plot=True, save=False)
 
         files_per_cam = {}
         cams_not_found = []

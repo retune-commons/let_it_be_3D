@@ -324,13 +324,7 @@ class Synchronizer(ABC):
                 if alignment_error > self.synchro_metadata["synchro_error_threshold"]:
                     led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._handle_synchro_fails()
 
-                self.led_detection = LEDMarkerPlot(
-                    image=iio.v3.imread(self.video_metadata.filepath, index=0),
-                    led_center_coordinates=led_center_coordinates,
-                    box_size=self.box_size,
-                    video_metadata=self.video_metadata,
-                    output_directory=self.output_directory,
-                )
+                self._plot_led_marker()
                 self.led_timeseries_for_cross_video_validation = \
                     self._adjust_led_timeseries_for_cross_validation(start_idx=offset_adjusted_start_idx,
                                                                      offset=remaining_offset)
@@ -352,6 +346,21 @@ class Synchronizer(ABC):
                                                         synchronized_video_filepath=synchronized_video_filepath)
 
         return marker_detection_filepath, synchronized_video_filepath
+
+    def _plot_led_marker(self) -> None:
+        if self.video_metadata.charuco_video:
+            led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_LED_marker"
+        else:
+            led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
+        self.led_detection = LEDMarkerPlot(
+            image=iio.v3.imread(self.video_metadata.filepath, index=0),
+            led_center_coordinates=led_center_coordinates,
+            box_size=self.box_size,
+            cam_id=self.video_metadata.cam_id,
+            filename=led_plot_filename,
+            output_directory=self.output_directory,
+        )
+        self.led_detection.create_plot(plot=False, save=True)
 
     def _save_synchro(self, filepath: Path, led_center_coordinates: Coordinates, offset_adjusted_start_idx: int,
                       remaining_offset: int, alignment_error: float) -> None:
@@ -462,9 +471,8 @@ class Synchronizer(ABC):
                 output_directory=temp_folder,
                 marker_detection_directory=self.video_metadata.led_extraction_filepath,
             )
-            dlc_filepath_out = dlc_interface.analyze_objects(
-                filtering=False, use_gpu=self.use_gpu, filepath=dlc_filepath_out
-            )
+            dlc_filepath_out = dlc_interface.analyze_objects(filepath=dlc_filepath_out, filtering=False,
+                                                             use_gpu=self.use_gpu)
             for file in temp_folder.iterdir():
                 if file.suffix == ".pickle":
                     dlc_created_picklefile = file
@@ -497,9 +505,8 @@ class Synchronizer(ABC):
                 output_directory=self.output_directory,
                 marker_detection_directory=config_filepath,
             )
-            manual_interface.analyze_objects(
-                filepath=manual_filepath_out, labels=[self.synchro_metadata["synchro_marker"]], only_first_frame=True
-            )
+            manual_interface.analyze_objects(filepath=manual_filepath_out,
+                                             labels=[self.synchro_metadata["synchro_marker"]], only_first_frame=True)
 
             df = pd.read_hdf(manual_filepath_out)
             x_key, y_key = (
@@ -570,14 +577,24 @@ class Synchronizer(ABC):
             fps=self.video_metadata.fps,
         )
 
+        if self.video_metadata.fps > self.video_metadata.target_fps:
+            tag = f"_downsampled{self.video_metadata.target_fps}"
+        else:
+            tag = f"_upsampled{self.video_metadata.target_fps}"
+        if self.video_metadata.charuco_video:
+            filename_individual = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_synchronization_individual{tag}"
+        else:
+            filename_individual = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronization_individual{tag}"
         self.synchronization_individual = AlignmentPlotIndividual(
             template=adjusted_motif_timeseries[best_match_offset][0],
             led_timeseries=self.led_timeseries[best_match_start_frame_idx:],
-            video_metadata=self.video_metadata,
+            filename = filename_individual,
+            cam_id= self.video_metadata.cam_id,
             output_directory=self.output_directory,
             led_box_size=self.box_size,
             alignment_error=alignment_error,
         )
+        self.synchronization_individual.create_plot(plot=False, save=True)
 
         return offset_adjusted_start_idx, remaining_offset, alignment_error
 
@@ -907,9 +924,7 @@ class RecordingVideoSynchronizer(Synchronizer):
                 output_directory=self.output_directory,
                 marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(
-                filtering=True, use_gpu=self.use_gpu, filepath=output_filepath
-            )
+            dlc_ending = dlc_interface.analyze_objects(filepath=output_filepath, filtering=True, use_gpu=self.use_gpu)
 
         return output_filepath
 
