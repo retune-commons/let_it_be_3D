@@ -125,7 +125,7 @@ def create_calibration_key(
 
 
 KEYS_TO_CHECK_PROJECT = [
-        "valid_cam_IDs",
+        "valid_cam_ids",
         "paradigms",
         "animal_lines",
         "led_extraction_type",
@@ -207,4 +207,5 @@ SYNCHRO_METADATA_KEYS = ["handle_synchro_fails",
                          "use_2D_filter",
                          'num_frames_to_pick',
                          "rapid_aligner_path",
-                         "use_gpu"]
+                         "use_gpu",
+                         "led_box_size"]

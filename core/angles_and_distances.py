@@ -19,10 +19,10 @@ def fill_in_distances(distances: Dict) -> Dict:
     return filled_d
 
 
-def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict) -> Dict:
+def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     if "distances" in parameters:
         anipose_io = _set_distances_from_configuration(
-            parameters["distances"], anipose_io
+            parameters["distances"], anipose_io, df_xyz=df_xyz
         )
     else:
         print(
@@ -30,7 +30,7 @@ def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict) 
         )
 
     if "angles" in parameters:
-        anipose_io = _set_angles_to_plane(parameters["angles"], anipose_io)
+        anipose_io = _set_angles_to_plane(parameters["angles"], anipose_io, df_xyz=df_xyz)
     else:
         print(
             "WARNING: No angles were computed. If this is unexpected please edit the ground truth file accordingly"
@@ -39,24 +39,24 @@ def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict) 
     return anipose_io
 
 
-def _set_distances_from_configuration(distances_to_compute: Dict, anipose_io: Dict) -> Dict:
+def _set_distances_from_configuration(distances_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     conversion_factors = _get_conversion_factors_from_different_references(
-        anipose_io, distances_to_compute
+        distances_to_compute, df_xyz=df_xyz
     )
-    _add_distances_in_cm_for_each_conversion_factor(anipose_io, conversion_factors)
+    _add_distances_in_cm_for_each_conversion_factor(anipose_io, conversion_factors, df_xyz=df_xyz)
     return anipose_io
 
 
 def add_all_real_distances_errors(
-    anipose_io: Dict, ground_truth_distances: Dict
+    anipose_io: Dict, ground_truth_distances: Dict, df_xyz: pd.DataFrame
 ) -> Dict:
     all_distance_to_cm_conversion_factors = (
         _get_conversion_factors_from_different_references(
-            anipose_io=anipose_io, ground_truth_distances=ground_truth_distances
+            ground_truth_distances=ground_truth_distances, df_xyz=df_xyz
         )
     )
     anipose_io = _add_distances_in_cm_for_each_conversion_factor(
-        anipose_io=anipose_io, conversion_factors=all_distance_to_cm_conversion_factors
+        anipose_io=anipose_io, conversion_factors=all_distance_to_cm_conversion_factors, df_xyz=df_xyz
     )
     anipose_io = _add_distance_errors(
         anipose_io=anipose_io, gt_distances=ground_truth_distances
@@ -95,24 +95,24 @@ def _add_distance_errors(anipose_io: Dict, gt_distances: Dict) -> Dict:
 
 
 def _add_distances_in_cm_for_each_conversion_factor(
-    anipose_io: Dict, conversion_factors: Dict
+    anipose_io: Dict, conversion_factors: Dict, df_xyz: pd.DataFrame
 ) -> Dict:
     anipose_io["distances_in_cm"] = {}
     for reference_distance_id, conversion_factor in conversion_factors.items():
         anipose_io["distances_in_cm"][
             reference_distance_id
         ] = _convert_all_xyz_distances(
-            anipose_io=anipose_io, conversion_factor=conversion_factor
+            anipose_io=anipose_io, conversion_factor=conversion_factor, df_xyz=df_xyz
         )
     return anipose_io
 
 
-def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Dict) -> Dict:
+def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     anipose_io["reprojection_errors_calibration_validation_markers"] = {}
     all_reprojection_errors = []
-    for key in anipose_io["df_xyz"].iloc[0].keys():
+    for key in df_xyz.iloc[0].keys():
         if "error" in key:
-            reprojection_error = anipose_io["df_xyz"][key].iloc[0]
+            reprojection_error = df_xyz[key].iloc[0]
             marker_id = key[: key.find("_error")]
             anipose_io["reprojection_errors_calibration_validation_markers"][
                 marker_id
@@ -186,7 +186,7 @@ def _compute_differences_between_triangulated_and_gt_angles(
     return marker_ids_with_angles_error
 
 
-def _computes_angles(angles_to_compute: Dict, anipose_io: Dict) -> Dict[str, float]:
+def _computes_angles(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict[str, float]:
     """
     Computes the triangulated angles
     :return: dictionary of the angles computed
@@ -195,26 +195,26 @@ def _computes_angles(angles_to_compute: Dict, anipose_io: Dict) -> Dict[str, flo
     for angle, markers_dictionary in angles_to_compute.items():
         if len(markers_dictionary["marker"]) == 3:
             pt_a = _get_vector_from_label(
-                label=markers_dictionary["marker"][0], anipose_io=anipose_io
+                label=markers_dictionary["marker"][0], df_xyz=df_xyz
             )
             pt_b = _get_vector_from_label(
-                label=markers_dictionary["marker"][1], anipose_io=anipose_io
+                label=markers_dictionary["marker"][1], df_xyz=df_xyz
             )
             pt_c = _get_vector_from_label(
-                label=markers_dictionary["marker"][2], anipose_io=anipose_io
+                label=markers_dictionary["marker"][2], df_xyz=df_xyz
             )
             triangulated_angles[angle] = _get_angle_between_three_points_at_PointA(
                 PointA=pt_a, PointB=pt_b, PointC=pt_c
             )
         elif len(markers_dictionary["marker"]) == 5:
             pt_a = _get_vector_from_label(
-                label=markers_dictionary["marker"][2], anipose_io=anipose_io
+                label=markers_dictionary["marker"][2], df_xyz=df_xyz
             )
             pt_b = _get_vector_from_label(
-                label=markers_dictionary["marker"][3], anipose_io=anipose_io
+                label=markers_dictionary["marker"][3], df_xyz=df_xyz
             )
             pt_c = _get_vector_from_label(
-                label=markers_dictionary["marker"][4], anipose_io=anipose_io
+                label=markers_dictionary["marker"][4], df_xyz=df_xyz
             )
             plane_coord = _get_coordinates_plane_equation_from_three_points(
                 PointA=pt_a, PointB=pt_b, PointC=pt_c
@@ -222,10 +222,10 @@ def _computes_angles(angles_to_compute: Dict, anipose_io: Dict) -> Dict[str, flo
             N = _get_vector_product(A=plane_coord[0], B=plane_coord[2])
 
             pt_d = _get_vector_from_label(
-                label=markers_dictionary["marker"][0], anipose_io=anipose_io
+                label=markers_dictionary["marker"][0], df_xyz=df_xyz
             )
             pt_e = _get_vector_from_label(
-                label=markers_dictionary["marker"][1], anipose_io=anipose_io
+                label=markers_dictionary["marker"][1], df_xyz=df_xyz
             )
             triangulated_angles[angle] = _get_angle_between_two_points_and_plane(
                 PointA=pt_d, PointB=pt_e, N=N
@@ -238,14 +238,14 @@ def _computes_angles(angles_to_compute: Dict, anipose_io: Dict) -> Dict[str, flo
     return triangulated_angles
 
 
-def _set_angles_to_plane(angles_to_compute: Dict, anipose_io: Dict) -> Dict:
+def _set_angles_to_plane(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     """
     Sets the angles between the screws and the plane
     :param angles_to_compute:
     :param anipose_io:
     :return:
     """
-    anipose_io["angles_to_plane"] = _computes_angles(angles_to_compute, anipose_io)
+    anipose_io["angles_to_plane"] = _computes_angles(angles_to_compute, anipose_io, df_xyz=df_xyz)
     return anipose_io
 
 
@@ -260,20 +260,20 @@ def set_angles_error_between_screws_and_plane(gt_angles: Dict, anipose_io: Dict)
     return anipose_io
 
 
-def _convert_all_xyz_distances(anipose_io: Dict, conversion_factor: float) -> Dict:
+def _convert_all_xyz_distances(anipose_io: Dict, conversion_factor: float, df_xyz: pd.DataFrame) -> Dict:
     marker_id_combinations = it.combinations(anipose_io["bodyparts"], 2)
     all_distances_in_cm = {}
     for marker_id_a, marker_id_b in marker_id_combinations:
         if marker_id_a not in all_distances_in_cm.keys():
             all_distances_in_cm[marker_id_a] = {}
         xyz_distance = get_xyz_distance_in_triangulation_space(marker_ids=(marker_id_a, marker_id_b),
-                                                               df_xyz=anipose_io["df_xyz"])
+                                                               df_xyz=df_xyz)
         all_distances_in_cm[marker_id_a][marker_id_b] = xyz_distance / conversion_factor
     return all_distances_in_cm
 
 
 def _get_conversion_factors_from_different_references(
-    anipose_io: Dict, ground_truth_distances: Dict
+        ground_truth_distances: Dict, df_xyz: pd.DataFrame
 ) -> Dict:
     all_conversion_factors = {}
     for reference, markers in ground_truth_distances.items():
@@ -284,7 +284,7 @@ def _get_conversion_factors_from_different_references(
             distance_to_cm_conversion_factor = _get_xyz_to_cm_conversion_factor(
                 reference_marker_ids=reference_marker_ids,
                 distance_in_cm=distance_in_cm,
-                df_xyz=anipose_io["df_xyz"],
+                df_xyz=df_xyz,
             )
             all_conversion_factors[
                 reference_distance_id
@@ -295,7 +295,7 @@ def _get_conversion_factors_from_different_references(
 
 def get_xyz_distance_in_triangulation_space(
     marker_ids: Tuple[str, str], df_xyz: pd.DataFrame
-) -> float:
+) -> Union[pd.Series, float]:
     squared_differences = [
         (df_xyz[f"{marker_ids[0]}_{axis}"] - df_xyz[f"{marker_ids[1]}_{axis}"]) ** 2
         for axis in ["x", "y", "z"]
@@ -399,12 +399,12 @@ def _get_angle_between_two_points_and_plane(
     return _get_angle_between_plane_and_line(N=N, R=R)
 
 
-def _get_vector_from_label(label: str, anipose_io: Dict) -> np.array:
+def _get_vector_from_label(label: str, df_xyz: pd.DataFrame) -> np.array:
     return np.asarray(
         [
-            anipose_io["df_xyz"][label + "_x"],
-            anipose_io["df_xyz"][label + "_y"],
-            anipose_io["df_xyz"][label + "_z"],
+            df_xyz[label + "_x"],
+            df_xyz[label + "_y"],
+            df_xyz[label + "_z"],
         ]
     )
 

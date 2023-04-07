@@ -40,7 +40,7 @@ class VideoMetadata:
         if state == "del":
             raise TypeError("This video_metadata has problems. Use the filename checker to resolve!")
         else:
-            self.intrinsic_calibration = self._get_intrinsic_parameters(
+            self.intrinsic_calibration, self.intrinsic_calibration_filepath = self._get_intrinsic_parameters(
                 max_calibration_frames=self.max_calibration_frames,
             )
         if self.calvin:
@@ -67,18 +67,10 @@ class VideoMetadata:
             recording_config_dict: Dict,
             video_filepath: Path,
     ) -> str:
-        for attribute in ["valid_cam_IDs", "paradigms", "animal_lines", "load_calibration", "max_calibration_frames",
+        for attribute in ["valid_cam_ids", "paradigms", "animal_lines", "load_calibration", "max_calibration_frames",
                           "max_ram_digestible_frames", "max_cpu_cores_to_pool"]:
             setattr(self, attribute, project_config_dict[attribute])
-        if self.load_calibration:
-            if "intrinsic_calibration_directory" in project_config_dict:
-                self.intrinsic_calibration_directory = Path(
-                    project_config_dict["intrinsic_calibration_directory"]
-                )
-            else:
-                raise ValueError(
-                    "If you use load_calibration = True, you need to set an intrinsic calibrations directory!"
-                )
+        self.intrinsic_calibration_directory = Path(project_config_dict["intrinsic_calibration_directory"])
         while True:
             undefined_attributes = self._extract_filepath_metadata()
             if undefined_attributes:
@@ -170,9 +162,9 @@ class VideoMetadata:
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():
                         self.cam_id = cam
-                    elif piece in self.valid_paradigms:
+                    elif piece in self.paradigms:
                         self.paradigm = piece
-                    elif piece in self.valid_mouse_lines:
+                    elif piece in self.animal_lines:
                         self.mouse_line = piece
                     elif piece.startswith("F"):
                         sub_pieces = piece.split("-")
@@ -207,19 +199,19 @@ class VideoMetadata:
     def _get_intrinsic_parameters(
             self,
             max_calibration_frames: int,
-    ) -> Dict:
-        intrinsic_calibration = self._get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration(
+    ) -> Tuple[Dict, Path]:
+        intrinsic_calibration, intrinsic_calibration_filepath = self._get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration(
             max_calibration_frames=max_calibration_frames)
         adjusting_required = self._is_adjusting_of_intrinsic_calibration_required()
         if adjusting_required:
             intrinsic_calibration = self._adjust_intrinsic_calibration(
                 unadjusted_intrinsic_calibration=intrinsic_calibration
             )
-        return intrinsic_calibration
+        return intrinsic_calibration, intrinsic_calibration_filepath
 
     def _get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration(self,
                                                                               max_calibration_frames: int
-                                                                              ) -> Dict:
+                                                                              ) -> Tuple[Dict, Path]:
         if self.fisheye:
             if self.load_calibration:
                 try:
@@ -234,7 +226,7 @@ class VideoMetadata:
                     raise FileNotFoundError(
                         f"Could not find a file for an intrinsic calibration .p file for {self.cam_id}.\n"
                         f"It is required having a pickle file including came_id in the intrinsic_calibrations_directory\n"
-                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True"
+                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True\n"
                         f"Use 'load_calibration = False' in project_config to calibrate now!"
                     )
             else:
@@ -242,7 +234,7 @@ class VideoMetadata:
                     intrinsic_calibration_checkerboard_video_filepath = [
                         file
                         for file in self.intrinsic_calibration_directory.iterdir()
-                        if file.suffix == ".mp4"
+                        if file.suffix  in [".mp4", ".AVI", ".mov"]
                            and "checkerboard" in file.stem
                            and self.cam_id in file.stem
                     ][0]
@@ -275,7 +267,7 @@ class VideoMetadata:
                     raise FileNotFoundError(
                         f"Could not find a file for an intrinsic calibration .p file for {self.cam_id}.\n"
                         f"It is required having a pickle file including came_id in the intrinsic_calibrations_directory\n"
-                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True"
+                        f"({self.intrinsic_calibration_directory}) if you use load_calibration = True\n‚"
                         f'Use "load_calibration = False" in project_config to calibrate now!'
                     )
             else:
@@ -283,7 +275,7 @@ class VideoMetadata:
                     intrinsic_calibration_checkerboard_video_filepath = [
                             file
                             for file in self.intrinsic_calibration_directory.iterdir()
-                            if file.suffix == ".mp4"
+                            if file.suffix in [".mp4", ".AVI", ".mov"]
                                and "checkerboard" in file.stem
                                and self.cam_id in file.stem
                         ][0]
@@ -302,7 +294,7 @@ class VideoMetadata:
                     f"checkerboard_intrinsiccalibrationresults_{self.cam_id}.p")
                 with open(intrinsic_calibration_filepath, "wb") as io:
                     pickle.dump(intrinsic_calibration, io)
-        return intrinsic_calibration
+        return intrinsic_calibration, intrinsic_calibration_filepath
 
     def _is_adjusting_of_intrinsic_calibration_required(self) -> bool:
         adjusting_required = False
@@ -430,9 +422,9 @@ class VideoMetadataChecker(VideoMetadata):
                 for cam in self.valid_cam_ids:
                     if piece.lower() == cam.lower():
                         self.cam_id = cam
-                    elif piece in self.valid_paradigms:
+                    elif piece in self.paradigms:
                         self.paradigm = piece
-                    elif piece in self.valid_mouse_lines:
+                    elif piece in self.animal_lines:
                         self.mouse_line = piece
                     elif piece.startswith("F"):
                         sub_pieces = piece.split("-")
@@ -479,10 +471,10 @@ class VideoMetadataChecker(VideoMetadata):
                     f"Recording_date was not found in filename or did not match the required structure for date. \nPlease include the date as YYMMDD , e.g., 220928, into the filename!"
                 )
             elif attribute == "paradigm":
-                f"Paradigm was not found in filename or did not match any of the defined paradigms. \nPlease Please include one of the following paradigms into the filename: {self.valid_paradigms} or add the paradigm to valid_paradigmes!"
+                f"Paradigm was not found in filename or did not match any of the defined paradigms. \nPlease Please include one of the following paradigms into the filename: {self.paradigms} or add the paradigm to paradigms!"
             elif attribute == "mouse_line":
                 print(
-                    f"Mouse_line was not found in filename or is not supported. \nPlease include one of the following lines into the filename: {self.valid_mouse_lines} or add the line to valid_mouse_lines!"
+                    f"Mouse_line was not found in filename or is not supported. \nPlease include one of the following lines into the filename: {self.animal_lines} or add the line to valid_mouse_lines!"
                 )
             elif attribute == "mouse_number":
                 print(

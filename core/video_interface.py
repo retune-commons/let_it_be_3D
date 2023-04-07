@@ -12,7 +12,7 @@ class VideoInterface:
             self, video_metadata: VideoMetadata, output_dir: Path, test_mode: bool = False
     ) -> None:
         self.video_metadata = video_metadata
-        if self.video_metadata.charuco_video:
+        if self.video_metadata.calibration:
             filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_undistorted_image"
         elif self.video_metadata.recording:
             filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
@@ -45,7 +45,7 @@ class VideoInterface:
         )
 
     def export_for_aniposelib(self) -> Union:
-        if not self.video_metadata.charuco_video:
+        if not self.video_metadata.calibration:
             return self.marker_detection_filepath
         else:
             return self._export_as_aniposelib_camera_object()

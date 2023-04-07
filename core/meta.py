@@ -3,7 +3,7 @@ from abc import ABC
 from pathlib import Path
 from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
-from typing import Tuple, Optional, Dict, Union
+from typing import Tuple, Optional, Dict, Union, List
 
 import pandas as pd
 import yaml
@@ -276,7 +276,7 @@ class MetaInterface(ABC):
                         test_mode=test_mode,
                         max_iters=max_iters,
                         p_threshold=p_threshold,
-                        angle_thresold=angle_threshold))
+                        angle_threshold=angle_threshold))
                 recording_day["calibrations"]['report'] = str(self.objects["calibration_objects"][
                                                                   recording_day["calibrations"][
                                                                       "calibration_key"]].report_filepath)
@@ -303,7 +303,7 @@ class MetaInterface(ABC):
                         recording
                     ].csv_output_filepath
                 )
-                recording_day["recordings"][recording]["reprojerr_mean"] = self.objects["triangulation_recordings_objects"][recording].reprojerr_nonan.mean()
+                recording_day["recordings"][recording]["reprojerr_mean"] = self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 

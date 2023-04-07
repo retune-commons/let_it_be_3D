@@ -67,7 +67,7 @@ paradigms:
 - OTR
 - OTT
 - OTE
-valid_cam_IDs:
+valid_cam_ids:
 - Bottom
 - Top
 - Side1
@@ -91,13 +91,13 @@ triangulation_type: triangulate
 allowed_num_diverging_frames: 20
 
 # repeat, default, manual, error
-handle_synchro_fails: manual
-default_offset_ms: 7000
+handle_synchro_fails: default
+default_offset_ms: 6575
 start_pattern_match_ms: 0
 end_pattern_match_ms: 120000
 synchro_error_threshold: 100
 synchro_marker: LED5
-led_box_size = 15
+led_box_size: 15
 use_2D_filter: False
 score_threshold: 0.9
 num_frames_to_pick: 5

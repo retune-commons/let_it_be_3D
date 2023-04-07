@@ -70,7 +70,7 @@ def _get_metadata_from_configs(recording_config_filepath: Path, project_config_f
     for dictionary_key in KEYS_TO_CHECK_CAMERA:
         cameras_with_missing_keys = check_keys(
             dictionary=project_config_dict[dictionary_key],
-            list_of_keys=project_config_dict["valid_cam_IDs"],
+            list_of_keys=project_config_dict["valid_cam_ids"],
         )
         if cameras_with_missing_keys:
             raise KeyError(
@@ -199,7 +199,7 @@ class Calibration():
             project_config_filepath=project_config_filepath,
         )
         self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
-        for attribute in ["valid_cam_IDs", "calibration_tag", "calibration_validation_tag",
+        for attribute in ["valid_cam_ids", "calibration_tag", "calibration_validation_tag",
                           "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
@@ -222,6 +222,8 @@ class Calibration():
             video_metadata.target_fps = self.target_fps
 
     def run_synchronization(self, test_mode: bool = False) -> None:
+        self.synchronized_charuco_videofiles = {}
+        self.camera_objects = []
         for video_interface in self.video_interfaces.values():
             video_interface.run_synchronizer(
                 synchronizer=CharucoVideoSynchronizer,
@@ -240,7 +242,7 @@ class Calibration():
             fps=self.target_fps)[0][0]
         led_timeseries_crossvalidation = {}
         for video_interface in self.video_interfaces.values():
-            if hasattr(video_interface.synchronizer_object, "led_timeseries_for_cross_video_validation"):
+            if video_interface.synchronizer_object.led_timeseries_for_cross_video_validation is not None:
                 led_timeseries_crossvalidation[
                     video_interface.video_metadata.cam_id
                 ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
@@ -392,7 +394,7 @@ def _find_non_matching_list_elements(list1: List[str], list2: List[str]) -> List
     return [marker_id for marker_id in list1 if marker_id not in list2]
 
 
-def _get_duplicate_elems_in_list(self, list1: List[str])->List[str]:
+def _get_duplicate_elems_in_list(list1: List[str])->List[str]:
     individual_elems, duplicate_elems = [], []
     for elem in list1:
         if elem in individual_elems:
@@ -454,7 +456,7 @@ class Triangulation(ABC):
             project_config_filepath=project_config_filepath,
         )
         self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
-        for attribute in ["use_gpu", "valid_cam_IDs", "calibration_tag", "calibration_validation_tag",
+        for attribute in ["use_gpu", "valid_cam_ids", "calibration_tag", "calibration_validation_tag",
                           "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
@@ -468,6 +470,7 @@ class Triangulation(ABC):
             output_directory=self.output_directory,
             filename_tag=self.calibration_validation_tag if self._videometadata_tag == "calvin" else "",
             test_mode=test_mode,
+            filetypes=self._allowed_filetypes,
         )
         metadata = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
                                       attributes_to_check=self._metadata_keys)
@@ -546,7 +549,7 @@ class Triangulation(ABC):
                 for i, keys in enumerate(df.columns):
                     a, b, c = keys
                     if b in existing_markers_to_exclude and c == "likelihood":
-                        df.isetitem(i, 0)
+                        df.iloc[:, i] = 0
                 df.to_hdf(h5_file, key="key", mode="w")
         self.markers_excluded_manually = True
 
@@ -579,7 +582,7 @@ class Triangulation(ABC):
             set([marker_id for scorer, marker_id, key in calibration_validation_markers_df.columns]))
         marker_ids_not_in_ground_truth = _find_non_matching_list_elements(prediction_marker_ids, defined_marker_ids)
         marker_ids_not_in_prediction = _find_non_matching_list_elements(defined_marker_ids, prediction_marker_ids)
-        if add_missing_marker_ids_with_0_likelihood & marker_ids_not_in_prediction:
+        if add_missing_marker_ids_with_0_likelihood & bool(marker_ids_not_in_prediction):
             calibration_validation_markers_df = _add_missing_marker_ids_to_prediction(
                 missing_marker_ids=marker_ids_not_in_prediction,
                 df=calibration_validation_markers_df,
@@ -602,7 +605,7 @@ class Triangulation(ABC):
             calibration_validation_markers_df_filepath, "empty", mode="w"
         )
 
-    def _load_calibration(self, filepath: Path) -> ap_lib.cameras.CameraGroup():
+    def _load_calibration(self, filepath: Path) -> ap_lib.cameras.CameraGroup:
         if filepath.name.endswith(".toml") and filepath.exists():
             return ap_lib.cameras.CameraGroup.load(filepath)
         else:
@@ -725,9 +728,6 @@ class TriangulationRecordings(Triangulation):
                 test_mode=test_mode,
                 synchro_metadata=self.synchro_metadata,
             )
-            self.synchronized_videos[
-                video_interface.video_metadata.cam_id
-            ] = video_interface.synchronized_video_filepath
         self._plot_synchro_crossvalidation()
         if not synchronize_only:
             self.csv_output_filepath = self._create_csv_filepath()
@@ -756,7 +756,7 @@ class TriangulationRecordings(Triangulation):
 
         led_timeseries_crossvalidation = {}
         for video_interface in self.video_interfaces.values():
-            if hasattr(video_interface.synchronizer_object, "led_timeseries_for_cross_video_validation"):
+            if video_interface.synchronizer_object.led_timeseries_for_cross_video_validation is not None:
                 led_timeseries_crossvalidation[
                     video_interface.video_metadata.cam_id
                 ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
@@ -789,8 +789,9 @@ class TriangulationRecordings(Triangulation):
             if '_z' in key:
                 self.df[key] = self.df[key] - z
 
-        lengthleftside = get_xyz_distance_in_triangulation_space(marker_ids=Tuple(config['ReferenceLengthMarkers']), df_xyz=self.df)
+        lengthleftside = get_xyz_distance_in_triangulation_space(marker_ids=tuple(config['ReferenceLengthMarkers']), df_xyz=self.df.iloc[best_frame, :])
         conversionfactor = config['ReferenceLengthCm'] / lengthleftside
+
         bp_keys_unflat = set(get_3D_df_keys(key[:-2]) for key in self.df.keys() if
                              'error' not in key and 'score' not in key and "M_" not in key and 'center' not in key and 'fn' not in key)
         bp_keys = list(it.chain(*bp_keys_unflat))
@@ -815,8 +816,11 @@ class TriangulationRecordings(Triangulation):
         self.rotated_filepath = self._create_csv_filepath()
         if (not test_mode) or (test_mode and not self.rotated_filepath.exists()):
             _save_dataframe_as_csv(filepath=str(self.rotated_filepath), df=rotated)
-        visualization = RotationVisualization(rotated_markers=rotated_markers, config=config, filepath=self.rotated_filepath,
-                              rotation_error=self.rotation_error)
+        visualization = RotationVisualization(
+            rotated_markers=rotated_markers, config=config,
+            output_filepath=self.rotated_filepath,
+            rotation_error=self.rotation_error
+        )
         visualization.create_plot(plot=False, save=True)
 
     def create_triangulated_video(
@@ -838,8 +842,8 @@ class TriangulationRecordings(Triangulation):
         idx = int(
             (self.video_plotting_config["start_s"] + idx) * self.target_fps)
 
-        t = TriangulationVisualization(df_filepath=self.rotated_filepath, output_directory=self.output_directory,
-                                       idx=idx, config=self.video_plotting_config, plot=False, save=False)
+        t = TriangulationVisualization(df_3D_filepath=self.rotated_filepath, output_directory=self.output_directory,
+                                       idx=idx, config=self.video_plotting_config)
         return t.return_fig()
 
 
@@ -908,12 +912,12 @@ class CalibrationValidation(Triangulation):
             self, show_3D_plot: bool = True, verbose: int = 1
     ) -> None:
         self.anipose_io = add_reprojection_errors_of_all_calibration_validation_markers(
-            anipose_io=self.anipose_io
+            anipose_io=self.anipose_io, df_xyz=self.df
         )
-        self.anipose_io = set_distances_and_angles_for_evaluation(self.ground_truth_config, self.anipose_io)
+        self.anipose_io = set_distances_and_angles_for_evaluation(self.ground_truth_config, self.anipose_io, df_xyz=self.df)
         gt_distances = fill_in_distances(self.ground_truth_config["distances"])
         self.anipose_io = add_all_real_distances_errors(
-            anipose_io=self.anipose_io, ground_truth_distances=gt_distances
+            anipose_io=self.anipose_io, ground_truth_distances=gt_distances, df_xyz=self.df
         )
         self.anipose_io = set_angles_error_between_screws_and_plane(
             self.ground_truth_config["angles"], self.anipose_io

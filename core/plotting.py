@@ -270,7 +270,7 @@ class AlignmentPlotIndividual:
             led_timeseries: np.ndarray,
             filename: str = "",
             cam_id: str = "",
-            output_directory: Optional[Union[str, Path]],
+            output_directory: Optional[Union[str, Path]] = None,
             led_box_size: Optional[int] = None,
             alignment_error: Optional[int] = None,
     ) -> None:
@@ -301,20 +301,18 @@ class AlignmentPlotIndividual:
             plt.show()
         plt.close()
 
-
 class AlignmentPlotCrossvalidation:
     def __init__(
             self,
             template: np.ndarray,
             led_timeseries: Dict,
             filename: str="",
-            output_directory: Optional[Union[str, Path]],
+            output_directory: Optional[Union[str, Path]] = None,
     ):
         self.template = template
         self.led_timeseries = led_timeseries
-        self.filename = filename
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
-        self.filepath = self._create_filepath()
+        self.filepath = self._create_filepath(filename=filename)
 
     def _create_filepath(self, filename: str) -> str:
         filepath = self.output_directory.joinpath(filename)
@@ -340,10 +338,10 @@ class LEDMarkerPlot:
             self,
             image: np.ndarray,
             led_center_coordinates: Coordinates,
-            box_size: Optional[int]=None,
+            box_size: Optional[int] = None,
             cam_id: str="",
             filename: str="",
-            output_directory: Optional[Union[str, Path]],
+            output_directory: Optional[Union[str, Path]] = None,
     ) -> None:
         self.image = image
         self.led_center_coordinates = led_center_coordinates
@@ -391,12 +389,12 @@ class Intrinsics:
                  filename: str = "",
                  fisheye: bool = False,
                  output_directory: Optional[Union[str, Path]] = None) -> None:
-        self._create_all_images(frame_idx=0)
+        self.video_filepath = video_filepath
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
         self.filepath = self._create_filepath(filename=filename)
-        self.video_filepath = video_filepath
         self.fisheye = fisheye
         self.intrinsic_calibration = intrinsic_calibration
+        self._create_all_images(frame_idx=0)
 
     def _create_all_images(self, frame_idx: int = 0) -> None:
         self.distorted_input_image = load_single_frame_of_video(
@@ -431,7 +429,7 @@ class Intrinsics:
         plt.close()
 
     def _create_filepath(self, filename: str) -> Path:
-        filepath = self.output_dir.joinpath(filename)
+        filepath = self.output_directory.joinpath(filename)
         return filepath
 
     def _undistort_fisheye_image_for_inspection(self, image: np.ndarray) -> np.ndarray:

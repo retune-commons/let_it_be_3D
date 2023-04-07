@@ -324,7 +324,7 @@ class Synchronizer(ABC):
                 if alignment_error > self.synchro_metadata["synchro_error_threshold"]:
                     led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = self._handle_synchro_fails()
 
-                self._plot_led_marker()
+                self._plot_led_marker(led_center_coordinates=led_center_coordinates)
                 self.led_timeseries_for_cross_video_validation = \
                     self._adjust_led_timeseries_for_cross_validation(start_idx=offset_adjusted_start_idx,
                                                                      offset=remaining_offset)
@@ -347,15 +347,15 @@ class Synchronizer(ABC):
 
         return marker_detection_filepath, synchronized_video_filepath
 
-    def _plot_led_marker(self) -> None:
-        if self.video_metadata.charuco_video:
+    def _plot_led_marker(self, led_center_coordinates: Coordinates) -> None:
+        if self.video_metadata.calibration:
             led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_LED_marker"
         else:
             led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
         self.led_detection = LEDMarkerPlot(
             image=iio.v3.imread(self.video_metadata.filepath, index=0),
             led_center_coordinates=led_center_coordinates,
-            box_size=self.box_size,
+            box_size=self.led_box_size,
             cam_id=self.video_metadata.cam_id,
             filename=led_plot_filename,
             output_directory=self.output_directory,
@@ -394,6 +394,7 @@ class Synchronizer(ABC):
     def _handle_synchro_fails(self) -> Tuple[Coordinates, Union[int, Any], Union[float, Any], Union[int, Any]]:
         if self.synchro_metadata["handle_synchro_fails"] == "repeat":
             led_center_coordinates = self._get_led_center_coordinates()
+            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
             offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
                 template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
                 end_time=self.synchro_metadata["end_pattern_match_ms"])
@@ -407,6 +408,7 @@ class Synchronizer(ABC):
         elif self.synchro_metadata["handle_synchro_fails"] == "manual":
             self.video_metadata.led_extraction_type = "manual"
             led_center_coordinates = self._get_led_center_coordinates()
+            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
             offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
                 template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
                 end_time=self.synchro_metadata["end_pattern_match_ms"])
@@ -445,7 +447,7 @@ class Synchronizer(ABC):
             video_filepath_out = temp_folder.joinpath(
                 f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_samples.mp4"
             )
-            if self.video_metadata.charuco_video:
+            if self.video_metadata.calibration:
                 dlc_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5"
                 )
@@ -491,7 +493,7 @@ class Synchronizer(ABC):
 
         elif self.video_metadata.led_extraction_type == "manual":
             config_filepath = self.video_metadata.led_extraction_filepath
-            if self.video_metadata.charuco_video:
+            if self.video_metadata.calibration:
                 manual_filepath_out = temp_folder.joinpath(
                     f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_LED_detection_predictions.h5"
                 )
@@ -526,10 +528,10 @@ class Synchronizer(ABC):
             self, led_center_coords: Coordinates
     ) -> np.ndarray:
         box_row_indices = _get_start_end_indices_from_center_coord_and_length(
-            center_px=led_center_coords.row, length=self.box_size
+            center_px=led_center_coords.row, length=self.led_box_size
         )
         box_col_indices = _get_start_end_indices_from_center_coord_and_length(
-            center_px=led_center_coords.column, length=self.box_size
+            center_px=led_center_coords.column, length=self.led_box_size
         )
         mean_pixel_intensities = self._calculate_mean_pixel_intensities(
             box_row_indices=box_row_indices, box_col_indices=box_col_indices
@@ -581,7 +583,7 @@ class Synchronizer(ABC):
             tag = f"_downsampled{self.video_metadata.target_fps}"
         else:
             tag = f"_upsampled{self.video_metadata.target_fps}"
-        if self.video_metadata.charuco_video:
+        if self.video_metadata.calibration:
             filename_individual = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_charuco_synchronization_individual{tag}"
         else:
             filename_individual = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_synchronization_individual{tag}"
@@ -591,7 +593,7 @@ class Synchronizer(ABC):
             filename = filename_individual,
             cam_id= self.video_metadata.cam_id,
             output_directory=self.output_directory,
-            led_box_size=self.box_size,
+            led_box_size=self.led_box_size,
             alignment_error=alignment_error,
         )
         self.synchronization_individual.create_plot(plot=False, save=True)
@@ -828,7 +830,7 @@ class Synchronizer(ABC):
         return filepath_out
 
     def _construct_video_filepath(self, part_id: Optional[int] = None) -> Path:
-        if self.video_metadata.charuco_video:
+        if self.video_metadata.calibration:
             if part_id is None:
                 filepath = self.output_directory.joinpath(
                     f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}_synchronized_downsampled{self.target_fps}fps.mp4"
