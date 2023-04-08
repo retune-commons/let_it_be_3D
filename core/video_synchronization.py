@@ -291,10 +291,8 @@ class Synchronizer(ABC):
             output_directory: Path,
             synchro_metadata: Dict,
     ) -> None:
-        self.led_timeseries_for_cross_video_validation = None
-        self.led_detection = None
-        self.led_timeseries = None
-        self.template_blinking_motif = None
+        self.led_timeseries_for_cross_video_validation, self.led_detection = None, None
+        self.led_timeseries, self.template_blinking_motif = None, None
         self.video_metadata = video_metadata
         self.use_rapid_aligner = bool(synchro_metadata["rapid_aligner_path"])
         if self.use_rapid_aligner:
@@ -358,86 +356,6 @@ class Synchronizer(ABC):
 
         return marker_detection_filepath, synchronized_video_filepath
 
-    def _plot_led_marker(self, led_center_coordinates: Coordinates) -> None:
-        if self.video_metadata.calibration:
-            led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
-                                f"_charuco_LED_marker"
-        else:
-            led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
-                                f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
-        self.led_detection = LEDMarkerPlot(
-            image=iio.v3.imread(self.video_metadata.filepath, index=0),
-            led_center_coordinates=led_center_coordinates,
-            box_size=self.led_box_size,
-            cam_id=self.video_metadata.cam_id,
-            filename=led_plot_filename,
-            output_directory=self.output_directory,
-        )
-        self.led_detection.create_plot(plot=False, save=True)
-
-    def _save_synchro(self, filepath: Path, led_center_coordinates: Coordinates, offset_adjusted_start_idx: int,
-                      remaining_offset: int, alignment_error: float) -> None:
-        time = datetime.now().strftime("%Y%m%d%H%M%S")
-        synchro_dict = {"filepath": str(self.video_metadata.filepath),
-                        "fps": self.video_metadata.fps,
-                        "led_center_coordinates": (led_center_coordinates.y, led_center_coordinates.x),
-                        "offset_adjusted_start_idx": offset_adjusted_start_idx,
-                        "remaining_offset": remaining_offset,
-                        "alignment_error": alignment_error,
-                        "time": time,
-                        "scorer": self.video_metadata.led_extraction_filepath,
-                        "synchro_marker": self.synchro_metadata["synchro_marker"],
-                        "led_box_size": self.led_box_size,
-                        "method": self.video_metadata.led_extraction_type,
-                        "pattern": self.video_metadata.led_pattern}
-        with open(filepath, "wb") as file:
-            pickle.dump(synchro_dict, file)
-
-    def _get_framenumber_of_synchronized_files(self, synchronize_only: bool, marker_detection_filepath: Path,
-                                               synchronized_video_filepath: Path, verbose: bool = True
-                                               ) -> Tuple[Any, Any]:
-        if synchronize_only:
-            framenum_synchronized = iio.v2.get_reader(synchronized_video_filepath).count_frames()
-        else:
-            framenum_synchronized = pd.read_hdf(marker_detection_filepath).shape[0]
-        duration_synchronized = (framenum_synchronized / self.video_metadata.target_fps)
-        if verbose:
-            print(f"{self.video_metadata.cam_id} Frames after synchronization: {framenum_synchronized}")
-
-        return framenum_synchronized, duration_synchronized
-
-    def _handle_synchro_fails(self) -> Tuple[Coordinates, Union[int, Any], Union[float, Any], Union[int, Any]]:
-        if self.synchro_metadata["handle_synchro_fails"] == "repeat":
-            led_center_coordinates = self._get_led_center_coordinates()
-            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
-            offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
-                template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
-                end_time=self.synchro_metadata["end_pattern_match_ms"])
-        elif self.synchro_metadata["handle_synchro_fails"] == "default":
-            alignment_error = 0
-            led_center_coordinates = Coordinates(0, 0)
-            default_offset = self.synchro_metadata["default_offset_ms"]
-            default_start_idx = self._get_frame_index_closest_to_time(time=default_offset)
-            offset_adjusted_start_idx, remaining_offset = _adjust_start_idx_and_offset(
-                start_frame_idx=default_start_idx, offset=default_offset, fps=self.video_metadata.fps)
-        elif self.synchro_metadata["handle_synchro_fails"] == "manual":
-            self.video_metadata.led_extraction_type = "manual"
-            led_center_coordinates = self._get_led_center_coordinates()
-            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
-            offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
-                template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
-                end_time=self.synchro_metadata["end_pattern_match_ms"])
-        elif self.synchro_metadata["handle_synchro_fails"] == "error":
-            raise ValueError(
-                "Could not synchronize the video. \n"
-                "Make sure, that you chose the right synchronization pattern, \n"
-                "that the LED is visible during the pattern\n"
-                "and that you chose a proper alignment threshold!")
-        else:
-            raise ValueError(
-                "project_config key handle_synchro_fails has to be in ['error', 'manual', 'repeat', 'default']")
-        return led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error
-
     def _get_preexisting_output_filepath(self) -> Path:
         output_file = None
         if type(self) == CharucoVideoSynchronizer:
@@ -449,10 +367,6 @@ class Synchronizer(ABC):
             output_file = self._create_h5_filepath(tag=f"_downsampled{self.target_fps}fps_synchronized",
                                                    filtered=self.synchro_metadata['use_2D_filter'])
         return output_file
-
-    def _get_synchro_filepath(self) -> Path:
-        return self.output_directory.joinpath(
-            f"synchro_{self.video_metadata.recording_date}_{self.video_metadata.cam_id}.p")
 
     def _get_led_center_coordinates(self) -> Coordinates:
         temp_folder = self.output_directory.joinpath("temp")
@@ -739,6 +653,86 @@ class Synchronizer(ABC):
         upsampled_timeseries = d(new_indices)
         return upsampled_timeseries
 
+    def _handle_synchro_fails(self) -> Tuple[Coordinates, Union[int, Any], Union[float, Any], Union[int, Any]]:
+        if self.synchro_metadata["handle_synchro_fails"] == "repeat":
+            led_center_coordinates = self._get_led_center_coordinates()
+            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
+            offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
+                template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
+                end_time=self.synchro_metadata["end_pattern_match_ms"])
+        elif self.synchro_metadata["handle_synchro_fails"] == "default":
+            alignment_error = 0
+            led_center_coordinates = Coordinates(0, 0)
+            default_offset = self.synchro_metadata["default_offset_ms"]
+            default_start_idx = self._get_frame_index_closest_to_time(time=default_offset)
+            offset_adjusted_start_idx, remaining_offset = _adjust_start_idx_and_offset(
+                start_frame_idx=default_start_idx, offset=default_offset, fps=self.video_metadata.fps)
+        elif self.synchro_metadata["handle_synchro_fails"] == "manual":
+            self.video_metadata.led_extraction_type = "manual"
+            led_center_coordinates = self._get_led_center_coordinates()
+            self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)
+            offset_adjusted_start_idx, remaining_offset, alignment_error = self._find_best_match_of_template(
+                template=self.template_blinking_motif, start_time=self.synchro_metadata["start_pattern_match_ms"],
+                end_time=self.synchro_metadata["end_pattern_match_ms"])
+        elif self.synchro_metadata["handle_synchro_fails"] == "error":
+            raise ValueError(
+                "Could not synchronize the video. \n"
+                "Make sure, that you chose the right synchronization pattern, \n"
+                "that the LED is visible during the pattern\n"
+                "and that you chose a proper alignment threshold!")
+        else:
+            raise ValueError(
+                "project_config key handle_synchro_fails has to be in ['error', 'manual', 'repeat', 'default']")
+        return led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error
+
+    def _plot_led_marker(self, led_center_coordinates: Coordinates) -> None:
+        if self.video_metadata.calibration:
+            led_plot_filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                                f"_charuco_LED_marker"
+        else:
+            led_plot_filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
+                                f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_LED_marker"
+        self.led_detection = LEDMarkerPlot(
+            image=iio.v3.imread(self.video_metadata.filepath, index=0),
+            led_center_coordinates=led_center_coordinates,
+            box_size=self.led_box_size,
+            cam_id=self.video_metadata.cam_id,
+            filename=led_plot_filename,
+            output_directory=self.output_directory,
+        )
+        self.led_detection.create_plot(plot=False, save=True)
+
+    def _save_synchro(self, filepath: Path, led_center_coordinates: Coordinates, offset_adjusted_start_idx: int,
+                      remaining_offset: int, alignment_error: float) -> None:
+        time = datetime.now().strftime("%Y%m%d%H%M%S")
+        synchro_dict = {"filepath": str(self.video_metadata.filepath),
+                        "fps": self.video_metadata.fps,
+                        "led_center_coordinates": (led_center_coordinates.y, led_center_coordinates.x),
+                        "offset_adjusted_start_idx": offset_adjusted_start_idx,
+                        "remaining_offset": remaining_offset,
+                        "alignment_error": alignment_error,
+                        "time": time,
+                        "scorer": self.video_metadata.led_extraction_filepath,
+                        "synchro_marker": self.synchro_metadata["synchro_marker"],
+                        "led_box_size": self.led_box_size,
+                        "method": self.video_metadata.led_extraction_type,
+                        "pattern": self.video_metadata.led_pattern}
+        with open(filepath, "wb") as file:
+            pickle.dump(synchro_dict, file)
+
+    def _get_framenumber_of_synchronized_files(self, synchronize_only: bool, marker_detection_filepath: Path,
+                                               synchronized_video_filepath: Path, verbose: bool = True
+                                               ) -> Tuple[Any, Any]:
+        if synchronize_only:
+            framenum_synchronized = iio.v2.get_reader(synchronized_video_filepath).count_frames()
+        else:
+            framenum_synchronized = pd.read_hdf(marker_detection_filepath).shape[0]
+        duration_synchronized = (framenum_synchronized / self.video_metadata.target_fps)
+        if verbose:
+            print(f"{self.video_metadata.cam_id} Frames after synchronization: {framenum_synchronized}")
+
+        return framenum_synchronized, duration_synchronized
+
     def _downsample_video(
             self,
             start_idx: int,
@@ -928,21 +922,6 @@ class RecordingVideoSynchronizer(Synchronizer):
         Optional[Path], Optional[Path]]:
         pass
 
-    def _create_h5_filepath(
-            self, tag: str = "_rawfps_unsynchronized", filtered: bool = False
-    ) -> Path:
-        if filtered:
-            h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
-                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
-            )
-        else:
-            h5_filepath = self.output_directory.joinpath(
-                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
-                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
-            )
-        return h5_filepath
-
     def _run_deep_lab_cut_for_marker_detection(
             self, video_filepath: Path, test_mode: bool = False
     ) -> Path:
@@ -979,6 +958,20 @@ class RecordingVideoSynchronizer(Synchronizer):
 
         return output_filepath
 
+    def _create_h5_filepath(
+            self, tag: str = "_rawfps_unsynchronized", filtered: bool = False
+    ) -> Path:
+        if filtered:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}_filtered.h5"
+            )
+        else:
+            h5_filepath = self.output_directory.joinpath(
+                f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}_"
+                f"{self.video_metadata.paradigm}_{self.video_metadata.cam_id}{tag}.h5"
+            )
+        return h5_filepath
 
 class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
     def _adjust_video_to_target_fps_and_run_marker_detection(

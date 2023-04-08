@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Tuple, Dict
 
@@ -14,7 +15,15 @@ from .user_specific_rules import user_specific_rules_on_videometadata
 from .utils import check_keys
 
 
-class VideoMetadata:
+class VideoMetadata(ABC):
+    @abstractmethod
+    def _print_message(self, attributes: List) -> None:
+        pass
+
+    @abstractmethod
+    def _rename_file(self) -> bool:
+        pass
+
     def __init__(
             self,
             video_filepath: Path,
@@ -47,12 +56,6 @@ class VideoMetadata:
             self.framenum = 1
         else:
             self.framenum = iio.v2.get_reader(video_filepath).count_frames()
-
-    def _print_message(self, attributes: List) -> None:
-        pass
-
-    def _rename_file(self) -> bool:
-        pass
 
     def _check_filepaths(self, video_filepath: Path) -> Path:
         if (video_filepath.suffix in [".mp4", ".mov", ".AVI", ".avi", ".jpg", ".png", ".tiff",

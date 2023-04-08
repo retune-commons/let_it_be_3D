@@ -102,6 +102,11 @@ class IntrinsicCameraCalibrator(ABC):
         )
         return calibration_results
 
+    def _get_indices_of_selected_frames(self) -> List[int]:
+        sampling_rate = self._determine_sampling_rate()
+        frame_idxs = self._get_sampling_frame_indices(sampling_rate=sampling_rate)
+        return list(frame_idxs)
+
     def _attempt_to_match_max_frame_count(
             self,
             corners_per_image: List[np.ndarray],
@@ -125,6 +130,12 @@ class IntrinsicCameraCalibrator(ABC):
             print(f"Limited them to only {len(corners_per_image)}.")
         return corners_per_image
 
+    def _compute_object_points(self, n_detected_boards: int) -> List[np.ndarray]:
+        object_points = []
+        for i in range(n_detected_boards):
+            object_points.append(self.objp)
+        return object_points
+
     def _attempt_to_reach_max_frame_count(
             self,
             corners_per_image: List[np.ndarray],
@@ -145,17 +156,6 @@ class IntrinsicCameraCalibrator(ABC):
                 break
         return corners_per_image
 
-    def _construct_calibration_results(self, K: np.ndarray, D: np.ndarray) -> Dict:
-        calibration_results = {"K": K, "D": D, "size": self.imsize}
-        setattr(self, "calibration_results", calibration_results)
-        return calibration_results
-
-    def _compute_object_points(self, n_detected_boards: int) -> List[np.ndarray]:
-        object_points = []
-        for i in range(n_detected_boards):
-            object_points.append(self.objp)
-        return object_points
-
     def _determine_sampling_rate(self) -> int:
         total_frame_count = self.video_reader.count_frames()
         if total_frame_count >= 5 * self.max_calibration_frames:
@@ -163,11 +163,6 @@ class IntrinsicCameraCalibrator(ABC):
         else:
             sampling_rate = 1
         return sampling_rate
-
-    def _get_indices_of_selected_frames(self) -> List[int]:
-        sampling_rate = self._determine_sampling_rate()
-        frame_idxs = self._get_sampling_frame_indices(sampling_rate=sampling_rate)
-        return list(frame_idxs)
 
     def _get_sampling_frame_indices(self, sampling_rate: int) -> np.ndarray:
         total_frame_count = self.video_reader.count_frames()
@@ -188,6 +183,12 @@ class IntrinsicCameraCalibrator(ABC):
         )
         sampled_corners = np.asarray(all_detected_corners)[sampling_idxs]
         return list(sampled_corners)
+
+    def _construct_calibration_results(self, K: np.ndarray, D: np.ndarray) -> Dict:
+        calibration_results = {"K": K, "D": D, "size": self.imsize}
+        setattr(self, "calibration_results", calibration_results)
+        return calibration_results
+
 
 
 class IntrinsicCameraCalibratorCharuco(IntrinsicCameraCalibrator, ABC):

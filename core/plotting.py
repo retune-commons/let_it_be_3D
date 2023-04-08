@@ -24,6 +24,56 @@ def _save_figure(filepath: Union[str, Path]):
     plt.savefig(filepath, dpi=400)
 
 
+def _connect_one_set_of_markers(
+        ax: plt.Figure,
+        all_markers: Dict,
+        group: Dict
+) -> None:
+    if all(x in list(all_markers.keys()) for x in group['markers']):
+        x = [all_markers[marker]['x'] for marker in group['markers']]
+        y = [all_markers[marker]['y'] for marker in group['markers']]
+        z = [all_markers[marker]['z'] for marker in group['markers']]
+        ax.plot(x, y, z, alpha=group['alpha'], c=group['color'])
+
+
+def _fill_one_set_of_markers(
+        ax: plt.Figure,
+        all_markers: Dict,
+        group: Dict
+) -> None:
+    if all(x in list(all_markers.keys()) for x in group['markers']):
+        points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
+        z = [all_markers[marker]['z'] for marker in group['markers']]
+        artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
+        ax.add_patch(artist)
+        art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
+
+
+def _connect_one_set_of_marker_ids(
+        ax: plt.Figure,
+        points: Dict,
+        bps: str,
+        bp_dict: Dict,
+        color: np.ndarray,
+) -> None:
+    ixs = [bp_dict[bp] for bp in bps]
+    ax.plot(points[ixs, 0], points[ixs, 1], points[ixs, 2], color=color)
+
+
+def _connect_all_marker_ids(
+        ax: plt.Figure,
+        points: Dict,
+        scheme: List[str],
+        bodyparts: List[str],
+) -> None:
+    cmap = plt.get_cmap("tab10")
+    bp_dict = dict(zip(bodyparts, range(len(bodyparts))))
+    for i, bps in enumerate(scheme):
+        _connect_one_set_of_marker_ids(
+            ax=ax, points=points, bps=bps, bp_dict=bp_dict, color=cmap(i)[:3]
+        )
+
+
 class RotationVisualization:
     def __init__(
             self,
@@ -63,31 +113,6 @@ class RotationVisualization:
         return filepath.parent.joinpath(filepath.stem + ".png")
 
 
-def _connect_one_set_of_markers(
-        ax: plt.Figure,
-        all_markers: Dict,
-        group: Dict
-) -> None:
-    if all(x in list(all_markers.keys()) for x in group['markers']):
-        x = [all_markers[marker]['x'] for marker in group['markers']]
-        y = [all_markers[marker]['y'] for marker in group['markers']]
-        z = [all_markers[marker]['z'] for marker in group['markers']]
-        ax.plot(x, y, z, alpha=group['alpha'], c=group['color'])
-
-
-def _fill_one_set_of_markers(
-        ax: plt.Figure,
-        all_markers: Dict,
-        group: Dict
-) -> None:
-    if all(x in list(all_markers.keys()) for x in group['markers']):
-        points_2d = [[all_markers[marker]['x'], all_markers[marker]['y']] for marker in group['markers']]
-        z = [all_markers[marker]['z'] for marker in group['markers']]
-        artist = Polygon(np.array(points_2d), closed=False, color=group['color'], alpha=group['alpha'])
-        ax.add_patch(artist)
-        art3d.pathpatch_2d_to_3d(artist, z=z, zdir='z')
-
-
 # ToDo: rework, idx as argument of create_plot, not __init!
 class TriangulationVisualization:
     def __init__(
@@ -106,11 +131,6 @@ class TriangulationVisualization:
         self.bodyparts = list(set(key.split('_')[0] for key in self.df_3D.keys() if
                                   not any([label in key for label in self.config["markers_to_exclude"]])))
         self.filepath = self._create_filepath()
-
-    def _create_filepath(self) -> str:
-        filename = f"3D_plot_{self.filename_tag}"
-        filepath = self.output_directory.joinpath(filename)
-        return str(filepath)
 
     def create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> Optional[np.ndarray]:
         fig = plt.figure(figsize=(15, 15))
@@ -149,30 +169,10 @@ class TriangulationVisualization:
     def return_fig(self) -> np.ndarray:
         return self.create_plot(plot=False, save=False, return_fig=True)
 
-
-def _connect_one_set_of_marker_ids(
-        ax: plt.Figure,
-        points: Dict,
-        bps: str,
-        bp_dict: Dict,
-        color: np.ndarray,
-) -> None:
-    ixs = [bp_dict[bp] for bp in bps]
-    ax.plot(points[ixs, 0], points[ixs, 1], points[ixs, 2], color=color)
-
-
-def _connect_all_marker_ids(
-        ax: plt.Figure,
-        points: Dict,
-        scheme: List[str],
-        bodyparts: List[str],
-) -> None:
-    cmap = plt.get_cmap("tab10")
-    bp_dict = dict(zip(bodyparts, range(len(bodyparts))))
-    for i, bps in enumerate(scheme):
-        _connect_one_set_of_marker_ids(
-            ax=ax, points=points, bps=bps, bp_dict=bp_dict, color=cmap(i)[:3]
-        )
+    def _create_filepath(self) -> str:
+        filename = f"3D_plot_{self.filename_tag}"
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
 
 
 # ToDo: rewrite function to take df_filepath instead of p3d and function to get bodyparts from df
@@ -191,11 +191,6 @@ class CalibrationValidationPlot:
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
         self.filepath = self._create_filepath()
         self.marker_ids_to_connect = marker_ids_to_connect
-
-    def _create_filepath(self) -> str:
-        filename = f"3D_plot_{self.filename_tag}"
-        filepath = self.output_directory.joinpath(filename)
-        return str(filepath)
 
     def create_plot(self, plot: bool, save: bool) -> None:
         fig = plt.figure(figsize=(8, 6))
@@ -222,6 +217,11 @@ class CalibrationValidationPlot:
             plt.show()
         plt.close()
 
+    def _create_filepath(self) -> str:
+        filename = f"3D_plot_{self.filename_tag}"
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
+
 
 class PredictionsPlot:
     def __init__(
@@ -238,11 +238,6 @@ class PredictionsPlot:
             output_directory = predictions.parent
         self.output_directory = convert_to_path(output_directory)
         self.filepath = self._create_filepath()
-
-    def _create_filepath(self) -> str:
-        filename = f"predictions_{self.cam_id}"
-        filepath = self.output_directory.joinpath(filename)
-        return str(filepath)
 
     def create_plot(self, plot: bool, save: bool) -> None:
         df = pd.read_hdf(self.predictions)
@@ -264,6 +259,11 @@ class PredictionsPlot:
             plt.show()
         plt.close()
 
+    def _create_filepath(self) -> str:
+        filename = f"predictions_{self.cam_id}"
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
+
 
 class AlignmentPlotIndividual:
     def __init__(
@@ -284,10 +284,6 @@ class AlignmentPlotIndividual:
         self.cam_id = cam_id
         self.filepath = self._create_filepath(filename=filename)
 
-    def _create_filepath(self, filename: str) -> str:
-        filepath = self.output_directory.joinpath(filename)
-        return str(filepath)
-
     def create_plot(self, plot: bool, save: bool) -> None:
         end_idx = self.template.shape[0]
         fig = plt.figure(figsize=(9, 6), facecolor="white")
@@ -303,6 +299,10 @@ class AlignmentPlotIndividual:
             plt.show()
         plt.close()
 
+    def _create_filepath(self, filename: str) -> str:
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
+
 
 class AlignmentPlotCrossvalidation:
     def __init__(
@@ -317,10 +317,6 @@ class AlignmentPlotCrossvalidation:
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
         self.filepath = self._create_filepath(filename=filename)
 
-    def _create_filepath(self, filename: str) -> str:
-        filepath = self.output_directory.joinpath(filename)
-        return str(filepath)
-
     def create_plot(self, plot: bool, save: bool):
         fig = plt.figure(figsize=(9, 6), facecolor="white")
         end_idx = self.template.shape[0]
@@ -334,6 +330,10 @@ class AlignmentPlotCrossvalidation:
         if plot:
             plt.show()
         plt.close()
+
+    def _create_filepath(self, filename: str) -> str:
+        filepath = self.output_directory.joinpath(filename)
+        return str(filepath)
 
 
 class LEDMarkerPlot:
@@ -352,10 +352,6 @@ class LEDMarkerPlot:
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
         self.filepath = self._create_filepath(filename=filename)
         self.cam_id = cam_id
-
-    def _create_filepath(self, filename: str) -> Path:
-        filepath = self.output_directory.joinpath(filename)
-        return filepath
 
     def create_plot(self, plot: bool, save: bool):
         fig = plt.figure()
@@ -384,6 +380,10 @@ class LEDMarkerPlot:
             plt.show()
         plt.close()
 
+    def _create_filepath(self, filename: str) -> Path:
+        filepath = self.output_directory.joinpath(filename)
+        return filepath
+
 
 # ToDo: specify intrinsic calibration!
 class Intrinsics:
@@ -398,23 +398,6 @@ class Intrinsics:
         self.fisheye = fisheye
         self.intrinsic_calibration = intrinsic_calibration
         self._create_all_images(frame_idx=0)
-
-    def _create_all_images(self, frame_idx: int = 0) -> None:
-        self.distorted_input_image = load_single_frame_of_video(
-            filepath=self.video_filepath, frame_idx=frame_idx
-        )
-        if self.fisheye:
-            self.undistorted_output_image = (
-                self._undistort_fisheye_image_for_inspection(
-                    image=self.distorted_input_image
-                )
-            )
-        else:
-            self.undistorted_output_image = cv2.undistort(
-                self.distorted_input_image,
-                self.intrinsic_calibration["K"],
-                self.intrinsic_calibration["D"],
-            )
 
     def create_plot(self, plot: bool, save: bool) -> None:
         fig = plt.figure(figsize=(12, 5), facecolor="white")
@@ -434,6 +417,23 @@ class Intrinsics:
     def _create_filepath(self, filename: str) -> Path:
         filepath = self.output_directory.joinpath(filename)
         return filepath
+
+    def _create_all_images(self, frame_idx: int = 0) -> None:
+        self.distorted_input_image = load_single_frame_of_video(
+            filepath=self.video_filepath, frame_idx=frame_idx
+        )
+        if self.fisheye:
+            self.undistorted_output_image = (
+                self._undistort_fisheye_image_for_inspection(
+                    image=self.distorted_input_image
+                )
+            )
+        else:
+            self.undistorted_output_image = cv2.undistort(
+                self.distorted_input_image,
+                self.intrinsic_calibration["K"],
+                self.intrinsic_calibration["D"],
+            )
 
     def _undistort_fisheye_image_for_inspection(self, image: np.ndarray) -> np.ndarray:
         k_for_fisheye = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(

@@ -188,6 +188,65 @@ def _initialize_camera_group(camera_objects: List) -> ap_lib.cameras.CameraGroup
     return ap_lib.cameras.CameraGroup(camera_objects)
 
 
+def _add_missing_marker_ids_to_prediction(
+        missing_marker_ids: List[str], df: pd.DataFrame(), framenum: int = 1
+) -> pd.DataFrame():
+    try:
+        scorer = list(df.columns)[0][0]
+    except IndexError:
+        scorer = "zero_likelihood_markers"
+    for marker_id in missing_marker_ids:
+        for key in ["x", "y", "likelihood"]:
+            df.loc[[i for i in range(framenum)], (scorer, marker_id, key)] = 0
+    return df
+
+
+def _find_non_matching_list_elements(list1: List[str], list2: List[str]) -> List[str]:
+    return [marker_id for marker_id in list1 if marker_id not in list2]
+
+
+def _get_duplicate_elems_in_list(list1: List[str]) -> List[str]:
+    individual_elems, duplicate_elems = [], []
+    for elem in list1:
+        if elem in individual_elems:
+            duplicate_elems.append(elem)
+        else:
+            individual_elems.append(elem)
+
+
+def _remove_marker_ids_not_in_ground_truth(
+        marker_ids_to_remove: List[str], df: pd.DataFrame()
+) -> pd.DataFrame():
+    columns_to_remove = [column_name for column_name in df.columns if
+                         column_name[1] in marker_ids_to_remove]
+    return df.drop(columns=columns_to_remove)
+
+
+def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
+    filepath = convert_to_path(filepath)
+    if filepath.exists():
+        filepath.unlink()
+    df.to_csv(filepath, index=False)
+
+
+def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
+    all_normalization_markers = [config['center']]
+    for marker in config["ReferenceLengthMarkers"]:
+        all_normalization_markers.append(marker)
+    for marker in config["ReferenceRotationMarkers"]:
+        all_normalization_markers.append(marker)
+    all_normalization_markers = set(all_normalization_markers)
+    normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
+    normalization_keys = list(set(it.chain(*normalization_keys_nested)))
+    df_normalization_keys = df.loc[:, normalization_keys]
+    valid_frames_for_normalization = list(df_normalization_keys.dropna(axis=0).index)
+
+    if valid_frames_for_normalization:
+        return valid_frames_for_normalization[0]
+    else:
+        raise ValueError("Could not normalize the dataframe!")
+
+
 class Calibration:
     """
     A class, in which videos are calibrated to each other.
@@ -283,10 +342,13 @@ class Calibration:
         A class, that checks the metadata and filenames of videos in a given
         folder and allows for filename changing via user input.
     core.meta.MetaInterface.create_calibrations:
-        Create Calibration objects for all calibration_directories added to meta.
+        Create Calibration objects for all calibration_directories added to MetaInterface.
+    core.meta.MetaInterface.synchronize_calibrations:
+        Run the function run_synchronization for all calibration objects added
+        to MetaInterface.
     core.meta.MetaInterface.calibrate:
         Run the function run_calibration or calibrate_optimal for all calibration
-        objects added to meta.
+        objects added to MetaInterface.
 
     Examples
     ________
@@ -313,7 +375,7 @@ class Calibration:
             test_mode: bool = False,
     ) -> None:
         """
-        Construct all necessary attributes for the Calibration Class.
+        Construct all necessary attributes for the Calibration class.
 
         Read the metadata from project-/recording config and from video filenames.
         Create representations of the videos inside the given calibration_directory.
@@ -537,7 +599,8 @@ class Calibration:
             calibration_validation output if > 0
             or no output if < 1.
         test_mode: bool, default False
-            If True, pre-existing files won't be overwritten during the analysis.
+            If True (default False), then pre-existing files won't be
+            overwritten during the analysis.
 
         Returns
         -------
@@ -614,46 +677,6 @@ class Calibration:
                 filename=filename,
             )
             synchronization_crossvalidation.create_plot(save=True, plot=verbose)
-
-def _add_missing_marker_ids_to_prediction(
-        missing_marker_ids: List[str], df: pd.DataFrame(), framenum: int = 1
-) -> pd.DataFrame():
-    try:
-        scorer = list(df.columns)[0][0]
-    except IndexError:
-        scorer = "zero_likelihood_markers"
-    for marker_id in missing_marker_ids:
-        for key in ["x", "y", "likelihood"]:
-            df.loc[[i for i in range(framenum)], (scorer, marker_id, key)] = 0
-    return df
-
-
-def _find_non_matching_list_elements(list1: List[str], list2: List[str]) -> List[str]:
-    return [marker_id for marker_id in list1 if marker_id not in list2]
-
-
-def _get_duplicate_elems_in_list(list1: List[str]) -> List[str]:
-    individual_elems, duplicate_elems = [], []
-    for elem in list1:
-        if elem in individual_elems:
-            duplicate_elems.append(elem)
-        else:
-            individual_elems.append(elem)
-
-
-def _remove_marker_ids_not_in_ground_truth(
-        marker_ids_to_remove: List[str], df: pd.DataFrame()
-) -> pd.DataFrame():
-    columns_to_remove = [column_name for column_name in df.columns if
-                         column_name[1] in marker_ids_to_remove]
-    return df.drop(columns=columns_to_remove)
-
-
-def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
-    filepath = convert_to_path(filepath)
-    if filepath.exists():
-        filepath.unlink()
-    df.to_csv(filepath, index=False)
 
 
 class Triangulation(ABC):
@@ -770,7 +793,7 @@ class Triangulation(ABC):
         A class, in which videos are calibrated to each other.
     core.meta.MetaInterface.triangulate_recordings:
         Run the function run_triangulation for all TriangulationRecording
-        objects added to meta.
+        objects added to MetaInterface.
     Calibration.triangulate_optim:
         Run the function run_triangulation for the CalibrationValidation
         object passed to triangulate_optim.
@@ -1126,24 +1149,6 @@ class Triangulation(ABC):
         return df
 
 
-def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
-    all_normalization_markers = [config['center']]
-    for marker in config["ReferenceLengthMarkers"]:
-        all_normalization_markers.append(marker)
-    for marker in config["ReferenceRotationMarkers"]:
-        all_normalization_markers.append(marker)
-    all_normalization_markers = set(all_normalization_markers)
-    normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
-    normalization_keys = list(set(it.chain(*normalization_keys_nested)))
-    df_normalization_keys = df.loc[:, normalization_keys]
-    valid_frames_for_normalization = list(df_normalization_keys.dropna(axis=0).index)
-
-    if valid_frames_for_normalization:
-        return valid_frames_for_normalization[0]
-    else:
-        raise ValueError("Could not normalize the dataframe!")
-
-
 class TriangulationRecordings(Triangulation):
     """
     Subclass of Triangulation, in which videos are triangulated based on a
@@ -1169,13 +1174,13 @@ class TriangulationRecordings(Triangulation):
         Parent class, for triangulation of videos or images.
     core.meta.MetaInterface.create_recordings:
         Create TriangulationRecording objects for all recording_directories
-        added to meta.
+        added to MetaInterface.
     core.meta.MetaInterface.synchronize_recordings:
         Run the function run_synchronization for all TriangulationRecording
-        objects added to meta.
+        objects added to MetaInterface.
     core.meta.MetaInterface.triangulate_recordings:
         Run the function run_triangulation for all TriangulationRecording
-        objects added to meta.
+        objects added to MetaInterface.
     core.checker_objects.CheckRecording:
         A class, that checks the metadata and filenames of videos in a given
         folder and allows for filename changing via user input.
@@ -1434,10 +1439,10 @@ class CalibrationValidation(Triangulation):
         Parent class, for triangulation of videos or images.
     core.meta.MetaInterface.create_calibrations:
         Create CalibrationValidation objects and run add_ground_truth_config for
-        all calibration_directories added to meta.
+        all calibration_directories added to MetaInterface.
     core.meta.MetaInterface.synchronize_calibrations:
         Run get_marker_predictions for all calibration_validation objects added
-        to meta.
+        to MetaInterface.
     core.checker_objects.CheckCalibrationValidation:
         A class, that checks the metadata and filenames of videos in a given
         folder and allows for filename changing via user input.
