@@ -167,7 +167,7 @@ class MetaInterface(ABC):
                 recording_object = self.objects["triangulation_recordings_objects"][recording]
                 recording_meta = recording_day["recordings"][recording]
                 recording_object.run_synchronization(
-                    test_mode=test_mode, synchronize_only=synchronize_only
+                    test_mode=test_mode, verbose=verbose
                 )
                 for video in recording_meta["videos"]:
                     try:
@@ -338,13 +338,11 @@ class MetaInterface(ABC):
         normalization_config_path = convert_to_path(normalization_config_path)
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
-                self.objects["triangulation_recordings_objects"][
+                rotated_filepath, rotation_error = self.objects["triangulation_recordings_objects"][
                     recording
                 ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode)
-                recording_day["recordings"][recording]["normalised_3D_csv"] = \
-                    self.objects["triangulation_recordings_objects"][recording].rotated_filepath
-                recording_day["recordings"][recording]["normalisation_rotation_error"] = \
-                    self.objects["triangulation_recordings_objects"][recording].rotation_error
+                recording_day["recordings"][recording]["normalised_3D_csv"] = rotated_filepath
+                recording_day["recordings"][recording]["normalisation_rotation_error"] = rotation_error
         self.meta["meta_step"] = 8
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 

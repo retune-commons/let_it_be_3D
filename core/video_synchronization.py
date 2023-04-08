@@ -305,7 +305,7 @@ class Synchronizer(ABC):
         self.synchro_metadata = synchro_metadata
 
     def run_synchronization(
-            self, synchronize_only: bool, test_mode: bool = False
+            self, synchronize_only: bool, test_mode: bool = False, verbose: bool = True
     ) -> Tuple[Optional[Path], Optional[Path]]:
 
         self.template_blinking_motif = _construct_template_motif(
@@ -353,7 +353,8 @@ class Synchronizer(ABC):
         self.video_metadata.framenum_synchronized, self.video_metadata.duration_synchronized = \
             self._get_framenumber_of_synchronized_files(synchronize_only=synchronize_only,
                                                         marker_detection_filepath=marker_detection_filepath,
-                                                        synchronized_video_filepath=synchronized_video_filepath)
+                                                        synchronized_video_filepath=synchronized_video_filepath,
+                                                        verbose=verbose)
 
         return marker_detection_filepath, synchronized_video_filepath
 
@@ -393,13 +394,15 @@ class Synchronizer(ABC):
             pickle.dump(synchro_dict, file)
 
     def _get_framenumber_of_synchronized_files(self, synchronize_only: bool, marker_detection_filepath: Path,
-                                               synchronized_video_filepath: Path) -> Tuple[Any, Any]:
+                                               synchronized_video_filepath: Path, verbose: bool = True
+                                               ) -> Tuple[Any, Any]:
         if synchronize_only:
             framenum_synchronized = iio.v2.get_reader(synchronized_video_filepath).count_frames()
         else:
             framenum_synchronized = pd.read_hdf(marker_detection_filepath).shape[0]
         duration_synchronized = (framenum_synchronized / self.video_metadata.target_fps)
-        print(f"{self.video_metadata.cam_id} Frames after synchronization: {framenum_synchronized}")
+        if verbose:
+            print(f"{self.video_metadata.cam_id} Frames after synchronization: {framenum_synchronized}")
 
         return framenum_synchronized, duration_synchronized
 

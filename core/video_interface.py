@@ -34,6 +34,7 @@ class VideoInterface:
             synchronize_only: bool,
             test_mode: bool,
             synchro_metadata: Dict,
+            verbose: bool = True
     ) -> None:
         self.synchronizer_object = synchronizer(
             video_metadata=self.video_metadata,
@@ -44,7 +45,7 @@ class VideoInterface:
             self.marker_detection_filepath,
             self.synchronized_video_filepath,
         ) = self.synchronizer_object.run_synchronization(
-            synchronize_only=synchronize_only, test_mode=test_mode
+            synchronize_only=synchronize_only, test_mode=test_mode, verbose=verbose
         )
 
     def export_for_aniposelib(self) -> Union:

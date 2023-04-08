@@ -252,7 +252,7 @@ def _set_angles_to_plane(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.D
     return anipose_io
 
 
-def set_angles_error_between_screws_and_plane(gt_angles: Dict, anipose_io: Dict) -> Dict:
+def set_angles_error_between_line_and_plane(gt_angles: Dict, anipose_io: Dict) -> Dict:
     """
     Sets the angles between the screws and the plane
     :return:
@@ -383,9 +383,16 @@ def _get_vector_length(vector: np.array) -> float:
 def _get_angle_between_plane_and_line(N: np.array, R: np.array) -> float:
     """
 
-    :param N: normal vector of the plane
-    :param R:
-    :return:
+
+    Parameters
+    ----------
+    N: np.array
+        normal vector of the plane
+    R: np.array
+
+    Returns
+    -------
+
     """
     cosphi = _get_vector_length(vector=_get_vector_product(A=N, B=R)) / (
             _get_vector_length(N) * _get_vector_length(R)

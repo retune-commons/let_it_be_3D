@@ -186,8 +186,7 @@ STANDARD_ATTRIBUTES_TRIANGULATION = ["all_cameras",
                                      "rotation_error",
                                      "synchronization_individuals",
                                      "led_detection_individuals",
-                                     "ground_truth_config",
-                                     "synchronized_videos"]
+                                     "ground_truth_config"]
 
 STANDARD_ATTRIBUTES_CALIBRATION = ["camera_group",
                                    "report_filepath",

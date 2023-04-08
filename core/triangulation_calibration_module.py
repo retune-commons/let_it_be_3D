@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from moviepy.editor import VideoClip
+from numpy import ndarray
 from scipy.spatial.transform import Rotation
 
 from .angles_and_distances import (
@@ -15,7 +16,7 @@ from .angles_and_distances import (
     set_distances_and_angles_for_evaluation,
     fill_in_distances,
     add_all_real_distances_errors,
-    set_angles_error_between_screws_and_plane, get_xyz_distance_in_triangulation_space,
+    set_angles_error_between_line_and_plane, get_xyz_distance_in_triangulation_space,
 )
 from .marker_detection import ManualAnnotation, DeeplabcutInterface
 from .plotting import (
@@ -189,12 +190,11 @@ def _initialize_camera_group(camera_objects: List) -> ap_lib.cameras.CameraGroup
 
 class Calibration:
     """
-    A class in which videos are calibrated to each other.
+    A class, in which videos are calibrated to each other.
 
     Temporal synchronization of the videos can be performed based on a pattern.
-    Spatial calibration is performed using aniposelib with additional methods
-    to validate the calibration based on known ground_truth.
-
+    Spatial calibration is performed using aniposelib (ap_lib) with additional
+    methods to validate the calibration based on known ground_truth.
 
     Parameters
     ----------
@@ -207,8 +207,9 @@ class Calibration:
     output_directory: Path or string, optional
         Directory, in which the files created during the analysis are saved.
         Per default it will be set the same as the calibration_directory.
-    test_mode: bool
-        If True, pre-existing files won't be overwritten during the analysis.
+    test_mode: bool, default False
+        If True (default False), then pre-existing files won't be overwritten
+        during the analysis.
 
     Attributes
     __________
@@ -238,8 +239,6 @@ class Calibration:
     calibration_index: int
         Index of a calibration.
         Together with recording_date, it creates a unique calibration key.
-    valid_cam_ids: list of str
-        All camera names to search for in the files in calibration_directory.
     calibration_tag: str
         Filename tag to search for in the files in calibration_directory.
     reprojerr: float
@@ -258,21 +257,52 @@ class Calibration:
 
     Methods
     _______
-    run_synchronization(test_mode)
-        Performs synchronization of all videos to the led_pattern and downsampling to target_fps.
-    run_calibration: use_own_intrinsic_calibration: bool = True,
-            verbose: int = 0,
-            charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
-            test_mode: bool = False,
-            iteration: Optional[int] = None,
+    run_synchronization(test_mode, verbose)
+        Perform synchronization of all videos to the led_pattern and
+        downsampling to target_fps.
+    run_calibration(use_own_intrinsic_calibration, charuco_calibration_board, iteration, verbose, test_mode)
+        Call ap_lib calibrate function.
+    calibrate_optimal(calibration_validation, max_iters, p_threshold, angle_threshold, verbose, test_mode)
+        Call run_calibration repeatedly and validate the quality of the
+        resulting calibration on calibration_validation images and ground_truth.
 
-    calibrate_optimal: calibration_validation: "CalibrationValidation",
-            max_iters: int = 5,
-            p_threshold: float = 0.1,
-            angle_threshold: float = 5.,
-            verbose: int = 1,
-            test_mode: bool = False,
+    References
+    __________
+    [1] Karashchuk, P., Rupp, K. L., Dickinson, E. S., et al. (2021).
+    Anipose: A toolkit for robust markerless 3D pose estimation.
+    Cell reports, 36(13), 109730. https://doi.org/10.1016/j.celrep.2021.109730
 
+    See Also
+    ________
+    TriangulationRecordings:
+        A class, in which videos are triangulated based on a calibration file.
+    CalibrationValidation:
+        A class, in which images are triangulated based on a calibration file
+        and the triangulated coordinates are validated based on a ground_truth.
+    core.checker_objects.CheckCalibration:
+        A class, that checks the metadata and filenames of videos in a given
+        folder and allows for filename changing via user input.
+    core.meta.MetaInterface.create_calibrations:
+        Create Calibration objects for all calibration_directories added to meta.
+    core.meta.MetaInterface.calibrate:
+        Run the function run_calibration or calibrate_optimal for all calibration
+        objects added to meta.
+
+    Examples
+    ________
+    >>> from pathlib import Path
+    >>> from core.triangulation_calibration_module import Calibration
+    >>> rec_config = Path(
+    ... "test_data/Server_structure/Calibrations/220922/recording_config_220922.yaml"
+    ... )
+    >>> calibration_object = Calibration(
+    ... calibration_directory=rec_config.parent,
+    ... recording_config_filepath=rec_config,
+    ... project_config_filepath="test_data/project_config.yaml",
+    ... output_directory=rec_config.parent,
+    ... )
+    >>> calibration_object.run_synchronization()
+    >>> calibration_object.run_calibration(verbose=2)
     """
     def __init__(
             self,
@@ -283,11 +313,10 @@ class Calibration:
             test_mode: bool = False,
     ) -> None:
         """
-        Constructs all necessary attributes for the Calibration Class.
+        Construct all necessary attributes for the Calibration Class.
 
-        Reads the metadata from project-/recording config.
-        Creates representations of the videos inside the given calibration_directory.
-        Reads metadata from the video filenames.
+        Read the metadata from project-/recording config and from video filenames.
+        Create representations of the videos inside the given calibration_directory.
 
         Parameters
         ----------
@@ -300,8 +329,9 @@ class Calibration:
         output_directory: Path or string, optional
             Directory, in which the files created during the analysis are saved.
             Per default it will be set the same as the calibration_directory.
-        test_mode: bool
-            If True, pre-existing files won't be overwritten during the analysis.
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
         """
         for attribute in STANDARD_ATTRIBUTES_CALIBRATION:
             setattr(self, attribute, None)
@@ -316,7 +346,7 @@ class Calibration:
             project_config_filepath=project_config_filepath,
         )
         self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
-        for attribute in ["valid_cam_ids", "calibration_tag", "allowed_num_diverging_frames"]:
+        for attribute in ["calibration_tag", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
             setattr(self, attribute, recording_config_dict[attribute])
@@ -339,7 +369,26 @@ class Calibration:
         for video_metadata in self.metadata_from_videos.values():
             video_metadata.target_fps = self.target_fps
 
-    def run_synchronization(self, test_mode: bool = False) -> None:
+    def run_synchronization(self, test_mode: bool = False, verbose: bool = True) -> None:
+        """
+        Perform synchronization of all videos to the led_pattern and
+        downsampling to target_fps.
+
+        Call the synchronizer via VideoInterface and save the
+        synchronized_video_filepaths.
+        Create a plot for crossvalidation of the synchronised LED timeseries.
+        Exclude videos, if there are any duplicates in camera names or
+        diverging framenumbers after synchronization.
+
+        Parameters
+        ----------
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+        verbose: bool, default True
+            If True (default), then Crossvalidation plot and synchronised number
+            of frames for each camera are printed.
+        """
         self.synchronized_charuco_videofiles = {}
         self.camera_objects = []
         for video_interface in self.video_interfaces.values():
@@ -349,30 +398,14 @@ class Calibration:
                 synchronize_only=True,
                 test_mode=test_mode,
                 synchro_metadata=self.synchro_metadata,
+                verbose=verbose
             )
             self.synchronized_charuco_videofiles[
                 video_interface.video_metadata.cam_id
             ] = str(video_interface.synchronized_video_filepath)
             self.camera_objects.append(video_interface.export_for_aniposelib())
 
-        template = list(self.video_interfaces.values())[
-            0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
-            fps=self.target_fps)[0][0]
-        led_timeseries_crossvalidation = {}
-        for video_interface in self.video_interfaces.values():
-            if video_interface.synchronizer_object.led_timeseries_for_cross_video_validation is not None:
-                led_timeseries_crossvalidation[
-                    video_interface.video_metadata.cam_id
-                ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
-        if list(led_timeseries_crossvalidation.keys()):
-            filename = f'{self.recording_date}_charuco_synchronization_crossvalidation_{self.target_fps}'
-            synchronization_crossvalidation = AlignmentPlotCrossvalidation(
-                template=template,
-                led_timeseries=led_timeseries_crossvalidation,
-                output_directory=self.output_directory,
-                filename=filename,
-            )
-            synchronization_crossvalidation.create_plot(save=True, plot=True)
+        self._plot_synchro_crossvalidation(verbose=verbose)
         cameras = [camera_object.name for camera_object in self.camera_objects]
         duplicate_cams = _get_duplicate_elems_in_list(cameras)
         if duplicate_cams:
@@ -398,6 +431,33 @@ class Calibration:
             test_mode: bool = False,
             iteration: Optional[int] = None,
     ) -> Path:
+        """
+        Call ap_lib calibrate function.
+
+        Create a filename for the calibration file.
+        Pass videos to ap_lib.cameras.camera_group.calibrate_videos function.
+
+        Parameters
+        ----------
+        use_own_intrinsic_calibration: bool, default True
+            If True (default), then the externally created intrinsic calibrations
+            are passed to the calibrate function. Otherwise, the ap_lib built-in
+            intrinsic calibration is used.
+        verbose: int, default 0
+            Show ap_lib output if > 1 or no output if <= 1.
+        charuco_calibration_board: ap_lib.boards.CharucoBoard, optional
+            Specify the board, that was used in the calibration videos.
+        test_mode: bool, default False
+            If True, pre-existing files won't be overwritten during the analysis.
+        iteration: int, optional
+            Variable to be included into the filename to make the
+            filepath of calibration files unique for repeated calibrations.
+
+        Returns
+        -------
+        calibration_filepath: Path
+
+        """
         calibration_key = create_calibration_key(videos=self.valid_videos,
                                                  recording_date=self.recording_date,
                                                  calibration_index=self.calibration_index,
@@ -448,7 +508,43 @@ class Calibration:
             verbose: int = 1,
             test_mode: bool = False,
     ):
-        """finds optimal calibration through repeated optimisations of anipose"""
+        """
+        Call run_calibration repeatedly and validates the quality of the
+        resulting calibration on calibration_validation images and ground_truth.
+
+        Repeat calibration until a good calibration is reached or max_iters is
+        superceded.
+        Check whether the triangulated data in calibration_validation matches
+        the ground_truth data p_threshold and angle_threshold.
+        Create a report file in which the metadata to the calibration of each
+        iteration is specified.
+
+        Parameters
+        ----------
+        calibration_validation: CalibrationValidation
+            Object, containing images, triangulated data and ground_truth
+            information for calibration validation.
+        max_iters: int, default 5
+            Number of iterations allowed to find a good calibration.
+        p_threshold: float, default 0.1
+            Threshold for errors in the triangulated distances compared to
+            ground truth (mean distances in percent).
+        angle_threshold: float, default 5
+            Threshold for errors in the triangulated angles compared to ground
+            truth (mean angles in degrees).
+        verbose: int, default 1
+            Show ap_lib output if > 1,
+            calibration_validation output if > 0
+            or no output if < 1.
+        test_mode: bool, default False
+            If True, pre-existing files won't be overwritten during the analysis.
+
+        Returns
+        -------
+        calibration_filepath: Path
+            The filepath to the optimal calibration of if no good calibration
+            was reached during iteration, the filepath of the last calibration.
+        """
         report = pd.DataFrame()
         calibration_found = False
         calibration_key = create_calibration_key(videos=self.valid_videos,
@@ -465,41 +561,28 @@ class Calibration:
                                                             iteration=cal)
 
             calibration_validation.run_triangulation(calibration_toml_filepath=calibration_filepath)
-
-            calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
-            calibration_errors = calibration_validation.anipose_io["distance_errors_in_cm"]
-            calibration_angles_errors = calibration_validation.anipose_io[
-                "angles_error_screws_plan"]
-            reprojerr_nonan = calibration_validation.anipose_io["reproj_nonan"].mean()
-
-            all_angle_errors, all_percentage_errors = [], []
-            for reference in calibration_errors.keys():
-                all_percentage_errors = [
-                    percentage_error
-                    for marker_id_a, marker_id_b, distance_error, percentage_error in
-                    calibration_errors[
-                        reference]["individual_errors"]]
-            all_angle_errors = list(calibration_angles_errors.values())
-
-            mean_dist_err_percentage = np.nanmean(np.asarray(all_percentage_errors))
-            mean_angle_err = np.nanmean(np.asarray(all_angle_errors))
+            mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean = \
+                calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
 
             if verbose > 0:
                 print(
                     f"Calibration {cal}\n mean percentage error: {mean_dist_err_percentage}\n "
-                    f"mean angle error: {mean_angle_err}")
+                    f"mean angle error: {mean_angle_err}"
+                    f"ap_lib reprojerr: {self.reprojerr}")
 
             report.loc[cal, "mean_distance_error_percentage"] = mean_dist_err_percentage
             report.loc[cal, "mean_angle_error"] = mean_angle_err
-            report.loc[cal, "reprojerror"] = reprojerr_nonan
+            report.loc[cal, "reprojerror"] = reprojerr_nonan_mean
+            report.loc[cal, "ap_lib_reprojerr"] = self.reprojerr
 
             if (mean_dist_err_percentage < p_threshold and mean_angle_err < angle_threshold):
                 calibration_found = True
                 calibration_filepath.rename(good_calibration_filepath)
                 calibration_filepath = good_calibration_filepath
-                print(
-                    f"Good Calibration reached at iteration {cal}!"
-                    f"Named it {good_calibration_filepath}.")
+                if verbose > 0:
+                    print(
+                        f"Good Calibration reached at iteration {cal}!"
+                        f"Named it {good_calibration_filepath}.")
                 break
 
         self.report_filepath = self.output_directory.joinpath(
@@ -507,10 +590,30 @@ class Calibration:
         report.to_csv(self.report_filepath, index=False)
 
         if not calibration_found:
-            print(
-                "No optimal calibration found with given thresholds! Returned last executed calibration!")
+            if verbose > 0:
+                print(
+                    "No optimal calibration found with given thresholds! Returned last executed calibration!")
         return calibration_filepath
 
+    def _plot_synchro_crossvalidation(self, verbose: bool = True) -> None:
+        template = list(self.video_interfaces.values())[
+            0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
+            fps=self.target_fps)[0][0]
+        led_timeseries_crossvalidation = {}
+        for video_interface in self.video_interfaces.values():
+            if video_interface.synchronizer_object.led_timeseries_for_cross_video_validation is not None:
+                led_timeseries_crossvalidation[
+                    video_interface.video_metadata.cam_id
+                ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
+        if list(led_timeseries_crossvalidation.keys()):
+            filename = f'{self.recording_date}_charuco_synchronization_crossvalidation_{self.target_fps}'
+            synchronization_crossvalidation = AlignmentPlotCrossvalidation(
+                template=template,
+                led_timeseries=led_timeseries_crossvalidation,
+                output_directory=self.output_directory,
+                filename=filename,
+            )
+            synchronization_crossvalidation.create_plot(save=True, plot=verbose)
 
 def _add_missing_marker_ids_to_prediction(
         missing_marker_ids: List[str], df: pd.DataFrame(), framenum: int = 1
@@ -554,6 +657,124 @@ def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
 
 
 class Triangulation(ABC):
+    """
+    Parent class, for triangulation of videos or images.
+
+    Triangulation is performed using aniposelib (ap_lib).
+
+    Parameters
+    ----------
+    project_config_filepath: Path or string
+        Filepath to the project_config .yaml file.
+    directory: Path or string
+        Directory, where the videos or images are stored.
+    recording_config_filepath: Path or string
+        Filepath to the recording_config .yaml file.
+    test_mode: bool, default False
+        If True (default False), then pre-existing files won't be overwritten
+        during the analysis.
+    output_directory: Path or string, optional
+        Directory, in which the files created during the analysis are saved.
+        Per default it will be set the same as the directory.
+
+    Attributes
+    __________
+    project_config_filepath: Path
+        Filepath to the project_config .yaml file.
+    output_directory: Path
+        Directory, in which the files created during the analysis are saved.
+    video_interfaces: {str: VideoInterface}
+        List of VideoInterface objects for all videos or images.
+    metadata_from_videos: {str: VideoMetadata}
+        List of VideoMetadata objects for all videos or images.
+    triangulation_dlc_cams_filepaths: {str: Path}
+        Containing the filepath to the predictions for each camera.
+    csv_output_filepath: Path
+        Filepath, were the triangulated dataframe should be saved.
+    recording_date: str
+        Date at which the calibration was done based on recording_config and as
+        read from the filenames.
+    target_fps: int
+        Fps rate, to which the videos should be synchronized.
+    led_pattern: dict
+        Blinking pattern to use for temporal synchronisation.
+    mouse_id: str
+        Only defined in TriangulationRecordings. The mouse_id as read
+        from the filenames.
+    paradigm: str
+        Only defined in TriangulationRecordings. The paradigm as read
+        from the filenames.
+    all_cameras: list of str
+        All camera names, that are stored in the camera_group.
+    self.camera_group: ap_lib.cameras.CameraGroup
+        Group of cameras loaded from calibration_toml_filepath.
+    anipose_io: dict
+        Containing information for ap_lib functions, such as points_flat, p3ds,
+        n_joints, reprojerr, as well as errors and distances calculated from
+        ground truth.
+    markers: list of str
+        All markers that will be triangulated.
+    normalised_dataframe: bool, default False
+        If True (default False), then the dataframe was normalised based on
+        input from normalisation config.
+    markers_excluded_manually: bool, default False
+        If True (default False), then markers were excluded from predictions
+        based on marker exclusion config.
+    rotated_filepath: Path
+        Filepath, were the rotated triangulated dataframe is saved.
+    video_plotting_config: dict
+        Containing information from video_plotting config to create 3D videos.
+    synchronization_individuals: list of AlignmentPlotIndividual
+        Only defined in TriangulationRecordings. Container for the AlignmentPlotIndividual objects of each synchronized video.
+    led_detection_individuals: list of LEDMarkerPlot
+        Only defined in TriangulationRecordings. Container for the LEDMarkerPlot objects of each synchronized video.
+    synchro_metadata: dict
+        Only used in TriangulationRecordings. Dictionary used as input for synchronizer objects.
+    allowed_num_diverging_frames: int
+        Only used in TriangulationRecordings. Difference of framenumber to the framenumber median of all synchronised videos,
+        that is allowed before a video has to be excluded.
+    ground_truth_config: dict
+        Only defined in CalibrationValidation to compare the triangulated data
+        to ground truth data.
+    calibration_validation_tag: str
+        Only used in CalibrationValidation. Filename tag to search for in the
+        filenames in directory.
+    _allowed_filetypes: list of str
+        Abstract property, specify what file endings to look for in directory.
+
+    Methods
+    _______
+    run_triangulation(calibration_toml_filepath, test_mode):
+        Load and validate the calibration, triangulate and create 3D df.
+    exclude_marker(all_markers_to_exclude_config_path, verbose):
+        Exclude markers in prediction based on markers_to_exclude config.
+    _get_dataframe_of_triangulated_points(anipose_io):
+        Combine the triangulated data from anipose_io to a 3D df.
+
+    References
+    __________
+    [1] Karashchuk, P., Rupp, K. L., Dickinson, E. S., et al. (2021).
+    Anipose: A toolkit for robust markerless 3D pose estimation.
+    Cell reports, 36(13), 109730. https://doi.org/10.1016/j.celrep.2021.109730
+
+    See Also
+    ________
+    TriangulationRecordings:
+        Subclass of Triangulation, in which videos are triangulated based on a
+        calibration file.
+    CalibrationValidation:
+        Subclass of Triangulation, in which images are triangulated based on a
+        calibration file and the triangulated coordinates are validated based on
+        a ground_truth.
+    Calibration:
+        A class, in which videos are calibrated to each other.
+    core.meta.MetaInterface.triangulate_recordings:
+        Run the function run_triangulation for all TriangulationRecording
+        objects added to meta.
+    Calibration.triangulate_optim:
+        Run the function run_triangulation for the CalibrationValidation
+        object passed to triangulate_optim.
+    """
     @abstractmethod
     def _create_csv_filepath(self) -> Path:
         pass
@@ -574,11 +795,33 @@ class Triangulation(ABC):
         pass
 
     def __init__(self,
-                 project_config_filepath: Path,
-                 directory: Path,
-                 recording_config_filepath: Path,
+                 project_config_filepath: Union[Path, str],
+                 directory: Union[Path, str],
+                 recording_config_filepath: Union[Path, str],
                  test_mode: bool = False,
-                 output_directory: Optional[Path] = None):
+                 output_directory: Optional[Union[Path, str]] = None):
+        """
+        Construct all necessary attributes for the Triangulation Class.
+
+        Read the metadata from project-/recording config and from video filenames.
+        Create csv_output_filepath based on the metadata.
+        Create representations of the videos inside the given directory.
+
+        Parameters
+        ----------
+        project_config_filepath: Path or string
+            Filepath to the project_config .yaml file.
+        directory: Path or string
+            Directory, where the videos or images are stored.
+        recording_config_filepath: Path or string
+            Filepath to the recording_config .yaml file.
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+        output_directory: Path or string, optional
+            Directory, in which the files created during the analysis are saved.
+            Per default it will be set the same as the directory.
+        """
         for attribute in STANDARD_ATTRIBUTES_TRIANGULATION:
             setattr(self, attribute, None)
         self.directory = convert_to_path(directory)
@@ -592,11 +835,10 @@ class Triangulation(ABC):
             project_config_filepath=project_config_filepath,
         )
         self.synchro_metadata = {key: project_config_dict[key] for key in SYNCHRO_METADATA_KEYS}
-        for attribute in ["use_gpu", "valid_cam_ids", "calibration_tag",
-                          "calibration_validation_tag",
+        for attribute in ["use_gpu", "calibration_validation_tag",
                           "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
-        for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
+        for attribute in ["recording_date", "led_pattern", "target_fps"]:
             setattr(self, attribute, recording_config_dict[attribute])
 
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
@@ -619,7 +861,23 @@ class Triangulation(ABC):
             self,
             calibration_toml_filepath: Union[Path, str],
             test_mode: bool = False,
-    ):
+    ) -> None:
+        """
+        Load and validate the calibration, triangulate and create 3D df.
+
+        Validate, that the camera names in camera_group match
+        triangulation_dlc_cams_filepaths and drop or add empty files if they don't.
+        Triangulate using different options as defined in the project_config via
+        ap_lib functions.
+
+        Parameters
+        ----------
+        calibration_toml_filepath: Path or str
+            Filepath to the calibration, that should be used for triangulation.
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+        """
         calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
 
@@ -665,14 +923,25 @@ class Triangulation(ABC):
         self.df = self._get_dataframe_of_triangulated_points(anipose_io=self.anipose_io)
         if (not test_mode) or (test_mode and not self.csv_output_filepath.exists()):
             _save_dataframe_as_csv(filepath=self.csv_output_filepath, df=self.df)
-        self.delete_temp_files()
+        self._delete_temp_files()
 
-    def delete_temp_files(self) -> None:
+    def _delete_temp_files(self) -> None:
         for path in self.triangulation_dlc_cams_filepaths.values():
             if "_temp" in path.name:
                 path.unlink()
 
-    def exclude_markers(self, all_markers_to_exclude_config_path: Path, verbose: bool = True):
+    def exclude_markers(self, all_markers_to_exclude_config_path: Union[Path, str], verbose: bool = True):
+        """
+        Exclude markers in prediction based on markers_to_exclude config.
+
+        Parameters
+        ----------
+        all_markers_to_exclude_config_path: Path or str
+            Filepath to the config used for exclusion of markers.
+        verbose: bool, default True
+            If True (default), print if exclusion of markers worked without any
+            abnormalities.
+        """
         all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
         missing_cams = check_keys(all_markers_to_exclude,
                                   list(self.triangulation_dlc_cams_filepaths))
@@ -712,32 +981,26 @@ class Triangulation(ABC):
             cols = get_multi_index(markers)
             df = pd.DataFrame(data=np.zeros((framenum, len(cols))), columns=cols, dtype=int)
             df.to_hdf(str(h5_output_filepath), "empty")
-            self._validate_calibration_validation_marker_ids(
-                calibration_validation_markers_df_filepath=h5_output_filepath,
-                framenum=framenum,
-                defined_marker_ids=markers
-            )
+            self._validate_triangulation_marker_ids(
+                triangulation_markers_df_filepath=h5_output_filepath, framenum=framenum,
+                defined_marker_ids=markers)
             self.triangulation_dlc_cams_filepaths[cam] = h5_output_filepath
 
-    def _validate_calibration_validation_marker_ids(
-            self,
-            calibration_validation_markers_df_filepath: Path,
-            framenum: int,
-            defined_marker_ids: List[str],
-            add_missing_marker_ids_with_0_likelihood: bool = True,
-    ) -> None:
-        calibration_validation_markers_df = pd.read_hdf(calibration_validation_markers_df_filepath)
+    def _validate_triangulation_marker_ids(self, triangulation_markers_df_filepath: Path,
+                                           framenum: int, defined_marker_ids: List[str],
+                                           add_missing_marker_ids_with_0_likelihood: bool = True) -> None:
+        triangulation_markers_df = pd.read_hdf(triangulation_markers_df_filepath)
         prediction_marker_ids = list(
             set([marker_id for scorer, marker_id, key in
-                 calibration_validation_markers_df.columns]))
+                 triangulation_markers_df.columns]))
         marker_ids_not_in_ground_truth = _find_non_matching_list_elements(prediction_marker_ids,
                                                                           defined_marker_ids)
         marker_ids_not_in_prediction = _find_non_matching_list_elements(defined_marker_ids,
                                                                         prediction_marker_ids)
         if add_missing_marker_ids_with_0_likelihood & bool(marker_ids_not_in_prediction):
-            calibration_validation_markers_df = _add_missing_marker_ids_to_prediction(
+            triangulation_markers_df = _add_missing_marker_ids_to_prediction(
                 missing_marker_ids=marker_ids_not_in_prediction,
-                df=calibration_validation_markers_df,
+                df=triangulation_markers_df,
                 framenum=framenum,
             )
             print(
@@ -745,16 +1008,16 @@ class Triangulation(ABC):
                 f"likelihood of 0: {marker_ids_not_in_prediction}."
             )
         if marker_ids_not_in_ground_truth:
-            calibration_validation_markers_df = _remove_marker_ids_not_in_ground_truth(
+            triangulation_markers_df = _remove_marker_ids_not_in_ground_truth(
                 marker_ids_to_remove=marker_ids_not_in_ground_truth,
-                df=calibration_validation_markers_df,
+                df=triangulation_markers_df,
             )
             print(
                 "The following marker_ids were deleted from the dataframe, since they were "
                 f"not present in the ground truth: {marker_ids_not_in_ground_truth}."
             )
-        calibration_validation_markers_df.to_hdf(
-            calibration_validation_markers_df_filepath, "empty", mode="w"
+        triangulation_markers_df.to_hdf(
+            triangulation_markers_df_filepath, "empty", mode="w"
         )
 
     def _load_calibration(self, filepath: Path) -> ap_lib.cameras.CameraGroup:
@@ -779,10 +1042,10 @@ class Triangulation(ABC):
     ) -> Dict:
         n_cams, anipose_io["n_points"], anipose_io["n_joints"], _ = anipose_io["points"].shape
         if test_mode:
-            a, b = 0, 2
-            anipose_io["points"] = anipose_io["points"][:, a:b, :, :]
-            anipose_io["n_points"] = b - a
-            anipose_io["scores"] = anipose_io["scores"][:, a:b, :]
+            start_idx, end_idx = 0, 2
+            anipose_io["points"] = anipose_io["points"][:, start_idx:end_idx, :, :]
+            anipose_io["n_points"] = (end_idx - start_idx) if end_idx < anipose_io['n_points'] else anipose_io['n_points']
+            anipose_io["scores"] = anipose_io["scores"][:, start_idx:end_idx, :]
         anipose_io["points"][anipose_io["scores"] < self.score_threshold] = np.nan
 
         anipose_io["points_flat"] = anipose_io["points"].reshape(n_cams, -1, 2)
@@ -882,7 +1145,65 @@ def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
 
 
 class TriangulationRecordings(Triangulation):
+    """
+    Subclass of Triangulation, in which videos are triangulated based on a
+    calibration file.
 
+    Temporal synchronization of the videos can be performed based on a pattern.
+    The triangulated dataframe can be normalised (rotated and translated).
+    For visalization, a triangulated video can be created.
+
+    Methods
+    _______
+    run_synchronization(test_mode, verbose):
+        Perform analysis of all videos using DLC or other methods,
+        synchronization to the led_pattern and downsampling to target_fps.
+    create_triangulated_video(filename, config_path):
+        Create video of the triangulated data.
+    normalize(normalization_config_path, test_mode):
+        Rotate and translate the triangulated dataframe.
+
+    See Also
+    ________
+    Triangulation:
+        Parent class, for triangulation of videos or images.
+    core.meta.MetaInterface.create_recordings:
+        Create TriangulationRecording objects for all recording_directories
+        added to meta.
+    core.meta.MetaInterface.synchronize_recordings:
+        Run the function run_synchronization for all TriangulationRecording
+        objects added to meta.
+    core.meta.MetaInterface.triangulate_recordings:
+        Run the function run_triangulation for all TriangulationRecording
+        objects added to meta.
+    core.checker_objects.CheckRecording:
+        A class, that checks the metadata and filenames of videos in a given
+        folder and allows for filename changing via user input.
+
+    Examples
+    ________
+    >>> from core.triangulation_calibration_module import TriangulationRecordings
+    >>> rec_config = "test_data/Server_structure/Calibrations/220922/recording_config_220922.yaml"
+    >>> directory = "test_data/Server_structure/VGlut2-flp/September2022/206_F2-63/220922_OTE/"
+    >>> triangulation_object = TriangulationRecordings(
+        ... directory=directory,
+        ... recording_config_filepath=rec_config,
+        ... project_config_filepath="test_data/project_config.yaml",
+        ... test_mode = False,
+        ... output_directory=directory
+        ... )
+    >>> triangulation_object.run_synchronization()
+    >>> triangulation_object.exclude_markers(
+        ... all_markers_to_exclude_config_path="test_data/markers_to_exclude_config.yaml",
+        ... verbose=False,
+        ... )
+    >>> triangulation_object.run_triangulation(
+        ... calibration_toml_filepath="test_data/Server_structure/Calibrations/220922/220922_0_Bottom_Ground1_Ground2_Side1_Side2_Side3.toml"
+        ... )
+    >>> normalised_path, normalisation_error = triangulation_object.normalize(
+        ... normalization_config_path="test_data/normalization_config.yaml"
+        ... )
+    """
     @property
     def _metadata_keys(self) -> List[str]:
         return ["recording_date", "paradigm", "mouse_id"]
@@ -896,8 +1217,27 @@ class TriangulationRecordings(Triangulation):
         return [".AVI", ".avi", ".mov", ".mp4"]
 
     def run_synchronization(
-            self, synchronize_only: bool = False, test_mode: bool = False
+            self, test_mode: bool = False, verbose: bool = True
     ) -> None:
+        """
+        Perform analysis of all videos using DLC or other methods,
+        synchronization to the led_pattern and downsampling to target_fps.
+
+        Call the synchronizer via VideoInterface and save the prediction file in
+        triangulation_dlc_cams_filepaths.
+        Create a plot for crossvalidation of the synchronised LED timeseries.
+        Define self.markers as unique markers found in all prediction files.
+        Exclude videos, if there are diverging framenumbers after synchronization.
+
+        Parameters
+        ----------
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+        verbose: bool, default True
+            If True (default), then Crossvalidation plot and synchronised number
+            of frames for each camera are printed.
+        """
         for video_interface in self.video_interfaces.values():
             if (
                     video_interface.video_metadata.fps
@@ -909,19 +1249,18 @@ class TriangulationRecordings(Triangulation):
             video_interface.run_synchronizer(
                 synchronizer=synchronizer,
                 output_directory=self.output_directory,
-                synchronize_only=synchronize_only,
+                synchronize_only=False,
                 test_mode=test_mode,
                 synchro_metadata=self.synchro_metadata,
+                verbose=verbose
             )
-        self._plot_synchro_crossvalidation()
-        if not synchronize_only:
-            self.csv_output_filepath = self._create_csv_filepath()
-            self.triangulation_dlc_cams_filepaths = {
-                video_interface: self.video_interfaces[
-                    video_interface
-                ].export_for_aniposelib()
-                for video_interface in self.video_interfaces
-            }
+        self._plot_synchro_crossvalidation(verbose=verbose)
+        self.triangulation_dlc_cams_filepaths = {
+            video_interface: self.video_interfaces[
+                video_interface
+            ].export_for_aniposelib()
+            for video_interface in self.video_interfaces
+        }
 
         all_markers = set()
         for file in self.triangulation_dlc_cams_filepaths.values():
@@ -935,7 +1274,7 @@ class TriangulationRecordings(Triangulation):
             if cam in cams_to_exclude:
                 self.triangulation_dlc_cams_filepaths.pop(cam)
 
-    def _plot_synchro_crossvalidation(self) -> None:
+    def _plot_synchro_crossvalidation(self, verbose: bool) -> None:
         template = list(self.video_interfaces.values())[
             0].synchronizer_object.template_blinking_motif.adjust_template_timeseries_to_fps(
             fps=self.target_fps)[0][0]
@@ -954,18 +1293,42 @@ class TriangulationRecordings(Triangulation):
                 filename=filename,
                 output_directory=self.output_directory,
             )
-            synchronization_crossvalidation.create_plot(save=True, plot=True)
+            synchronization_crossvalidation.create_plot(save=True, plot=verbose)
 
     def _create_csv_filepath(self) -> Path:
         filepath_out = self.output_directory.joinpath(
             f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_{self.target_fps}fps"
             f"_{self.score_threshold}p_excludedmarkers{self.markers_excluded_manually}_"
-            f"filtered{self.synchro_metadata['use_2D_filter']}_normalised{self.normalised_dataframe}_"
-            f"{self.triangulation_type}.csv"
+            f"filtered{self.synchro_metadata['use_2D_filter']}_"
+            f"normalised{self.normalised_dataframe}_{self.triangulation_type}.csv"
         )
         return filepath_out
 
-    def normalize(self, normalization_config_path: Path, test_mode: bool = False) -> None:
+    def normalize(self, normalization_config_path: Union[Path, str], test_mode: bool = False) -> Tuple[Path, float]:
+        """
+        Rotate and translate the triangulated dataframe.
+
+        Find frame, in which all markers given in the config are defined.
+        Translate all points to center. Convert into cm. Rotate dataframe using
+        scipy.transform.Rotation.align_vectors to align triangulated vectors
+        and ground truth vectors. Create a plot for Visualization of Rotation.
+
+        Parameters
+        ----------
+        normalization_config_path: Path or str
+            The path to the config used for normalisation.
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+
+        Returns
+        -------
+        self.rotated_filepath: Path
+            Filepath, were the rotated triangulated dataframe is saved.
+        rotation_error: flot
+            Error returned by scipy.transform.Rotation.align_vectors, representing
+            whether the alignment worked well.
+        """
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
         best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
@@ -978,23 +1341,21 @@ class TriangulationRecordings(Triangulation):
             if '_z' in key:
                 self.df[key] = self.df[key] - z
 
-        lengthleftside = get_xyz_distance_in_triangulation_space(
+        reference_length_px = get_xyz_distance_in_triangulation_space(
             marker_ids=tuple(config['ReferenceLengthMarkers']),
             df_xyz=self.df.iloc[best_frame, :])
-        conversionfactor = config['ReferenceLengthCm'] / lengthleftside
-
+        conversionfactor = config['ReferenceLengthCm'] / reference_length_px
         bp_keys_unflat = set(get_3D_df_keys(key[:-2]) for key in self.df.keys() if
                              'error' not in key and 'score' not in key and "M_" not in key and 'center' not in key and 'fn' not in key)
         bp_keys = list(it.chain(*bp_keys_unflat))
-
         normalised = self.df.copy()
         normalised[bp_keys] *= conversionfactor
+
         reference_rotation_markers = []
         for marker in config['ReferenceRotationMarkers']:
             reference_rotation_markers.append(get_3D_array(normalised, marker, best_frame))
-        r, self.rotation_error = Rotation.align_vectors(config["ReferenceRotationCoords"],
+        r, rotation_error = Rotation.align_vectors(config["ReferenceRotationCoords"],
                                                         reference_rotation_markers)
-
         rotated = normalised.copy()
         for key in bp_keys_unflat:
             rot_points = r.apply(normalised.loc[:, [key[0], key[1], key[2]]])
@@ -1011,15 +1372,26 @@ class TriangulationRecordings(Triangulation):
         visualization = RotationVisualization(
             rotated_markers=rotated_markers, config=config,
             output_filepath=self.rotated_filepath,
-            rotation_error=self.rotation_error
+            rotation_error=rotation_error
         )
         visualization.create_plot(plot=False, save=True)
+        return self.rotated_filepath, rotation_error
 
     def create_triangulated_video(
             self,
             filename: str,
-            config_path: Path
+            config_path: Union[Path, str]
     ) -> None:
+        """
+        Create video of the triangulated data.
+
+        Parameters
+        ----------
+        filename: str
+            The filename, where the video should be saved.
+        config_path: Path or str
+            The path to the config used to create triangulated videos.
+        """
         config_path = convert_to_path(config_path)
         self.video_plotting_config = read_config(config_path)
         triangulated_video = VideoClip(
@@ -1041,7 +1413,54 @@ class TriangulationRecordings(Triangulation):
 
 
 class CalibrationValidation(Triangulation):
+    """
+    Subclass of Triangulation, in which images are triangulated based on a
+    calibration file and the triangulated coordinates are validated based on
+    a ground_truth.
 
+    Methods
+    _______
+    add_ground_truth_config(ground_truth_config_filepath)
+        Read the metadata from ground_truth_config_filepath and create list of
+        markers.
+    get_marker_predictions(test_mode)
+        Run marker detection for all images in metadata_from_videos.
+    evaluate_triangulation_of_calibration_validation_markers(show_3D_plot, verbose)
+        Evaluate the triangulated data and return mean errors.
+
+    See Also
+    ________
+    Triangulation:
+        Parent class, for triangulation of videos or images.
+    core.meta.MetaInterface.create_calibrations:
+        Create CalibrationValidation objects and run add_ground_truth_config for
+        all calibration_directories added to meta.
+    core.meta.MetaInterface.synchronize_calibrations:
+        Run get_marker_predictions for all calibration_validation objects added
+        to meta.
+    core.checker_objects.CheckCalibrationValidation:
+        A class, that checks the metadata and filenames of videos in a given
+        folder and allows for filename changing via user input.
+    Calibration.triangulate_optim:
+        Run the function run_triangulation for the CalibrationValidation
+        object passed to triangulate_optim.
+
+    Examples
+    ________
+    >>> from core.triangulation_calibration_module import CalibrationValidation
+    >>> from pathlib import Path
+    >>> rec_config = Path("test_data/Server_structure/Calibrations/220922/recording_config_220922.yaml")
+    >>> calibration_validation_object = CalibrationValidation(
+        ... project_config_filepath="test_data/project_config.yaml",
+        ... directory=rec_config.parent, recording_config_filepath=rec_config,
+        ... test_mode = False, output_directory=rec_config.parent)
+    >>> calibration_validation_object.add_ground_truth_config("test_data/ground_truth_config.yaml")
+    >>> calibration_validation_object.get_marker_predictions()
+    >>> calibration_validation_object.run_triangulation(
+        ... calibration_toml_filepath="test_data/Server_structure/Calibrations/220922/220922_0_Bottom_Ground1_Ground2_Side1_Side2_Side3.toml",
+        ... test_mode = False)
+    >>> mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean = calibration_validation_object.evaluate_triangulation_of_calibration_validation_markers()
+    """
     @property
     def _metadata_keys(self) -> List[str]:
         return ["recording_date"]
@@ -1054,46 +1473,41 @@ class CalibrationValidation(Triangulation):
     def _allowed_filetypes(self) -> List[str]:
         return [".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"]
 
-    def add_ground_truth_config(self, ground_truth_config_filepath: Path) -> None:
+    def add_ground_truth_config(self, ground_truth_config_filepath: Union[Path, str]) -> None:
+        """
+        Read the metadata from ground_truth_config_filepath and create list of
+        markers.
+
+        Parameters
+        ----------
+        ground_truth_config_filepath: str or Path
+            The path to the ground_truth config file.
+        """
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
         self.ground_truth_config = read_config(ground_truth_config_filepath)
         self.markers = self.ground_truth_config["unique_ids"]
 
     def get_marker_predictions(self, test_mode: bool = False) -> None:
+        """
+        Run marker detection for all images in metadata_from_videos.
+
+        Save predictions in triangulation_dlc_cams_filepaths, validate
+        predictions and create predictions plots.
+
+        Parameters
+        ----------
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the analysis.
+        """
         self.markers_excluded_manually = False
-        self.csv_output_filepath = self._create_csv_filepath()
         self.triangulation_dlc_cams_filepaths = {}
         for cam in self.metadata_from_videos.values():
-            h5_output_filepath = self.output_directory.joinpath(
-                f"Calvin_{self.recording_date}_{cam.cam_id}.h5"
-            )
+            h5_output_filepath = self._run_marker_detection(cam=cam, test_mode=test_mode)
             self.triangulation_dlc_cams_filepaths[cam.cam_id] = h5_output_filepath
-            if not test_mode or (test_mode and not h5_output_filepath.exists()):
-                if cam.calibration_evaluation_type == "manual":
-                    config = cam.calibration_evaluation_filepath
-                    manual_interface = ManualAnnotation(
-                        object_to_analyse=cam.filepath,
-                        output_directory=self.output_directory,
-                        marker_detection_directory=config,
-                    )
-                    manual_interface.analyze_objects(filepath=h5_output_filepath,
-                                                     only_first_frame=True)
-                elif cam.calibration_evaluation_type == "DLC":
-                    config = cam.calibration_evaluation_filepath
-                    dlc_interface = DeeplabcutInterface(
-                        object_to_analyse=cam.filepath,
-                        output_directory=self.output_directory,
-                        marker_detection_directory=config,
-                    )
-                    dlc_interface.analyze_objects(filepath=h5_output_filepath,
-                                                  filtering=False)
-                    # filtering is not supported and not necessary for single frame predictions!
-                else:
-                    raise ValueError(
-                        "For calibration_evaluation only manual and DLC are supported!"
-                    )
-            self._validate_calibration_validation_marker_ids(
-                calibration_validation_markers_df_filepath=h5_output_filepath, framenum=1,
+            self._validate_triangulation_marker_ids(
+                triangulation_markers_df_filepath=h5_output_filepath,
+                framenum=1,
                 defined_marker_ids=self.markers
             )
             predictions = PredictionsPlot(
@@ -1106,7 +1520,35 @@ class CalibrationValidation(Triangulation):
 
     def evaluate_triangulation_of_calibration_validation_markers(
             self, show_3D_plot: bool = True, verbose: int = 1
-    ) -> None:
+    ) -> Tuple[np.float64, np.float64, np.float64]:
+        """
+        Evaluate the triangulated data and return mean errors.
+
+        Calculate the distances and angles for all references in ground truth
+        and get the differences between triangulated and ground truth data.
+        Print these differences and show the plot of the triangulated data.
+        Calculate the mean of distance and angle error and reprojection error.
+
+        Parameters
+        ----------
+        show_3D_plot: bool, default True
+            If True (default), then a plot of the triangulated
+            calibration_validation data is shown.
+        verbose: int, default 1
+            If > 0, then all angles and distances compared to their ground truth
+            will be printed.
+
+        Returns
+        -------
+        mean_dist_err_percentage: np.float64
+            The mean error of all triangulated distances compared to their
+            ground truth.
+        mean_angle_err: np.float64
+            The mean error of all triangulated errors compared to their ground
+            truth.
+        reprojerr_nonan_mean: np.float64
+            The mean reprojection error of all triangulated points.
+        """
         self.anipose_io = add_reprojection_errors_of_all_calibration_validation_markers(
             anipose_io=self.anipose_io, df_xyz=self.df
         )
@@ -1117,9 +1559,8 @@ class CalibrationValidation(Triangulation):
         self.anipose_io = add_all_real_distances_errors(
             anipose_io=self.anipose_io, ground_truth_distances=gt_distances, df_xyz=self.df
         )
-        self.anipose_io = set_angles_error_between_screws_and_plane(
-            self.ground_truth_config["angles"], self.anipose_io
-        )
+        self.anipose_io = set_angles_error_between_line_and_plane(
+            self.ground_truth_config["angles"], self.anipose_io)
 
         if verbose > 0:
             print(f'Mean reprojection error: {self.anipose_io["reproj_nonan"].mean()}')
@@ -1135,17 +1576,58 @@ class CalibrationValidation(Triangulation):
             ].items():
                 print(f"Considering {angle}, the angle error is: {angle_error}")
         if show_3D_plot:
-            calibrationvalidation = CalibrationValidationPlot(
+            calibration_validation_plot = CalibrationValidationPlot(
                 p3d=self.anipose_io["p3ds"][0],
                 bodyparts=self.anipose_io["bodyparts"],
                 output_directory=self.output_directory,
                 marker_ids_to_connect=self.ground_truth_config["marker_ids_to_connect_in_3D_plot"],
                 filename_tag="calvin"
             )
-            calibrationvalidation.create_plot(plot=True, save=True)
+            calibration_validation_plot.create_plot(plot=True, save=True)
+
+        all_percentage_errors = []
+        for reference in self.anipose_io["distance_errors_in_cm"].keys():
+            all_percentage_errors = [percentage_error for *_, percentage_error
+                                     in self.anipose_io["distance_errors_in_cm"][reference]["individual_errors"]]
+        all_angle_errors = list(self.anipose_io["angles_error_screws_plan"].values())
+
+        mean_dist_err_percentage = np.nanmean(np.asarray(all_percentage_errors))
+        mean_angle_err = np.nanmean(np.asarray(all_angle_errors))
+        reprojerr_nonan_mean = self.anipose_io["reproj_nonan"].mean()
+        return mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean
 
     def _create_csv_filepath(self) -> Path:
         filepath_out = self.output_directory.joinpath(
             f"Calvin_{self.recording_date}_{self.score_threshold}p_excludedmarkers"
             f"{self.markers_excluded_manually}_filteredFalse_{self.triangulation_type}.csv")
         return filepath_out
+
+    def _run_marker_detection(self, cam: VideoMetadata, test_mode: bool=False) -> Path:
+        h5_output_filepath = self.output_directory.joinpath(
+            f"Calvin_{self.recording_date}_{cam.cam_id}.h5"
+        )
+        if not test_mode or (test_mode and not h5_output_filepath.exists()):
+            if cam.calibration_evaluation_type == "manual":
+                config = cam.calibration_evaluation_filepath
+                manual_interface = ManualAnnotation(
+                    object_to_analyse=cam.filepath,
+                    output_directory=self.output_directory,
+                    marker_detection_directory=config,
+                )
+                h5_output_filepath = manual_interface.analyze_objects(filepath=h5_output_filepath,
+                                                                      only_first_frame=True)
+            elif cam.calibration_evaluation_type == "DLC":
+                config = cam.calibration_evaluation_filepath
+                dlc_interface = DeeplabcutInterface(
+                    object_to_analyse=cam.filepath,
+                    output_directory=self.output_directory,
+                    marker_detection_directory=config,
+                )
+                h5_output_filepath = dlc_interface.analyze_objects(filepath=h5_output_filepath,
+                                                                   filtering=False)
+                # filtering is not supported and not necessary for single frame predictions!
+            else:
+                raise ValueError(
+                    "For calibration_evaluation only manual and DLC are supported!"
+                )
+        return h5_output_filepath
