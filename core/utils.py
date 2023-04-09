@@ -281,6 +281,9 @@ synchro_error_threshold: int, default 100
 synchro_marker: str
     The marker to use for synchronisation. Has to be detectable by the 
     led_extraction method.
+led_box_size: int
+    Pixel range around predicted synchro marker position to calculate mean pixel
+    intensity for blinking pattern from.
 use_2D_filter: bool, default True
     Whether to use filtering on 2D marker detection predictions in recordings. 
     At the moment only available for DLC.
@@ -295,9 +298,13 @@ max_ram_digestible_frames: int, default 3000
 max_cpu_cores_to_pool: int, default 0
     If 0, then no multiprocessing will be used for writing of synchronised videos.
     Set to as many CPU cores, as you would like to use for multiprocessing.
+max_calibration_frames: int
+    Number of frames to take into account for intrinsic calibration. 300 works 
+    well, depending on CPU speed, it can be necessary to reduce.
 rapid_aligner_path: str, default ""
     If "", then no rapid_aligner (GPU based pattern alignment) will be used. 
-    Insert path to locally installed clone of the rapid_aligner package to use GPU for pattern synchronisation.
+    Insert path to locally installed clone of the rapid_aligner package to use 
+    GPU for pattern synchronisation.
 """
 
 KEYS_TO_CHECK_RECORDING = [

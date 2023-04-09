@@ -9,63 +9,26 @@ import pandas as pd
 def get_xyz_distance_in_triangulation_space(
         marker_ids: Tuple[str, str], df_xyz: pd.DataFrame
 ) -> Union[pd.Series, float]:
+    """
+    Calculate the distance between two markers in 3D.
+
+    Parameters
+    ----------
+    marker_ids: tuple of str
+        The two marker_ids to calculate the distance between.
+    df_xyz: pd.DataFrame
+        DataFrame of triangulated data.
+
+    Returns
+    -------
+    pd.Series or float
+        Distance between the two markers. float, if only one frame, else pd.Series.
+    """
     squared_differences = [
         (df_xyz[f"{marker_ids[0]}_{axis}"] - df_xyz[f"{marker_ids[1]}_{axis}"]) ** 2
         for axis in ["x", "y", "z"]
     ]
     return sum(squared_differences) ** 0.5
-
-
-def fill_in_distances(distances: Dict) -> Dict:
-    filled_d = {}
-    for key, value in distances.items():
-        filled_d[key] = value
-        for k, v in value.items():
-            if k in filled_d.keys():
-                filled_d[k][key] = v
-            else:
-                filled_d[k] = {}
-                filled_d[k][key] = v
-    return filled_d
-
-
-def add_all_real_distances_errors(
-        anipose_io: Dict, ground_truth_distances: Dict, df_xyz: pd.DataFrame
-) -> Dict:
-    all_distance_to_cm_conversion_factors = (
-        _get_conversion_factors_from_different_references(
-            ground_truth_distances=ground_truth_distances, df_xyz=df_xyz
-        )
-    )
-    anipose_io = _add_distances_in_cm_for_each_conversion_factor(
-        anipose_io=anipose_io, conversion_factors=all_distance_to_cm_conversion_factors, df_xyz=df_xyz
-    )
-    anipose_io = _add_distance_errors(
-        anipose_io=anipose_io, gt_distances=ground_truth_distances
-    )
-    return anipose_io
-
-
-def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
-    if "distances" in parameters:
-        anipose_io = _set_distances_from_configuration(
-            parameters["distances"], anipose_io, df_xyz=df_xyz
-        )
-    else:
-        print(
-            "WARNING: No distances were computed. If this is unexpected, "
-            "please edit the ground truth file accordingly"
-        )
-
-    if "angles" in parameters:
-        anipose_io = _set_angles_to_plane(parameters["angles"], anipose_io, df_xyz=df_xyz)
-    else:
-        print(
-            "WARNING: No angles were computed. If this is unexpected, "
-            "please edit the ground truth file accordingly"
-        )
-
-    return anipose_io
 
 
 def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
@@ -90,21 +53,108 @@ def add_reprojection_errors_of_all_calibration_validation_markers(anipose_io: Di
     return anipose_io
 
 
-def set_angles_error_between_line_and_plane(gt_angles: Dict, anipose_io: Dict) -> Dict:
+def set_distances_and_angles_for_evaluation(parameters: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     """
-    Sets the angles between the screws and the plane
+    Compute angles and distances and add them to anipose_io.
 
     Parameters
     ----------
-    gt_angles
-    anipose_io
+    parameters: dict
+        ground_truth_config
+    anipose_io: dict
+        Containing information to validate calibration in comparison with
+        ground truth.
+    df_xyz:
+        DataFrame of triangulated data.
 
     Returns
     -------
+    anipose_io: dict
+        Added "distances_in_cm" and "computed_angles".
 
+    See Also
+    ________
+    core.utils.KEYS_TO_CHECK_PROJECT
+    """
+    if "distances" in parameters:
+        anipose_io = _set_distances_from_configuration(
+            parameters["distances"], anipose_io, df_xyz=df_xyz
+        )
+    else:
+        print(
+            "WARNING: No distances were computed. If this is unexpected, "
+            "please edit the ground truth file accordingly"
+        )
+
+    if "angles" in parameters:
+        anipose_io = _set_computed_angles(parameters["angles"], anipose_io, df_xyz=df_xyz)
+    else:
+        print(
+            "WARNING: No angles were computed. If this is unexpected, "
+            "please edit the ground truth file accordingly"
+        )
+
+    return anipose_io
+
+
+def load_distances_from_ground_truth(distances: Dict) -> Dict:
+    """ Return distances from ground_truth_config["distances"]. """
+    filled_d = {}
+    for key, value in distances.items():
+        filled_d[key] = value
+        for k, v in value.items():
+            if k in filled_d.keys():
+                filled_d[k][key] = v
+            else:
+                filled_d[k] = {}
+                filled_d[k][key] = v
+    return filled_d
+
+
+def add_errors_between_computed_and_ground_truth_distances_for_different_references(
+        anipose_io: Dict, ground_truth_distances: Dict
+) -> Dict:
+    """
+    Calculate errors between computed distances compared to ground_truth.
+
+    Parameters
+    ----------
+    anipose_io: dict
+        Containing information to validate calibration in comparison with
+        ground truth, such as "bodyparts".
+    ground_truth_distances:
+        Distances defined in ground truth as returned by
+        load_distances_from_ground_truth.
+
+    Returns
+    -------
+    anipose_io: dict
+        Added "distance_errors_in_cm".
+    """
+    anipose_io = _add_distance_errors_for_different_references(anipose_io=anipose_io,
+                                                               gt_distances=ground_truth_distances)
+    return anipose_io
+
+
+def add_errors_between_computed_and_ground_truth_angles(gt_angles: Dict, anipose_io: Dict) -> Dict:
+    """
+    Set the errors between the computed and ground truth angles.
+
+    Parameters
+    ----------
+    gt_angles:
+        Angles from ground_truth = ground_truth_config["angles"].
+    anipose_io:
+        Containing information to validate calibration in comparison with
+        ground truth.
+
+    Returns
+    -------
+    anipose_io: dict
+        Added "angles_error_ground_truth_vs_triangulated".
     """
     anipose_io[
-        "angles_error_screws_plan"
+        "angles_error_ground_truth_vs_triangulated"
     ] = _compute_differences_between_triangulated_and_gt_angles(gt_angles, anipose_io)
     return anipose_io
 
@@ -153,7 +203,7 @@ def _add_distances_in_cm_for_each_conversion_factor(
     return anipose_io
 
 
-def _add_distance_errors(anipose_io: Dict, gt_distances: Dict) -> Dict:
+def _add_distance_errors_for_different_references(anipose_io: Dict, gt_distances: Dict) -> Dict:
     anipose_io["distance_errors_in_cm"] = {}
     for reference_distance_id, triangulated_distances in anipose_io[
         "distances_in_cm"
@@ -187,25 +237,15 @@ def _set_distances_from_configuration(distances_to_compute: Dict, anipose_io: Di
     conversion_factors = _get_conversion_factors_from_different_references(
         distances_to_compute, df_xyz=df_xyz
     )
-    _add_distances_in_cm_for_each_conversion_factor(anipose_io, conversion_factors, df_xyz=df_xyz)
+    anipose_io = _add_distances_in_cm_for_each_conversion_factor(anipose_io, conversion_factors, df_xyz=df_xyz)
     return anipose_io
 
 
-def _set_angles_to_plane(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
+def _set_computed_angles(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict:
     """
-    Sets the angles between the screws and the plane
-
-    Parameters
-    ----------
-    angles_to_compute
-    anipose_io
-    df_xyz
-
-    Returns
-    -------
-
+    Compute angles as defined in angles_to_compute and add to anipose_io.
     """
-    anipose_io["angles_to_plane"] = _computes_angles(angles_to_compute, anipose_io, df_xyz=df_xyz)
+    anipose_io["computed_angles"] = _compute_angles(angles_to_compute, df_xyz=df_xyz)
     return anipose_io
 
 
@@ -233,21 +273,23 @@ def _compute_differences_between_triangulated_and_gt_angles(
         gt_angles: Dict, anipose_io: Dict
 ) -> Dict[str, float]:
     """
-    Computes the difference between the triangulated angles
+    Compute the difference between the triangulated angles
     and the provided ground truth ones.
 
     Parameters
     ----------
-    gt_angles:
+    gt_angles: dict
         ground truth angles
-    anipose_io
+    anipose_io: dict
+        Containing information to validate calibration in comparison with
+        ground truth.
 
     Returns
     -------
-    Dict
-        Dict with angle errors
+    marker_ids_with_angles_error: dict
+        Markers with angle errors.
     """
-    triangulates_angles: Dict = anipose_io["angles_to_plane"]
+    triangulates_angles = anipose_io["computed_angles"]
     marker_ids_with_angles_error = {}
     if triangulates_angles.keys() == gt_angles.keys():
         for key in triangulates_angles:
@@ -259,7 +301,7 @@ def _compute_differences_between_triangulated_and_gt_angles(
             marker_ids_with_angles_error[key] = half_pi_corrected_angle
     else:
         raise ValueError(
-            "Please check the ground truth angles passed. The screws angles needed are:",
+            "Please check the ground truth angles passed. The angles needed are:",
             ", ".join(str(key) for key in triangulates_angles),
             "\n But the angles in the passed ground truth are:",
             ", ".join(str(key) for key in gt_angles),
@@ -269,7 +311,7 @@ def _compute_differences_between_triangulated_and_gt_angles(
 
 def _wrap_angles_360(angle: float) -> float:
     """
-    Wraps negative angle on 360 space
+    Wrap negative angle on 360 space.
 
     Parameters
     ----------
@@ -284,15 +326,16 @@ def _wrap_angles_360(angle: float) -> float:
     return angle if angle > 0 else 360 + angle
 
 
-def _computes_angles(angles_to_compute: Dict, anipose_io: Dict, df_xyz: pd.DataFrame) -> Dict[str, float]:
+def _compute_angles(angles_to_compute: Dict, df_xyz: pd.DataFrame) -> Dict:
     """
-    Computes the triangulated angles
+    Compute the angles.
 
     Parameters
     ----------
-    angles_to_compute
-    anipose_io
-    df_xyz
+    angles_to_compute: dict
+        Containing definition of angles.
+    df_xyz: pd.DataFrame
+        DataFrame of triangulated data.
 
     Returns
     -------
@@ -390,8 +433,6 @@ def _get_coordinates_plane_equation_from_three_points(
 ) -> np.array:
     R1 = _get_vector_from_two_points(PointA, PointB)
     R2 = _get_vector_from_two_points(PointA, PointC)
-    # check for linear independency
-    # np.solve: R2 * x != R1
     plane_equation_coordinates = np.asarray([PointA, R1, R2])
     return plane_equation_coordinates
 
@@ -423,17 +464,19 @@ def _get_vector_length(vector: np.array) -> float:
 
 def _get_angle_between_plane_and_line(N: np.array, R: np.array) -> float:
     """
-
+    Calculate angle between plane and line.
 
     Parameters
     ----------
     N: np.array
         normal vector of the plane
     R: np.array
+        vector between two points
 
     Returns
     -------
-
+    angle: float
+        Angle between N and R in degrees.
     """
     cosphi = _get_vector_length(vector=_get_vector_product(A=N, B=R)) / (
             _get_vector_length(N) * _get_vector_length(R)

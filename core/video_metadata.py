@@ -42,18 +42,34 @@ class VideoMetadata(ABC):
     Attributes
     __________
     self.intrinsic_calibration
+        The intrinsic calibration assigned to the camera, consisting of camera
+        matrix and distortion coefficient.
     self.intrinsic_calibration_filepath
+        The filepath to the intrinisc calibration saved as .p pickle file.
     self.calvin
+        Boolean argument, whether VideoMetadata belongs to calibration validation.
     self.recording
+        Boolean argument, whether VideoMetadata belongs to recording video.
     self.calibration
+        Boolean argument, whether VideoMetadata belongs to calibration video.
     self.exclusion_state
+        "Valid", if video has not to be excluded for any reasons, "exclude", if
+        it has to be excluded.
     self.filepath
+        The path to the video, which metadata will be stored here.
     self.recording_date
+        Date at which the calibration was done based on recording_config and as
+        read from the filenames.
     self.mouse_id
+        The mouse_id as read from the filename.
     self.mouse_line
+        The mouse line as read from the filename.
     self.mouse_number
+        The mouse number as read from the filename.
     self.cam_id
+        The cam_id as read from the filename.
     self.paradigm
+        The paradigm as read from the filename.
 
     See Also
     ________
@@ -490,6 +506,9 @@ class VideoMetadata(ABC):
 
 
 class VideoMetadataChecker(VideoMetadata):
+    """
+    Class to verify metadata for videos and rename filenames if necessary.
+    """
     def _extract_filepath_metadata(self) -> List[str]:
         """
         Extracts metadata from the given video filepath.

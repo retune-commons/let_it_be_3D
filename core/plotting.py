@@ -385,14 +385,30 @@ class LEDMarkerPlot:
         return filepath
 
 
-# ToDo: specify intrinsic calibration!
 class Intrinsics:
-    def __init__(self, video_filepath: Path,
+    def __init__(self, video_filepath: Union[Path, str],
                  intrinsic_calibration: Dict,
                  filename: str = "",
                  fisheye: bool = False,
                  output_directory: Optional[Union[str, Path]] = None) -> None:
-        self.video_filepath = video_filepath
+        """
+        Construct all necessary attributes for the Intrinsics Class.
+
+        Parameters
+        ----------
+        video_filepath: Path or str
+            The path to the video, that should be used to visualize undistortion.
+        intrinsic_calibration: dict
+            Intrinsic calibration results containing camera matrix and
+            distorsion coefficient at keys 'K' and 'D'.
+        filename: str, default ""
+            Filename how the plot will be saved to disk.
+        fisheye: bool, default False
+            If True, the fisheye undistorsion method will be used.
+        output_directory: Path or str, optional
+            Directory, where the plot will be saved.
+        """
+        self.video_filepath = convert_to_path(video_filepath)
         self.output_directory = convert_to_path(output_directory) if output_directory is not None else Path.cwd()
         self.filepath = self._create_filepath(filename=filename)
         self.fisheye = fisheye

@@ -24,7 +24,22 @@ class TimeseriesTemplate(ABC):
     def template_attribute_string(self) -> str:
         pass
 
-    def adjust_template_timeseries_to_fps(self, fps: int) -> List[Tuple[Any, int]]:
+    def adjust_template_timeseries_to_fps(self, fps: int) -> List[Tuple[np.ndarray, int]]:
+        """
+        Adjust template to framerate.
+
+        Parameters
+        ----------
+        fps: int
+            The framerate, to which the template will be adjusted.
+
+        Returns
+        -------
+        fps_adjusted_templates: list of tuple[np.ndarray, int]
+            List of all possible timeseries that could be observed, given the
+            framerate and the resolution of the template (1 ms) as tuple of
+            template as np.ndarray and offset in ms.
+        """
         template_timeseries = getattr(self, self.template_attribute_string)
         fps_adjusted_templates = []
         framerate = fps / 1000
@@ -45,6 +60,26 @@ class TimeseriesTemplate(ABC):
 
 
 class MotifTemplate(TimeseriesTemplate):
+    """
+    Class to store single motif.
+
+    Attributes
+    __________
+    led_on_time_in_ms: int
+        Duration of one on-peak.
+    on_off_period_length_in_ms: int
+        Period between two on-peaks.
+    motif_duration_in_ms: int
+        Total duration of the motif.
+    template_timeseries: np.ndarray
+        Array of binary 0 / 1 values representing a single motif with a
+        resolution of 1 ms.
+
+    Methods
+    _______
+    adjust_template_timeseries_to_fps
+        Adjust template to framerate.
+    """
     @property
     def template_attribute_string(self) -> str:
         return "template_timeseries"
@@ -55,6 +90,18 @@ class MotifTemplate(TimeseriesTemplate):
             on_off_period_length_in_ms: int,
             motif_duration_in_ms: int,
     ):
+        """
+        Constructor for class MotifTemplate.
+
+        Parameters
+        ----------
+        led_on_time_in_ms: int
+            Duration of one on-peak.
+        on_off_period_length_in_ms: int
+            Period between two on-peaks.
+        motif_duration_in_ms: int
+            Total duration of the motif.
+        """
         self.led_on_time_in_ms = led_on_time_in_ms
         self.on_off_period_length_in_ms = on_off_period_length_in_ms
         self.motif_duration_in_ms = motif_duration_in_ms
@@ -73,15 +120,44 @@ class MotifTemplate(TimeseriesTemplate):
 
 
 class MultiMotifTemplate(TimeseriesTemplate):
+    """
+    Class to combine single motives and store the resulting multi_motif.
+
+    Attributes
+    __________
+    multi_motif_template: np.ndarray
+        Array of binary 0 / 1 values representing a multi_motif_template with a
+        resolution of 1 ms.
+    motif_templates: list of MotifTemplates
+        List of single motifs.
+
+    Methods
+    _______
+    add_motif_template(motif_template)
+        Append a motif to the already existing multi_motif.
+    adjust_template_timeseries_to_fps
+        Adjust template to framerate.
+
+    See Also
+    ________
+    construct_template_motif
+        Construct template from dictionary.
+    """
     @property
     def template_attribute_string(self) -> str:
         return "multi_motif_template"
 
     def __init__(self) -> None:
+        """
+        Constructor for class MultiMotifTemplate.
+        """
         self.multi_motif_template = None
         self.motif_templates = []
 
     def add_motif_template(self, motif_template: MotifTemplate) -> None:
+        """
+        Append a motif to the already existing multi_motif.
+        """
         self.motif_templates.append(motif_template)
         self.multi_motif_template = self._update_session_template()
 
@@ -92,9 +168,43 @@ class MultiMotifTemplate(TimeseriesTemplate):
         return np.concatenate(individual_motif_template_timeseries)
 
 
-def _construct_template_motif(
+def construct_template_motif(
         blinking_patterns_metadata: Dict
 ) -> Union[MotifTemplate, MultiMotifTemplate]:
+    """
+    Construct template from dictionary.
+
+    Parameters
+    ----------
+    blinking_patterns_metadata:
+        Dictionaries with patterns as values, that specify arguments for
+        MotifTemplate as key-value pairs: "led_on_time_in_ms",
+        "on_off_period_length_in_ms", "motif_duration_in_ms".
+
+    Returns
+    -------
+    template_motif: MotifTemplate or MultiMotifTemplate
+        The constructed template.
+
+    See Also
+    ________
+    MultiMotifTemplate
+        Class to combine single motives and store the resulting multi_motif.
+    MotifTemplate
+        Class to store single motif.
+
+    Examples
+    ________
+    >>> from core.video_synchronization import construct_template_motif
+    >>> led_pattern = \
+    ... {0: {'led_on_time_in_ms': 50,
+    ... 'on_off_period_length_in_ms': 100,
+    ... 'motif_duration_in_ms': 3000},
+    ... 1: {'led_on_time_in_ms': 50,
+    ... 'on_off_period_length_in_ms': 1000,
+    ... 'motif_duration_in_ms': 2000}}
+    >>> template_motif = construct_template_motif(led_pattern)
+    """
     motif_templates = []
     for pattern_idx, parameters in blinking_patterns_metadata.items():
         motif_templates.append(
@@ -262,6 +372,76 @@ def _delete_individual_video_parts(filepaths_of_video_parts: List[Path]
 
 
 class Synchronizer(ABC):
+    """
+    Class to synchronize videos.
+
+    Run alignment between constructed MotifTemplate and detected led blinking
+    pattern.
+    Select frames based on timestemps to match framerate, potentially
+    interpolate and add frames.
+    Start marker detection or write video and save the adjusted files.
+
+    Parameters
+    __________
+    video_metadata: VideoMetadata
+        Metadata from video.
+    output_directory: Path or str
+        Directory, in which the files created during the synchronisation are
+        saved.
+    synchro_metadata: Dict
+        Metadata for synchronisation containing SYNCHRO_METADATA_KEYS.
+
+    Attributes
+    __________
+    video_metadata: VideoMetadata
+        Metadata from video.
+    use_rapid_aligner: bool
+        If True, synchro pattern alignment will be based on GPU, if False, on CPU.
+    rapid_aligner_path: Path
+        Path to locally installed clone of the rapid_aligner package to use GPU
+        for pattern synchronisation.
+    use_gpu: str
+        Whether to restrict the usage of GPU for DLC analyses.
+    led_box_size: int
+        Pixel range around predicted synchro marker position to calculate mean pixel
+        intensity for blinking pattern from.
+    output_directory: Path or str
+        Directory, in which the files created during the synchronisation are
+        saved.
+    synchro_metadata: Dict
+        Metadata for synchronisation containing SYNCHRO_METADATA_KEYS.
+    led_timeseries_for_cross_video_validation: np.ndarray
+        Mean pixel intensity at predicted synchro marker position adjusted to
+        target fps.
+    led_detection: LEDMarkerPlot
+        Plot to verify correct prediction of LED marker.
+    led_timeseries: np.ndarray
+        Extracted mean pixel intensity at predicted synchro marker position.
+    template_blinking_motif: MotifTemplate or MultiMotifTemplate
+        Constructed template from blinking pattern metadata.
+
+    Methods
+    _______
+    run_synchronization(synchronize_only, test_mode, verbose)
+        Run alignment between template and detected led blinking pattern.
+        Select frames to adjust framerate. Start marker detection or write video.
+
+    Examples
+    ________
+    >>> from core.video_synchronization import RecordingVideoDownSynchronizer
+    >>> from core.video_metadata import VideoMetadata
+    >>> from core.utils import read_config, SYNCHRO_METADATA_KEYS
+    >>> from pathlib import Path
+    >>> project_config = read_config("test_data/project_config.yaml")
+    >>> video_filepath = Path("test_data/Server_structure/VGlut2-flp/September2022/206_F2-63/220922_OTE/220922_206_F2-63_OTE_Side2.mp4")
+    >>> recording_config_dict = read_config("test_data/Server_structure/Calibrations/220922/recording_config_220922.yaml")
+    >>> synchro_metadata = {key:project_config[key] for key in SYNCHRO_METADATA_KEYS})
+    >>> video = VideoMetadata(video_filepath=video_filepath, recording_config_dict=recording_config_dict,
+        ... project_config_dict=project_config, tag = "recording")
+    >>> synchronizer_object = RecordingVideoDownSynchronizer(video_metadata=video,
+        ... output_directory=video_filepath.parent, synchro_metadata=synchro_metadata)
+    >>> marker_detection_filepath, _ = synchronizer_object.run_synchronization()
+    """
     @property
     def target_fps(self) -> int:
         return self.video_metadata.target_fps
@@ -270,15 +450,6 @@ class Synchronizer(ABC):
     def _adjust_video_to_target_fps_and_run_marker_detection(
             self, target_fps: int, start_idx: int, offset: float, test_mode: bool, synchronize_only: bool
     ) -> Tuple[Optional[Path], Optional[Path]]:
-        # call corresponding private method that takes care of two things:
-        #   - marker detection
-        #   - dropping / adding frames and potentially interpolation
-        # the private methods also determine the order, for instance:
-        #   - downsampling: drop frames first & then detect on the reduced data
-        #   - upsampling: detect markers first and then add missing frames (potentially interpolate markers)
-        # eventually returns the filepath where the relevant synchronized output was saved, which can be:
-        #   - filepath to the synchronized charucoboard video (.mp4 file)
-        #   - filepath to the DLC output of the detected markers (.h5 file)
         pass
 
     @abstractmethod
@@ -288,25 +459,69 @@ class Synchronizer(ABC):
     def __init__(
             self,
             video_metadata: VideoMetadata,
-            output_directory: Path,
+            output_directory: Union[Path or str],
             synchro_metadata: Dict,
     ) -> None:
+        """
+        Construct all necessary attributes for class Synchronizer.
+
+        Parameters
+        ----------
+        video_metadata: VideoMetadata
+            Metadata from video.
+        output_directory: Path or str
+            Directory, in which the files created during the synchronisation are
+            saved.
+        synchro_metadata: Dict
+            Metadata for synchronisation containing SYNCHRO_METADATA_KEYS.
+
+        See Also
+        ________
+        core.utils.SYNCHRO_METADATA_KEYS
+        core.utils.KEYS_TO_CHECK_PROJECT
+
+        Notes
+        _____
+        The keys in synchro_metadata are from project config. For explanation
+        of these attributes, we refer to KEYS_TO_CHECK_PROJECT.
+        """
         self.led_timeseries_for_cross_video_validation, self.led_detection = None, None
         self.led_timeseries, self.template_blinking_motif = None, None
         self.video_metadata = video_metadata
         self.use_rapid_aligner = bool(synchro_metadata["rapid_aligner_path"])
         if self.use_rapid_aligner:
             self.rapid_aligner_path = convert_to_path(synchro_metadata["rapid_aligner_path"])
-        self.output_directory = output_directory
+        self.output_directory = convert_to_path(output_directory)
         self.use_gpu = synchro_metadata["use_gpu"]
         self.led_box_size = synchro_metadata["led_box_size"]
         self.synchro_metadata = synchro_metadata
 
     def run_synchronization(
-            self, synchronize_only: bool, test_mode: bool = False, verbose: bool = True
+            self, synchronize_only: bool=False, test_mode: bool = False, verbose: bool = True
     ) -> Tuple[Optional[Path], Optional[Path]]:
+        """
+        Run alignment between template and detected led blinking pattern.
+        Select frames to adjust framerate. Start marker detection or write video.
 
-        self.template_blinking_motif = _construct_template_motif(
+        Parameters
+        ----------
+        synchronize_only: bool, default False
+            To be used by calibration videos only. If True, then only
+            synchronized videos are created and no marker detection is run.
+        test_mode: bool, default False
+            If True (default False), then pre-existing files won't be overwritten
+            during the synchronisation.
+        verbose: bool, default True
+            If True (default), then the number of synchronized frames is printed.
+
+        Returns
+        -------
+        marker_detection_filepath: Path, optional
+            The path to the synchronised marker prediction file.
+        synchronized_video_filepath: Path, optional
+            The path to the synchronised video file.
+        """
+        self.template_blinking_motif = construct_template_motif(
             blinking_patterns_metadata=self.video_metadata.led_pattern)
 
         preexisting_output_file = self._get_preexisting_output_filepath()

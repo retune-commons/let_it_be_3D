@@ -1,24 +1,73 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 import cv2
 import imageio as iio
 import numpy as np
 from numpy import ndarray
 
+from .utils import convert_to_path
+
 
 class IntrinsicCameraCalibrator(ABC):
     """
+    Intrinsic calibration for fisheye and regular cameras on checkerboard videos.
+
+    Parameters
+    __________
+    filepath_calibration_video: Path or str
+        The filepath to the intrinsic calibration videos. They have to be
+        recorded in same resolution as the recording/calibration videos
+        without cropping using a 6x6 checkerboard..
+    max_calibration_frames: int
+        Number of frames to take into account for intrinsic calibration.
+        300 works well, depending on CPU speed, it can be necessary to reduce.
+
+    Attributes
+    __________
+    filepath_calibration_video: Path or str
+        The filepath to the intrinsic calibration videos. They have to be
+        recorded in same resolution as the recording/calibration videos
+        without cropping using a 6x6 checkerboard..
+    max_calibration_frames: int
+        Number of frames to take into account for intrinsic calibration.
+        300 works well, depending on CPU speed, it can be necessary to reduce.
+    video_reader: Reader
+        imageio Reader object of the calibration video.
+    checkerboard_rows_and_columns
+    d: np.ndarray
+        Empty camera matrix.
+    imsize: tuple of ints
+        Size of the video.
+    k: np.ndarray
+        Empty camera matrix.
+    objp: np.ndarray
+        Empty object points. Shape as detected in one frame.
+
+    Methods
+    _______
+    run()
+        Detect board in frames and calibrate intrinsics.
+
+    References
+    __________
+    [1] Kenneth Jiang (2017).
+    Calibrate fisheye lens using OpenCV.
+    medium.com (https://medium.com/@kennethjiang/calibrate-fisheye-lens-using-opencv-333b05afa0b0)
+
     Copyright Kenneth Jiang.
-    This class and its subclasses use code taken from the article
-    “Calibrate fisheye lens using OpenCV”
-    published on medium.com on Sep 29, 2017 by Kenneth Jiang
-    (https://medium.com/@kennethjiang/calibrate-fisheye-lens-using-opencv-333b05afa0b0).
+    This class and its subclasses use code taken from [1]. Changes were made to
+    match our needs here.
 
-    Changes were made to match our needs here.
+    Examples
+    ________
+    >>> from core.camera_intrinsics import IntrinsicCalibratorFisheyeCamera
+    >>> intrinsic_calibration_object = IntrinsicCalibratorFisheyeCamera(
+        ... "test_data/intrinsic_calibrations/Bottom_checkerboard.mp4",
+        ... 100)
+    >>> intrinsic_calibration_object.run()
     """
-
     @abstractmethod
     def _run_camera_type_specific_calibration(
             self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
@@ -30,13 +79,6 @@ class IntrinsicCameraCalibrator(ABC):
     @abstractmethod
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         pass
-
-    def __init__(
-            self, filepath_calibration_video: Path, max_calibration_frames: int
-    ) -> None:
-        self.video_filepath = filepath_calibration_video
-        self.max_calibration_frames = max_calibration_frames
-        self.video_reader = iio.get_reader(filepath_calibration_video)
 
     @property
     def checkerboard_rows_and_columns(self) -> Tuple[int, int]:
@@ -73,11 +115,36 @@ class IntrinsicCameraCalibrator(ABC):
                          ].T.reshape(-1, 2)
         return objp
 
-    @property
-    def subpixel_criteria(self) -> Tuple:
-        return cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1
+    def __init__(
+            self, filepath_calibration_video: Union[Path, str], max_calibration_frames: int
+    ) -> None:
+        """
+        Construct all necessary attributes for the IntrinsicCameraCalibrator class.
+
+        Parameters
+        ----------
+        filepath_calibration_video: Path or str
+            The filepath to the intrinsic calibration videos. They have to be
+            recorded in same resolution as the recording/calibration videos
+            without cropping, using a 6x6 checkerboard.
+        max_calibration_frames: int
+            Number of frames to take into account for intrinsic calibration.
+            300 works well, depending on CPU speed, it can be necessary to reduce.
+        """
+        self.video_filepath = convert_to_path(filepath_calibration_video)
+        self.max_calibration_frames = max_calibration_frames
+        self.video_reader = iio.v2.get_reader(filepath_calibration_video)
 
     def run(self) -> Dict:
+        """
+        Detect board in frames and calibrate intrinsics.
+
+        Returns
+        -------
+        calibration_results: dict
+            Intrinsic calibration results containing camera matrix and
+            distorsion coefficient at keys 'K' and 'D'.
+        """
         selected_frame_idxs = self._get_indices_of_selected_frames()
         detected_board_corners_per_image = self._detect_board_corners(
             frame_idxs=selected_frame_idxs
@@ -190,12 +257,6 @@ class IntrinsicCameraCalibrator(ABC):
         return calibration_results
 
 
-
-class IntrinsicCameraCalibratorCharuco(IntrinsicCameraCalibrator, ABC):
-    def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
-        pass
-
-
 class IntrinsicCameraCalibratorCheckerboard(IntrinsicCameraCalibrator, ABC):
     def _detect_board_corners(self, frame_idxs: List[int]) -> List[np.ndarray]:
         detected_checkerboard_corners_per_image = []
@@ -265,8 +326,3 @@ class IntrinsicCalibratorRegularCameraCheckerboard(
             self, objpoints: List[np.ndarray], imgpoints: List[np.ndarray]
     ) -> Tuple:
         return cv2.calibrateCamera(objpoints, imgpoints, self.imsize, None, None)
-
-
-class IntrinsicCalibratorRegularCameraCharuco(IntrinsicCameraCalibratorCharuco):
-    def _run_camera_type_specific_calibration(self) -> None:
-        pass

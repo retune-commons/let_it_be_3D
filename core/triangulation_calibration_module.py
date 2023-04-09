@@ -14,9 +14,9 @@ from scipy.spatial.transform import Rotation
 from .angles_and_distances import (
     add_reprojection_errors_of_all_calibration_validation_markers,
     set_distances_and_angles_for_evaluation,
-    fill_in_distances,
-    add_all_real_distances_errors,
-    set_angles_error_between_line_and_plane, get_xyz_distance_in_triangulation_space,
+    load_distances_from_ground_truth,
+    add_errors_between_computed_and_ground_truth_distances_for_different_references,
+    add_errors_between_computed_and_ground_truth_angles, get_xyz_distance_in_triangulation_space,
 )
 from .marker_detection import ManualAnnotation, DeeplabcutInterface
 from .plotting import (
@@ -256,7 +256,7 @@ class Calibration:
     methods to validate the calibration based on known ground_truth.
 
     Parameters
-    ----------
+    __________
     calibration_directory: Path or string
         Directory, where the calibration videos are stored.
     project_config_filepath: Path or string
@@ -736,8 +736,8 @@ class Triangulation(ABC):
         Group of cameras loaded from calibration_toml_filepath.
     anipose_io: dict
         Containing information for ap_lib functions, such as points_flat, p3ds,
-        n_joints, reprojerr, as well as errors and distances calculated from
-        ground truth.
+        n_joints, reprojerr, as well as distances and angles to validate
+        calibration in comparison with ground truth.
     markers: list of str
         All markers that will be triangulated.
     normalised_dataframe: bool, default False
@@ -1680,14 +1680,13 @@ class CalibrationValidation(Triangulation):
         self.anipose_io = add_reprojection_errors_of_all_calibration_validation_markers(
             anipose_io=self.anipose_io, df_xyz=self.df
         )
-        self.anipose_io = set_distances_and_angles_for_evaluation(self.ground_truth_config,
-                                                                  self.anipose_io,
+        self.anipose_io = set_distances_and_angles_for_evaluation(parameters=self.ground_truth_config,
+                                                                  anipose_io=self.anipose_io,
                                                                   df_xyz=self.df)
-        gt_distances = fill_in_distances(self.ground_truth_config["distances"])
-        self.anipose_io = add_all_real_distances_errors(
-            anipose_io=self.anipose_io, ground_truth_distances=gt_distances, df_xyz=self.df
-        )
-        self.anipose_io = set_angles_error_between_line_and_plane(
+        gt_distances = load_distances_from_ground_truth(self.ground_truth_config["distances"])
+        self.anipose_io = add_errors_between_computed_and_ground_truth_distances_for_different_references(
+            anipose_io=self.anipose_io, ground_truth_distances=gt_distances)
+        self.anipose_io = add_errors_between_computed_and_ground_truth_angles(
             self.ground_truth_config["angles"], self.anipose_io)
 
         if verbose > 0:
@@ -1700,7 +1699,7 @@ class CalibrationValidation(Triangulation):
                     f'the mean distance error is: {distance_errors["mean_error"]} cm.'
                 )
             for angle, angle_error in self.anipose_io[
-                "angles_error_screws_plan"
+                "angles_error_ground_truth_vs_triangulated"
             ].items():
                 print(f"Considering {angle}, the angle error is: {angle_error}")
         if show_3D_plot:
