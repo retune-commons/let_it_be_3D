@@ -1,9 +1,9 @@
-center: MazeCornerClosedLeft
-ReferenceLengthCm: 50
-ReferenceLengthMarkers:
+CENTER: MazeCornerClosedLeft
+REFERENCE_LENGTH_CM: 50
+REFERENCE_LENGTH_MARKERS:
 - MazeCornerClosedLeft
 - MazeCornerOpenLeft
-ReferenceRotationCoords:
+REFERENCE_ROTATION_COORDS:
 - - 0
   - 0
   - 0
@@ -16,12 +16,12 @@ ReferenceRotationCoords:
 - - 50
   - 0
   - 0
-ReferenceRotationMarkers:
+REFERENCE_ROTATION_MARKERS:
 - MazeCornerClosedLeft
 - MazeCornerClosedRight
 - MazeCornerOpenRight
 - MazeCornerOpenLeft
-InvisibleMarkers:
+INVISIBLE_MARKERS:
  x: [0, 0, 0, 0, 0, 0, 0, 0]
  y: [0, 50, 50, 0, 0, 50, 50, 0]
  z: [0, 0, 0, 0, 50, 50, 50, 50]

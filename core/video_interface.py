@@ -1,66 +1,63 @@
-from typing import List, Tuple, Optional, Union, Dict
-from abc import ABC, abstractmethod
-import datetime
 from pathlib import Path
+from typing import Union, Dict, Type
 
-import pickle
-import imageio.v3 as iio
-import numpy as np
 import aniposelib as ap_lib
-import cv2
-import matplotlib.pyplot as plt
 
-from .video_synchronization import Synchronizer
-from .video_metadata import VideoMetadata
 from .plotting import Intrinsics
+from .video_metadata import VideoMetadata
 
 
 class VideoInterface:
     def __init__(
-        self, video_metadata: VideoMetadata, output_dir: Path, test_mode: bool = False
+            self, video_metadata: VideoMetadata, output_dir: Path, test_mode: bool = False
     ) -> None:
         self.video_metadata = video_metadata
-        self.plot_camera_intrinsics = Intrinsics(
-            video_metadata=video_metadata,
-            output_dir=output_dir,
-            save=not test_mode,
-            plot=False,
-        )
+        if self.video_metadata.calibration:
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                       f"_charuco_undistorted_image"
+        elif self.video_metadata.recording:
+            filename = f"{self.video_metadata.mouse_id}_{self.video_metadata.recording_date}" \
+                       f"_{self.video_metadata.paradigm}_{self.video_metadata.cam_id}_undistorted_image"
+        elif self.video_metadata.calvin:
+            filename = f"{self.video_metadata.recording_date}_{self.video_metadata.cam_id}" \
+                       f"_calvin_undistorted_image"
+        self.plot_camera_intrinsics = Intrinsics(video_filepath=self.video_metadata.filepath,
+                                                 intrinsic_calibration=self.video_metadata.intrinsic_calibration,
+                                                 filename=filename, fisheye=self.video_metadata.fisheye,
+                                                 output_directory=output_dir)
+        self.plot_camera_intrinsics.create_plot(save=not test_mode, plot=False)
 
     def run_synchronizer(
-        self,
-        synchronizer: Synchronizer,
-        rapid_aligner_path: Path,
-        output_directory: Path,
-        use_gpu: str,
-        synchronize_only: bool,
-        test_mode: bool,
-        synchro_metadata: Dict,
+            self,
+            synchronizer: Type,
+            output_directory: Path,
+            synchronize_only: bool,
+            test_mode: bool,
+            synchro_metadata: Dict,
+            verbose: bool = True
     ) -> None:
         self.synchronizer_object = synchronizer(
             video_metadata=self.video_metadata,
-            rapid_aligner_path=rapid_aligner_path,
             output_directory=output_directory,
-            use_gpu=use_gpu,
             synchro_metadata=synchro_metadata,
         )
         (
             self.marker_detection_filepath,
             self.synchronized_video_filepath,
         ) = self.synchronizer_object.run_synchronization(
-            synchronize_only=synchronize_only, test_mode=test_mode
+            synchronize_only=synchronize_only, test_mode=test_mode, verbose=verbose
         )
 
     def export_for_aniposelib(self) -> Union:
-        if not self.video_metadata.charuco_video:
+        if not self.video_metadata.calibration:
             return self.marker_detection_filepath
         else:
-            return self._export_as_aniposelib_Camera_object()
+            return self._export_as_aniposelib_camera_object()
 
     def inspect_intrinsic_calibration(self) -> None:
-        self.plot_camera_intrinsics.plot(plot=True, save=False)
+        self.plot_camera_intrinsics.plot()
 
-    def _export_as_aniposelib_Camera_object(self):
+    def _export_as_aniposelib_camera_object(self):
         if self.video_metadata.fisheye:
             camera = ap_lib.cameras.FisheyeCamera(
                 name=self.video_metadata.cam_id,

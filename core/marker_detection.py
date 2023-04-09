@@ -1,71 +1,108 @@
-from typing import List, Tuple, Optional, Union, Dict
+import io
+import sys
+import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-import sys
-import io
-import warnings
+from typing import List, Optional, Union
 
-import yaml
 import imageio.v3 as iio
 import matplotlib.pyplot as plt
-import pandas as pd
-
 
 from .utils import (
-    construct_dlc_output_style_df_from_manual_marker_coords,
+    construct_dlc_output_style_df_from_dictionary,
     convert_to_path,
     read_config,
 )
 
 
 class MarkerDetection(ABC):
+    """
+    Class to run marker detection using different marker detection methods.
+
+    Parameters
+    ----------
+    object_to_analyse: Path or str
+        The path to the video to be analysed.
+    output_directory: Path or str
+        The directory, in which the output file will be stored.
+    marker_detection_directory: Path or str, optional
+        The filepath to the config file to use for marker detection. E.g., the
+        DLC project config file. None, for manual Marker Detection.
+
+    Attributes
+    __________
+    object_to_analyse: Path
+        The path to the video to be analysed.
+    output_directory: Path
+        The directory, in which the output file will be stored.
+    marker_detection_directory: Path
+        The filepath to the config file to use for marker detection. E.g., the
+        DLC project config file. None, for manual Marker Detection.
+
+    Methods
+    _______
+    analyze_objects(filepath, labels, only_first_frame, filtering, use_gpu):
+        Abstract method for subclasses to be implemented using the
+        corresponding marker detection method.
+    """
     def __init__(
-        self,
-        object_to_analyse: Path,
-        output_directory: Path,
-        marker_detection_directory: Optional[Path] = None,
-    ):
+            self,
+            object_to_analyse: Union[Path, str],
+            output_directory: Union[Path, str],
+            marker_detection_directory: Optional[Union[Path, str]] = None,
+    ) -> None:
+        """
+        Construct all necessary attributes for class MarkerDetection.
+
+        Parameters
+        ----------
+        object_to_analyse: Path or str
+            The path to the video to be analysed.
+        output_directory: Path or str
+            The directory, in which the output file will be stored.
+        marker_detection_directory: Path or str, optional
+            The filepath to the config file to use for marker detection. E.g., the
+            DLC project config file. None, for manual Marker Detection.
+        """
         self.object_to_analyse = convert_to_path(object_to_analyse)
         self.output_directory = convert_to_path(output_directory)
-        if type(marker_detection_directory) != None:
+        if type(marker_detection_directory) is not None:
             self.marker_detection_directory = convert_to_path(
                 marker_detection_directory
             )
 
     @abstractmethod
-    def analyze_objects():
+    def analyze_objects(
+            self,
+            filepath: Path,
+            labels: Optional[List[str]] = None,
+            only_first_frame: bool = False,
+            filtering: bool = False,
+            use_gpu: str = "") -> Path:
         pass
 
 
 class DeeplabcutInterface(MarkerDetection):
-    def analyze_objects(
-        self, filepath: Path, filtering: bool = False, use_gpu: str = ""
-    ):
+    def analyze_objects(self, filepath: Path, filtering: bool = False, use_gpu: str = "", **kwargs) -> Path:
         filepath = convert_to_path(filepath)
-        if use_gpu == "prevent":
+        if use_gpu == "prevent":  # limit GPU use
             import tensorflow.compat.v1 as tf
-
             sess = tf.Session(config=tf.ConfigProto(device_count={"GPU": 0}))
         elif use_gpu == "low":
             import tensorflow.compat.v1 as tf
-
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         elif use_gpu == "full":
             import tensorflow.compat.v1 as tf
-
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
-        # mute deeplabcut
-        old_stdout = sys.stdout
+        old_stdout = sys.stdout  # mute deeplabcut
         text_trap = io.StringIO()
         sys.stdout = text_trap
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-
             import deeplabcut as dlc
-
             dlc_ending = dlc.analyze_videos(
                 config=str(self.marker_detection_directory),
                 videos=[str(self.object_to_analyse)],
@@ -91,21 +128,14 @@ class DeeplabcutInterface(MarkerDetection):
                     )
                 else:
                     print(f"{filtered_filepath} not found! Data was analysed but not filtered.")
-
-        # unmute
-        sys.stdout = old_stdout
-
+        sys.stdout = old_stdout  # unmute DLC
         return filepath
 
 
 class ManualAnnotation(MarkerDetection):
-    def analyze_objects(
-        self,
-        filepath: Path,
-        labels: Optional[List[str]] = None,
-        only_first_frame: bool = False,
-    ) -> Path:
-        if labels == None:
+    def analyze_objects(self, filepath: Path, labels: Optional[List[str]] = None, only_first_frame: bool = False,
+                        **kwargs) -> Path:
+        if labels is None:
             list_of_labels = read_config(self.marker_detection_directory)
         else:
             list_of_labels = labels
@@ -149,14 +179,6 @@ class ManualAnnotation(MarkerDetection):
             if only_first_frame:
                 break
 
-        df = construct_dlc_output_style_df_from_manual_marker_coords(
-            manual_annotated_marker_coords_pred=frames_annotated
-        )
+        df = construct_dlc_output_style_df_from_dictionary(marker_predictions=frames_annotated)
         df.to_hdf(filepath, "df")
         return filepath
-
-
-class TemplateMatching(MarkerDetection):
-    def analyze_objects(self):
-        # self.object_to_analyse, self.output_directory, self.marker_detection_directory
-        pass

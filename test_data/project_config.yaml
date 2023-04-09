@@ -67,7 +67,7 @@ paradigms:
 - OTR
 - OTT
 - OTE
-valid_cam_IDs:
+valid_cam_ids:
 - Bottom
 - Top
 - Side1
@@ -84,20 +84,21 @@ calibration_validation_tag: Position
 # "prevent" disables GPU usage, "low" restricts GPU memory for synchronization but not for DLC analysis, "full" uses entire GPU capacity
 use_gpu: ""
 intrinsic_calibration_directory: test_data/intrinsic_calibrations/
-# load calibration=True means, that you use previously recorded checkerboard calibrations to set the intrinsics of the cameras instead of calibrating on charuco videos (which is currently not possible)
+# load calibration=True means, that you use previously recorded checkerboard calibrations to set the intrinsics of the cameras instead of using the built-in aniposelib function to calibrate intrinsics
 load_calibration: True
 # triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False 
 triangulation_type: triangulate
-allowed_num_diverging_frames: 20
 
+allowed_num_diverging_frames: 20
 # repeat, default, manual, error
-handle_synchro_fails: manual
+handle_synchro_fails: default
 default_offset_ms: 7000
 start_pattern_match_ms: 0
 end_pattern_match_ms: 120000
 synchro_error_threshold: 100
 synchro_marker: LED5
-use_2D_filter: False
+led_box_size: 15
+use_2D_filter: True
 score_threshold: 0.9
 num_frames_to_pick: 5
 
