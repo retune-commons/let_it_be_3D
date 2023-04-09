@@ -1,8 +1,8 @@
 import datetime
 import pickle
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 import imageio as iio
 import numpy as np
@@ -12,25 +12,85 @@ from .camera_intrinsics import (
     IntrinsicCalibratorRegularCameraCheckerboard
 )
 from .user_specific_rules import user_specific_rules_on_videometadata
-from .utils import check_keys
+from .utils import check_keys, convert_to_path, \
+    KEYS_TO_CHECK_CAMERA_RECORDING, \
+    KEYS_PER_CAM_PROJECT, \
+    KEYS_VIDEOMETADATA_PROJECT, \
+    KEYS_VIDEOMETADATA_RECORDING
 
 
 class VideoMetadata(ABC):
-    @abstractmethod
-    def _print_message(self, attributes: List) -> None:
-        pass
+    """
+    Class to store metadata for videos.
 
-    @abstractmethod
-    def _rename_file(self) -> bool:
-        pass
+    Metadata is read from the filepath and the recording and project config
+    dictionaries.
 
+    Parameters
+    ----------
+    video_filepath: str or Path
+        The path to the video, which metadata will be stored here.
+    recording_config_dict: Dict
+        The recording config dictionary as read from the .yaml file.
+    project_config_dict: Dict
+        The project config dictionary as read from the .yaml file.
+    tag: str
+        Depending on the type of video. Values: "calvin" for calibration
+        validation, "recording" for recording and "calibration" for
+        calibration videos.
+
+    Attributes
+    __________
+    self.intrinsic_calibration
+    self.intrinsic_calibration_filepath
+    self.calvin
+    self.recording
+    self.calibration
+    self.exclusion_state
+    self.filepath
+    self.recording_date
+    self.mouse_id
+    self.mouse_line
+    self.mouse_number
+    self.cam_id
+    self.paradigm
+
+    See Also
+    ________
+    core.utils.KEYS_TO_CHECK_CAMERA_RECORDING
+    core.utils.KEYS_TO_CHECK_RECORDING
+    core.utils.KEYS_TO_CHECK_PROJECT
+
+    Notes
+    _____
+    The Attributes described in the docstring are only those ones, that are not
+    keys from recording or project config. For explanation of these attributes,
+    we refer to KEYS_TO_CHECK_CAMERA_RECORDING, KEYS_TO_CHECK_RECORDING and
+    KEYS_TO_CHECK_PROJECT.
+    """
     def __init__(
             self,
-            video_filepath: Path,
+            video_filepath: Union[str, Path],
             recording_config_dict: Dict,
             project_config_dict: Dict,
             tag: str,
     ) -> None:
+        """
+        Construct all necessary attributes for the VideoMetadata class.
+
+        Parameters
+        ----------
+        video_filepath: str or Path
+            The path to the video, which metadata will be stored here.
+        recording_config_dict: Dict
+            The recording config dictionary as read from the .yaml file.
+        project_config_dict: Dict
+            The project config dictionary as read from the .yaml file.
+        tag: str
+            Depending on the type of video. Values: "calvin" for calibration
+            validation, "recording" for recording and "calibration" for
+            calibration videos.
+        """
         self.calvin, self.recording, self.calibration = False, False, False
         if tag in ["calvin", "recording", "calibration"]:
             setattr(self, tag, True)
@@ -38,13 +98,22 @@ class VideoMetadata(ABC):
             raise KeyError(f"{tag} is not a valid tag for VideoMetadata!\n"
                            f"Only [calvin, recording, calibration] are valid.")
         self.exclusion_state = "valid"
-        self.filepath = self._check_filepaths(video_filepath=video_filepath)
+        self.filepath = self._check_filepaths(video_filepath=convert_to_path(video_filepath))
 
-        state = self._read_metadata(
-            recording_config_dict=recording_config_dict,
-            project_config_dict=project_config_dict,
-            video_filepath=video_filepath,
-        )
+        for attribute in KEYS_VIDEOMETADATA_PROJECT:
+            setattr(self, attribute, project_config_dict[attribute])
+        self.intrinsic_calibration_directory = Path(project_config_dict["intrinsic_calibration_directory"])
+        state = self._check_metadata(recording_config_dict=recording_config_dict,
+                                     video_filepath=video_filepath)
+
+        for key in KEYS_TO_CHECK_CAMERA_RECORDING:
+            setattr(self, key, recording_config_dict[self.cam_id][key])
+
+        for key in KEYS_PER_CAM_PROJECT:
+            setattr(self, key, project_config_dict[key][self.cam_id])
+
+        for key in KEYS_VIDEOMETADATA_RECORDING:
+            setattr(self, key, recording_config_dict[key])
 
         if state == "del":
             raise TypeError("This video_metadata has problems. Use the filename checker to resolve!")
@@ -64,16 +133,11 @@ class VideoMetadata(ABC):
         else:
             raise ValueError("The filepath is not linked to a video or image.")
 
-    def _read_metadata(
+    def _check_metadata(
             self,
-            project_config_dict: Dict,
             recording_config_dict: Dict,
             video_filepath: Path,
     ) -> str:
-        for attribute in ["valid_cam_ids", "paradigms", "load_calibration", "max_calibration_frames",
-                          "max_ram_digestible_frames", "max_cpu_cores_to_pool", "animal_lines"]:
-            setattr(self, attribute, project_config_dict[attribute])
-        self.intrinsic_calibration_directory = Path(project_config_dict["intrinsic_calibration_directory"])
         while True:
             undefined_attributes = self._extract_filepath_metadata()
             if undefined_attributes:
@@ -88,9 +152,6 @@ class VideoMetadata(ABC):
         if self.recording:
             self.mouse_id = self.mouse_line + "_" + self.mouse_number
 
-        # led pattern not necessary if no synchronisation necessary
-        for attribute in ["led_pattern", "target_fps", "calibration_index"]:
-            setattr(self, attribute, recording_config_dict[attribute])
         if self.recording_date != recording_config_dict["recording_date"]:
             raise ValueError(
                 f"The date of the recording_config_file and the provided video {video_filepath} do not match! "
@@ -98,28 +159,65 @@ class VideoMetadata(ABC):
             )
 
         metadata_dict = recording_config_dict[self.cam_id]
-        keys_per_cam = ["fps", "offset_row_idx", "offset_col_idx", "flip_h", "flip_v", "fisheye"]
-        missing_keys = check_keys(dictionary=metadata_dict, list_of_keys=keys_per_cam)
+        missing_keys = check_keys(dictionary=metadata_dict, list_of_keys=KEYS_TO_CHECK_CAMERA_RECORDING)
         if missing_keys:
             raise KeyError(
                 f"Missing metadata information in the recording_config_file for {self.cam_id} for {missing_keys}."
             )
-
-        # fps not necessary if all cams have the same fps
-        # offsets not necessary if no cropping was performed or use_intrinsic_calibration False
-        # fisheye not necessary if no camera is fisheye
-        for attribute in keys_per_cam:
-            setattr(self, attribute, metadata_dict[attribute])
-
-        self.processing_type = project_config_dict["processing_type"][self.cam_id]
-        self.calibration_evaluation_type = project_config_dict["calibration_evaluation_type"][self.cam_id]
-        self.processing_filepath = Path(project_config_dict["processing_filepath"][self.cam_id])
-        self.calibration_evaluation_filepath = Path(project_config_dict["calibration_evaluation_filepath"][self.cam_id])
-        self.led_extraction_type = project_config_dict["led_extraction_type"][self.cam_id]
-        self.led_extraction_filepath = project_config_dict["led_extraction_filepath"][self.cam_id]
         return "valid"
 
     def _extract_filepath_metadata(self) -> List:
+        """
+        Extracts metadata from the given video filepath.
+
+        Returns
+        -------
+        list
+            empty list
+
+        Raises
+        ______
+        ValueError
+            Error, if filenames are invalid. To prevent Errors, use the
+            filename_checker before and follow the explanations in the Notes
+            section below.
+
+        Notes
+        _____
+        Demands for filenames are specific for calibration, recording or
+        calibration_validation files.
+        calibration:
+            - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+            - including recording_date (YYMMDD), calibration_tag (as defined
+            in project_config) and cam_id (element of valid_cam_ids in
+            project_config)
+            - recording_date and calibration_tag have to be separated by an
+            underscore ("_")
+            - f"{recording_date}_{calibration_tag}_{cam_id}" =
+            Example: "220922_charuco_Front.mp4"
+        calibration_validation:
+            - has to be a video or image [".bmp", ".tiff", ".png", ".jpg",
+            ".AVI", ".avi", ".mp4"]
+            - including recording_date (YYMMDD), calibration_validation_tag
+            (as defined in project_config) and cam_id (element of valid_cam_ids
+            in project_config)
+            - recording_date and calibration_validation_tag have to be separated
+            by an underscore ("_")
+            - calibration_validation_tag mustn't be "calvin"
+            - f"{recording_date}_{calibration_validation_tag}" =
+            Example: "220922_position_Top.jpg"
+        recording:
+            - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+            - including recording_date (YYMMDD),
+            cam_id (element of valid_cam_ids in project_config),
+            mouse_line (element of animal_lines in project_config),
+            animal_id (beginning with F, split by "-" and followed by a number)
+            and paradigm (element of paradigms in project_config)
+            - recording_date, cam_id, mouse_line, animal_id and paradigm have
+            to be separated by an underscore ("_")
+            -f"{recording_date}_{cam_id}_{mouse_line}_{animal_id}_{paradigm}.mp4" =
+            Example: "220922_Side_206_F2-12_OTT.mp4"
+        """
         user_specific_rules_on_videometadata(videometadata=self)
         if self.calibration:
             for piece in self.filepath.stem.split("_"):
@@ -383,9 +481,61 @@ class VideoMetadata(ABC):
         intrinsic_calibration["K"] = adjusted_K
         return intrinsic_calibration
 
+    def _print_message(self, attributes: List) -> None:
+        pass
+
+    def _rename_file(self) -> bool:
+        pass
+
+
 
 class VideoMetadataChecker(VideoMetadata):
     def _extract_filepath_metadata(self) -> List[str]:
+        """
+        Extracts metadata from the given video filepath.
+
+        Returns
+        -------
+        undefined_attributes: list of str
+            Attributes, that could not be extracted from the filepath and that
+            should be corrected before analysis.
+
+        Notes
+        _____
+        Demands for filenames are specific for calibration, recording or
+        calibration_validation files.
+        calibration:
+            - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+            - including recording_date (YYMMDD), calibration_tag (as defined
+            in project_config) and cam_id (element of valid_cam_ids in
+            project_config)
+            - recording_date and calibration_tag have to be separated by an
+            underscore ("_")
+            - f"{recording_date}_{calibration_tag}_{cam_id}" =
+            Example: "220922_charuco_Front.mp4"
+        calibration_validation:
+            - has to be a video or image [".bmp", ".tiff", ".png", ".jpg",
+            ".AVI", ".avi", ".mp4"]
+            - including recording_date (YYMMDD), calibration_validation_tag
+            (as defined in project_config) and cam_id (element of valid_cam_ids
+            in project_config)
+            - recording_date and calibration_validation_tag have to be separated
+            by an underscore ("_")
+            - calibration_validation_tag mustn't be "calvin"
+            - f"{recording_date}_{calibration_validation_tag}" =
+            Example: "220922_position_Top.jpg"
+        recording:
+            - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+            - including recording_date (YYMMDD),
+            cam_id (element of valid_cam_ids in project_config),
+            mouse_line (element of animal_lines in project_config),
+            animal_id (beginning with F, split by "-" and followed by a number)
+            and paradigm (element of paradigms in project_config)
+            - recording_date, cam_id, mouse_line, animal_id and paradigm have
+            to be separated by an underscore ("_")
+            -f"{recording_date}_{cam_id}_{mouse_line}_{animal_id}_{paradigm}.mp4" =
+            Example: "220922_Side_206_F2-12_OTT.mp4"
+        """
         undefined_attributes = []
         user_specific_rules_on_videometadata(videometadata=self)
         if self.calibration:

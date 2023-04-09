@@ -92,6 +92,31 @@ class MultiMotifTemplate(TimeseriesTemplate):
         return np.concatenate(individual_motif_template_timeseries)
 
 
+def _construct_template_motif(
+        blinking_patterns_metadata: Dict
+) -> Union[MotifTemplate, MultiMotifTemplate]:
+    motif_templates = []
+    for pattern_idx, parameters in blinking_patterns_metadata.items():
+        motif_templates.append(
+            MotifTemplate(
+                led_on_time_in_ms=parameters["led_on_time_in_ms"],
+                on_off_period_length_in_ms=parameters["on_off_period_length_in_ms"],
+                motif_duration_in_ms=parameters["motif_duration_in_ms"],
+            )
+        )
+    if len(motif_templates) < 1:
+        raise ValueError(
+            "Could not construct a blinking pattern template. Please validate your config files!"
+        )
+    elif len(motif_templates) == 1:
+        template_motif = motif_templates[0]
+    else:
+        template_motif = MultiMotifTemplate()
+        for template in motif_templates:
+            template_motif.add_motif_template(motif_template=template)
+    return template_motif
+
+
 def _find_closest_timestamp_index(
         original_timestamps: np.ndarray, timestamp: float
 ) -> int:
@@ -157,31 +182,6 @@ def _get_start_end_indices_from_center_coord_and_length(
     start_index = center_px - (length // 2)
     end_index = center_px + (length - (length // 2))
     return start_index, end_index
-
-
-def _construct_template_motif(
-        blinking_patterns_metadata: Dict
-) -> Union[MotifTemplate, MultiMotifTemplate]:
-    motif_templates = []
-    for pattern_idx, parameters in blinking_patterns_metadata.items():
-        motif_templates.append(
-            MotifTemplate(
-                led_on_time_in_ms=parameters["led_on_time_in_ms"],
-                on_off_period_length_in_ms=parameters["on_off_period_length_in_ms"],
-                motif_duration_in_ms=parameters["motif_duration_in_ms"],
-            )
-        )
-    if len(motif_templates) < 1:
-        raise ValueError(
-            "Could not construct a blinking pattern template. Please validate your config files!"
-        )
-    elif len(motif_templates) == 1:
-        template_motif = motif_templates[0]
-    else:
-        template_motif = MultiMotifTemplate()
-        for template in motif_templates:
-            template_motif.add_motif_template(motif_template=template)
-    return template_motif
 
 
 def _load_synchro(filepath: Path) -> Tuple[Coordinates, Any, Any, Any]:
@@ -367,6 +367,10 @@ class Synchronizer(ABC):
             output_file = self._create_h5_filepath(tag=f"_downsampled{self.target_fps}fps_synchronized",
                                                    filtered=self.synchro_metadata['use_2D_filter'])
         return output_file
+
+    def _get_synchro_filepath(self) -> Path:
+        return self.output_directory.joinpath(
+            f"synchro_{self.video_metadata.recording_date}_{self.video_metadata.cam_id}.p")
 
     def _get_led_center_coordinates(self) -> Coordinates:
         temp_folder = self.output_directory.joinpath("temp")
@@ -654,6 +658,8 @@ class Synchronizer(ABC):
         return upsampled_timeseries
 
     def _handle_synchro_fails(self) -> Tuple[Coordinates, Union[int, Any], Union[float, Any], Union[int, Any]]:
+        print(f"Synchronisation failed. Using method "
+              f"{self.synchro_metadata['handle_synchro_fails']} now instead!")
         if self.synchro_metadata["handle_synchro_fails"] == "repeat":
             led_center_coordinates = self._get_led_center_coordinates()
             self.led_timeseries = self._extract_led_pixel_intensities(led_center_coords=led_center_coordinates)

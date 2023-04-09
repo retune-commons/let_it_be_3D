@@ -36,7 +36,7 @@ from .utils import (
     get_3D_array,
     KEYS_TO_CHECK_PROJECT,
     KEYS_TO_CHECK_RECORDING,
-    KEYS_TO_CHECK_CAMERA,
+    KEYS_TO_CHECK_CAMERA_PROJECT,
     STANDARD_ATTRIBUTES_TRIANGULATION,
     STANDARD_ATTRIBUTES_CALIBRATION,
     SYNCHRO_METADATA_KEYS
@@ -72,7 +72,7 @@ Tuple[dict, dict]:
             f"in the config_file {recording_config_filepath}!"
         )
 
-    for dictionary_key in KEYS_TO_CHECK_CAMERA:
+    for dictionary_key in KEYS_TO_CHECK_CAMERA_PROJECT:
         cameras_with_missing_keys = check_keys(
             dictionary=project_config_dict[dictionary_key],
             list_of_keys=project_config_dict["valid_cam_ids"],
@@ -283,9 +283,9 @@ class Calibration:
     synchronized_charuco_videofiles: {str: Path}
         Dict of synchronized calibration video per camera.
     video_interfaces: {str: VideoInterface}
-        List of VideoInterface objects for all calibration videos.
+        Dict of VideoInterface objects for all calibration videos.
     metadata_from_videos: {str: VideoMetadata}
-        List of VideoMetadata objects for all calibration videos.
+        Dict of VideoMetadata objects for all calibration videos.
     valid_videos: list of str
         Videos, that were found in the calibration_directory and
         not excluded due to synchronization issues.
@@ -707,9 +707,9 @@ class Triangulation(ABC):
     output_directory: Path
         Directory, in which the files created during the analysis are saved.
     video_interfaces: {str: VideoInterface}
-        List of VideoInterface objects for all videos or images.
+        Dict of VideoInterface objects for all videos or images.
     metadata_from_videos: {str: VideoMetadata}
-        List of VideoMetadata objects for all videos or images.
+        Dict of VideoMetadata objects for all videos or images.
     triangulation_dlc_cams_filepaths: {str: Path}
         Containing the filepath to the predictions for each camera.
     csv_output_filepath: Path
@@ -717,6 +717,9 @@ class Triangulation(ABC):
     recording_date: str
         Date at which the calibration was done based on recording_config and as
         read from the filenames.
+    calibration_index: int
+        Index of a calibration.
+        Together with recording_date, it creates a unique calibration key.
     target_fps: int
         Fps rate, to which the videos should be synchronized.
     led_pattern: dict
@@ -861,7 +864,7 @@ class Triangulation(ABC):
         for attribute in ["use_gpu", "calibration_validation_tag",
                           "score_threshold", "triangulation_type", "allowed_num_diverging_frames"]:
             setattr(self, attribute, project_config_dict[attribute])
-        for attribute in ["recording_date", "led_pattern", "target_fps"]:
+        for attribute in ["recording_date", "led_pattern", "target_fps", "calibration_index"]:
             setattr(self, attribute, recording_config_dict[attribute])
 
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
@@ -964,6 +967,12 @@ class Triangulation(ABC):
         verbose: bool, default True
             If True (default), print if exclusion of markers worked without any
             abnormalities.
+
+        Notes
+        _____
+        The all_markers_to_exclude_config_path has to be a path to a yaml file
+        representing a dictionary with the camera names as keys and a list of
+        the markers, that should be excluded as value.
         """
         all_markers_to_exclude = read_config(all_markers_to_exclude_config_path)
         missing_cams = check_keys(all_markers_to_exclude,
@@ -1333,11 +1342,37 @@ class TriangulationRecordings(Triangulation):
         rotation_error: flot
             Error returned by scipy.transform.Rotation.align_vectors, representing
             whether the alignment worked well.
+
+        Notes
+        -----
+        The normalization_config_path is a path to a yaml file, representing a
+        dictionary with the following key-value pairs:
+            CENTER: str
+                The marker, at which to set (0, 0, 0).
+            REFERENCE_LENGTH_CM: int
+                The reference length in cm.
+            REFERENCE_LENGTH_MARKERS: list
+                The two markers for defining the reference length. The distance
+                between those markers in px will be set to ReferenceLengthCm.
+            REFERENCE_ROTATION_COORDS: list of list of int
+                List of reference rotation markers (at least 3), to align the
+                real world space and the triangulated space.
+                Each element is a list of int, defining their x, y and z coordinate.
+            REFERENCE_ROTATION_MARKERS: list of str
+                List of triangulated markers, that should be aligned with
+                ReferenceRotationCoords. Their lengths have to be equal!
+            INVISIBLE_MARKERS: {str: list of int}
+                Keys are 'x', 'y' and 'z', values are lists of ints. All lists
+                have to match in length. The length is equal to the number of
+                points to be plotted.
+                Markers to plot in rotation visualization plot invisiblly. Can
+                be used to set the axis aspect equal, since this feature is not
+                established for 3D axes in matplotlib.
         """
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
         best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
-        x, y, z = get_3D_array(self.df, config['center'], best_frame)
+        x, y, z = get_3D_array(self.df, config['CENTER'], best_frame)
         for key in self.df.keys():
             if '_x' in key:
                 self.df[key] = self.df[key] - x
@@ -1347,9 +1382,9 @@ class TriangulationRecordings(Triangulation):
                 self.df[key] = self.df[key] - z
 
         reference_length_px = get_xyz_distance_in_triangulation_space(
-            marker_ids=tuple(config['ReferenceLengthMarkers']),
+            marker_ids=tuple(config['REFERENCE_LENGTH_MARKERS']),
             df_xyz=self.df.iloc[best_frame, :])
-        conversionfactor = config['ReferenceLengthCm'] / reference_length_px
+        conversionfactor = config['REFERENCE_LENGTH_CM'] / reference_length_px
         bp_keys_unflat = set(get_3D_df_keys(key[:-2]) for key in self.df.keys() if
                              'error' not in key and 'score' not in key and "M_" not in key and 'center' not in key and 'fn' not in key)
         bp_keys = list(it.chain(*bp_keys_unflat))
@@ -1357,9 +1392,9 @@ class TriangulationRecordings(Triangulation):
         normalised[bp_keys] *= conversionfactor
 
         reference_rotation_markers = []
-        for marker in config['ReferenceRotationMarkers']:
+        for marker in config['REFERENCE_ROTATION_MARKERS']:
             reference_rotation_markers.append(get_3D_array(normalised, marker, best_frame))
-        r, rotation_error = Rotation.align_vectors(config["ReferenceRotationCoords"],
+        r, rotation_error = Rotation.align_vectors(config["REFERENCE_ROTATION_COORDS"],
                                                         reference_rotation_markers)
         rotated = normalised.copy()
         for key in bp_keys_unflat:
@@ -1367,7 +1402,7 @@ class TriangulationRecordings(Triangulation):
             for axis in range(3):
                 rotated.loc[:, key[axis]] = rot_points[:, axis]
         rotated_markers = []
-        for marker in config['ReferenceRotationMarkers']:
+        for marker in config['REFERENCE_ROTATION_MARKERS']:
             rotated_markers.append(get_3D_array(rotated, marker, best_frame))
 
         self.normalised_dataframe = True
@@ -1396,6 +1431,44 @@ class TriangulationRecordings(Triangulation):
             The filename, where the video should be saved.
         config_path: Path or str
             The path to the config used to create triangulated videos.
+
+        Notes
+        _____
+        The yaml file at config_path has to have the following keys:
+            start_s: float
+            end_s: float
+            body_marker_size, body_label_size: int, int
+            body_marker_color, body_label_color: str, str
+                matplotlib color
+            body_marker_alpha, body_label_alpha: float 0 < 1, float 0 < 1
+            markers_to_exclude: list of str
+                Markers that should not be plotted. Recommended is, giving at
+                least "M_", "center_", "fnum" and "Unnamed" to it, since those
+                labels are created from aniposelib and can not be plotted.
+            markers_to_connect: list of list of str, optional
+                Each element consists of a list of markers, that will be
+                connected in the video.
+            markers_to_fill: list of dict, optional
+                Each element consists of a dict, that will be filled in the
+                video. The keys of the dict have to be:
+                    markers: list of str
+                        The markers, to create a polygon in between.
+                    color: str
+                        matplotlib color, to fill the polygon.
+                    alpha: float 0 < 1
+            additional_markers_to_plot: list of dict, optional
+                Markers to plot in addition to the triangulated points.
+                The elements of the lists are dictionaries containing the
+                following key-value pairs:
+                    name: str
+                    x, y, z: int, int, int
+                    alpha: float 0 < 1
+                    size: int
+                    color: str
+                        matplotlib color
+                Can be used to set the axis aspect equal, since this feature is
+                not established for 3D axes in matplotlib.
+                All markers can be used to be connected or filled.
         """
         config_path = convert_to_path(config_path)
         self.video_plotting_config = read_config(config_path)
@@ -1476,7 +1549,7 @@ class CalibrationValidation(Triangulation):
 
     @property
     def _allowed_filetypes(self) -> List[str]:
-        return [".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi"]
+        return [".bmp", ".tiff", ".png", ".jpg", ".AVI", ".avi", ".mp4"]
 
     def add_ground_truth_config(self, ground_truth_config_filepath: Union[Path, str]) -> None:
         """
@@ -1487,6 +1560,31 @@ class CalibrationValidation(Triangulation):
         ----------
         ground_truth_config_filepath: str or Path
             The path to the ground_truth config file.
+
+        Notes
+        _____
+        The ground_truth yaml file at ground_truth_config_filepath has to have
+        the following structure:
+            distances: {str: {str: float}}
+                Dictionary with first markers as key and dictionaries as values,
+                that have second markers as key and the known distances between
+                first and second markers as values.
+                Distances are floats in cm.
+            angles:
+                Dictionary with vertex markers as keys and dictionaries as values,
+                that have the following keys:
+                    value: float
+                        The value of the calculated angle in degrees.
+                    marker: list of str
+                        The markers between that draw the triangle (if 3 markers
+                        given: 0: vertex, 1/2: ray) or a plane and a line (if 5
+                        markers given: 1/2/3: plane, 4/5: line).
+            unique_ids: list of str
+                A list with all marker_ids to take into account for ground_truth
+                validation and plotting.
+            marker_ids_to_connect_in_3D_plot: list of list of str, optional
+                Each element consists of a list of markers, that will be
+                connected in the 3D calibration validation plot.
         """
         ground_truth_config_filepath = convert_to_path(ground_truth_config_filepath)
         self.ground_truth_config = read_config(ground_truth_config_filepath)
@@ -1553,6 +1651,31 @@ class CalibrationValidation(Triangulation):
             truth.
         reprojerr_nonan_mean: np.float64
             The mean reprojection error of all triangulated points.
+
+        Notes
+        _____
+        The path directing to the ground_truth yaml file, that is saved as
+        self.ground_truth_config, has to have the following structure:
+            distances: {str: {str: float}}
+                Dictionary with first markers as key and dictionaries as values,
+                that have second markers as key and the known distances between
+                first and second markers as values.
+                Distances are floats in cm.
+            angles:
+                Dictionary with vertex markers as keys and dictionaries as values,
+                that have the following keys:
+                    value: float
+                        The value of the calculated angle in degrees.
+                    marker: list of str
+                        The markers between that draw the triangle (if 3 markers
+                        given: 0: vertex, 1/2: ray) or a plane and a line (if 5
+                        markers given: 1/2/3: plane, 4/5: line).
+            unique_ids: list of str
+                A list with all marker_ids to take into account for ground_truth
+                validation and plotting.
+            marker_ids_to_connect_in_3D_plot: list of list of str, optional
+                Each element consists of a list of markers, that will be
+                connected in the 3D calibration validation plot.
         """
         self.anipose_io = add_reprojection_errors_of_all_calibration_validation_markers(
             anipose_io=self.anipose_io, df_xyz=self.df

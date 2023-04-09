@@ -3,25 +3,67 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import imageio.v3 as iio
 import matplotlib.pyplot as plt
 
 from .utils import (
-    construct_dlc_output_style_df_from_manual_marker_coords,
+    construct_dlc_output_style_df_from_dictionary,
     convert_to_path,
     read_config,
 )
 
 
 class MarkerDetection(ABC):
+    """
+    Class to run marker detection using different marker detection methods.
+
+    Parameters
+    ----------
+    object_to_analyse: Path or str
+        The path to the video to be analysed.
+    output_directory: Path or str
+        The directory, in which the output file will be stored.
+    marker_detection_directory: Path or str, optional
+        The filepath to the config file to use for marker detection. E.g., the
+        DLC project config file. None, for manual Marker Detection.
+
+    Attributes
+    __________
+    object_to_analyse: Path
+        The path to the video to be analysed.
+    output_directory: Path
+        The directory, in which the output file will be stored.
+    marker_detection_directory: Path
+        The filepath to the config file to use for marker detection. E.g., the
+        DLC project config file. None, for manual Marker Detection.
+
+    Methods
+    _______
+    analyze_objects(filepath, labels, only_first_frame, filtering, use_gpu):
+        Abstract method for subclasses to be implemented using the
+        corresponding marker detection method.
+    """
     def __init__(
             self,
-            object_to_analyse: Path,
-            output_directory: Path,
-            marker_detection_directory: Optional[Path] = None,
+            object_to_analyse: Union[Path, str],
+            output_directory: Union[Path, str],
+            marker_detection_directory: Optional[Union[Path, str]] = None,
     ) -> None:
+        """
+        Construct all necessary attributes for class MarkerDetection.
+
+        Parameters
+        ----------
+        object_to_analyse: Path or str
+            The path to the video to be analysed.
+        output_directory: Path or str
+            The directory, in which the output file will be stored.
+        marker_detection_directory: Path or str, optional
+            The filepath to the config file to use for marker detection. E.g., the
+            DLC project config file. None, for manual Marker Detection.
+        """
         self.object_to_analyse = convert_to_path(object_to_analyse)
         self.output_directory = convert_to_path(output_directory)
         if type(marker_detection_directory) is not None:
@@ -137,8 +179,6 @@ class ManualAnnotation(MarkerDetection):
             if only_first_frame:
                 break
 
-        df = construct_dlc_output_style_df_from_manual_marker_coords(
-            manual_annotated_marker_coords_pred=frames_annotated
-        )
+        df = construct_dlc_output_style_df_from_dictionary(marker_predictions=frames_annotated)
         df.to_hdf(filepath, "df")
         return filepath

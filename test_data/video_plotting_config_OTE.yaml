@@ -7,7 +7,6 @@ body_marker_alpha: 1
 body_label_size: 1
 body_label_color: black
 body_label_alpha: 0.2
-2D_likelihood_threshold: 0.6
 
 markers_to_exclude:
 - LED5

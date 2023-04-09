@@ -93,14 +93,14 @@ class RotationVisualization:
         ax = fig.add_subplot(111, projection="3d")
         for elem in self.rotated_markers:
             ax.scatter(elem[0], elem[1], elem[2], color='orange', alpha=0.5)
-        for elem in self.config["ReferenceRotationCoords"]:
+        for elem in self.config["REFERENCE_ROTATION_COORDS"]:
             ax.scatter(elem[0], elem[1], elem[2], color='blue', alpha=0.5)
         x = [point[0] for point in self.rotated_markers]
         y = [point[1] for point in self.rotated_markers]
         z = [point[2] for point in self.rotated_markers]
         ax.plot(x, y, z, c="blue")
-        ax.scatter(self.config["InvisibleMarkers"]["x"], self.config["InvisibleMarkers"]["y"],
-                   self.config["InvisibleMarkers"]["z"], alpha=0)
+        ax.scatter(self.config["INVISIBLE_MARKERS"]["x"], self.config["INVISIBLE_MARKERS"]["y"],
+                   self.config["INVISIBLE_MARKERS"]["z"], alpha=0)
         fig.suptitle(f"Rotation Error: {self.rotation_error}")
 
         if save:

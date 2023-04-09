@@ -100,14 +100,14 @@ class MetaInterface(ABC):
 
     See Also
     ________
-    FilenameCheckerInterface:
-        Interface to load all files and check filenames.
-    TriangulationRecordings:
+    core.filename_checker.FilenameCheckerInterface:
+        Interface to load all files and check filename and metadata.
+    core.triangulation_calibration_module.TriangulationRecordings:
         A class, in which videos are triangulated based on a calibration file.
-    CalibrationValidation:
+    core.triangulation_calibration_module.CalibrationValidation:
         A class, in which images are triangulated based on a calibration file
         and the triangulated coordinates are validated based on a ground_truth.
-    Calibration:
+    core.triangulation_calibration_module.Calibration:
         A class, in which videos are calibrated to each other.
 
     Examples
@@ -220,16 +220,27 @@ class MetaInterface(ABC):
         """
         Append all directories to metadata, that match appended
         paradigms and recording_dates in directory name.
+
+        See Also
+        ________
+        MetaInterface.add_recording_manually:
+            Adds recordings to metadata that don't match directory name structure.
+
+        Notes
+        _____
+        Demands for adding directories automatically:
+            - recording directory name has to start with a recording date
+            (YYMMDD) that is added to the MetaInterface
+            - recording directory name has to end with any of the paradigms (as
+            defined in project_config)
+        If you want to add recording directories, that don't match this structure,
+        use MetaInterface.add_recording_manually.
         """
         for recording_day in self.meta["recording_days"].values():
-            for file in Path(
-                    recording_day["recording_config_filepath"]
-            ).parent.parent.parent.glob("**"):
-                if (
-                        file.name[: len(recording_day["recording_date"])]
-                        == recording_day["recording_date"]
-                        and file.name[-3:] in self.paradigms
-                ):  # hardcoded length of paradigm and file structure
+            parents = Path(recording_day["recording_config_filepath"]).parents
+            for file in parents[len(parents)-1].glob("**"):
+                if file.name.startswith(recording_day["recording_date"]) and any(
+                        [file.stem.endswith(paradigm) for paradigm in self.paradigms]):
                     recording_day["recording_directories"].append(str(file))
             recording_day["num_recordings"] = len(
                 recording_day["recording_directories"]
@@ -769,7 +780,7 @@ class MetaInterface(ABC):
         with open(filepath, "w") as file:
             yaml.dump(self.meta, file)
 
-    def _read_project_config(self) -> List:
+    def _read_project_config(self) -> List[str]:
         project_config = read_config(self.project_config_filepath)
         missing_keys = check_keys(project_config, ["paradigms"])
         if missing_keys:

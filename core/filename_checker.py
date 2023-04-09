@@ -1,7 +1,7 @@
 from pathlib import Path
 from tkinter import Tk
 from tkinter.filedialog import askopenfilenames
-from typing import Tuple
+from typing import Tuple, Union, List
 
 import yaml
 
@@ -10,11 +10,85 @@ from .utils import convert_to_path, create_calibration_key
 
 
 class FilenameCheckerInterface:
-    def __init__(self, project_config_filepath: Path) -> None:
+    """
+        Interface to load all files and check filename and metadata.
+
+        Parameters
+        ----------
+        project_config_filepath: Path or str
+            Filepath to the project_config .yaml file.
+
+        Attributes
+        __________
+        objects: dict
+            Dictionary of all objects added to the FilenameCheckerInterface.
+        project_config_filepath: Path
+            Filepath to the project_config .yaml file.
+        paradigms: list of str
+            List of all paradigms to search for in directories.
+        recording_configs: list of Path
+            List of all recording_configs added to the FilenameCheckerInterface.
+        recording_dates: list of str
+            List of all recording_dates to search for in directories.
+        meta: dict
+            Dictionary of metadata of all objects added to the
+            FilenameCheckerInterface.
+
+        Methods
+        _______
+        select_recording_configs():
+            Open a window to select recording_config files in filedialog.
+        add_recording_config(filepath_to_recording_config)
+            Add recording_config file via method.
+        initialize_meta_config():
+            Append all directories to metadata, that match appended
+            paradigms and recording_dates in directory name.
+        add_recording_manually(file, recording_day):
+            Adds recordings to metadata that don't match directory name structure.
+        create_recordings():
+            Create CheckRecording objects for all recording_directories
+            added to FilenameCheckerInterface.
+        create_calibrations(ground_truth_config_filepath):
+            Create CheckCalibration and CheckCalibrationValidation objects for
+            all calibration_directories added to FilenameCheckerInterface.
+
+        See Also
+        ________
+        core.meta.MetaInterface:
+            Interface to load all files and run analysis.
+        core.checker_objects.CheckRecording:
+            A class, that checks the metadata and filenames of videos in a given
+            folder and allows for filename changing via user input.
+        core.checker_objects.CheckCalibration:
+            A class, that checks the metadata and filenames of videos in a given
+            folder and allows for filename changing via user input.
+        core.checker_objects.CheckCalibrationValidation:
+            A class, that checks the metadata and filenames of videos in a given
+            folder and allows for filename changing via user input.
+
+        Examples
+        ________
+        >>> from core.filename_checker import FilenameCheckerInterface
+        >>> filename_checker = FilenameCheckerInterface(project_config_filepath="test_data/project_config.yaml")
+        >>> filename_checker.add_recording_config("test_data/Server_structure/Calibrations/220922/recording_config_220922.yaml")
+        >>> filename_checker.initialize_meta_config()
+        >>> filename_checker.create_recordings()
+        >>> filename_checker.create_calibrations(ground_truth_config_filepath="test_data/ground_truth_config.yaml")
+        """
+    def __init__(self, project_config_filepath: Union[Path, str]) -> None:
+        """
+        Construct all necessary attributes for the FilenameCheckerInterface
+        class.
+
+        Parameters
+        ----------
+        project_config_filepath: Path or str
+            Filepath to the project_config .yaml file.
+        """
         self.project_config_filepath = convert_to_path(project_config_filepath)
         if not self.project_config_filepath.exists():
             raise FileNotFoundError("The file doesn't exist. Check your path!")
-        self._read_project_config()
+        self.paradigms = self._read_project_config()
         self.recording_configs = []
         self.recording_dates = []
         self.objects = {}
@@ -24,6 +98,11 @@ class FilenameCheckerInterface:
         }
 
     def select_recording_configs(self) -> None:
+        """
+        Open a window to select recording_config files in filedialog.
+
+        Add it to recording_configs.
+        """
         Tk().withdraw()
         selected_recording_configs = askopenfilenames(
             title="Select recording_config.yaml"
@@ -34,7 +113,16 @@ class FilenameCheckerInterface:
                 filepath_to_recording_config=filepath_to_recording_config
             )
 
-    def add_recording_config(self, filepath_to_recording_config: Path) -> None:
+    def add_recording_config(self, filepath_to_recording_config: Union[Path, str]) -> None:
+        """
+        Add recording_config via method.
+
+        Parameters
+        ----------
+        filepath_to_recording_config: Path or str
+            The path to the recording_config, that should be added to the
+            MetaInterface.
+        """
         filepath_to_recording_config = convert_to_path(filepath_to_recording_config)
         if (
                 filepath_to_recording_config.suffix == ".yaml"
@@ -56,49 +144,31 @@ class FilenameCheckerInterface:
             "calibration_index": calibration_index,
         }
 
-    def _read_project_config(self) -> None:
-        if self.project_config_filepath.exists():
-            with open(self.project_config_filepath, "r") as ymlfile:
-                project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-        for key in [
-            "paradigms",
-        ]:
-            try:
-                project_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
-                )
-        self.paradigms = project_config["paradigms"]
-
-    def _read_recording_config(self, recording_config_filepath: Path) -> Tuple[str, str]:
-        if recording_config_filepath.exists():
-            with open(recording_config_filepath, "r") as ymlfile:
-                recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-        for key in ["recording_date"]:
-            try:
-                recording_config[key]
-            except KeyError:
-                raise KeyError(
-                    f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
-                )
-        self.recording_dates.append(recording_config["recording_date"])
-        return str(recording_config["recording_date"]), str(
-            recording_config["calibration_index"]
-        )
-
     def initialize_meta_config(self) -> None:
+        """
+        Append all directories to metadata, that match appended
+        paradigms and recording_dates in directory name.
+
+        See Also
+        ________
+        FilenameCheckerInterface.add_recording_manually:
+            Adds recordings to metadata that don't match directory name structure.
+
+        Notes
+        _____
+        Demands for adding directories automatically:
+            - recording directory name has to start with a recording date
+            (YYMMDD) that is added to the FilenameCheckerInterface
+            - recording directory name has to end with any of the paradigms (as
+            defined in project_config)
+        If you want to add recording directories, that don't match this structure,
+        use FilenameCheckerInterface.add_recording_manually instead.
+        """
         for recording_day in self.meta["recording_days"].values():
-            for file in Path(
-                    recording_day["recording_config_filepath"]
-            ).parent.parent.parent.glob("**"):
-                if (
-                        file.name[: len(recording_day["recording_date"])]
-                        == recording_day["recording_date"]
-                        and file.name[-3:] in self.paradigms
-                ):  # hardcoded length of paradigm and file structure
+            parents = Path(recording_day["recording_config_filepath"]).parents
+            for file in parents[len(parents) - 1].glob("**"):
+                if file.name.startswith(recording_day["recording_date"]) and any(
+                        [file.stem.endswith(paradigm) for paradigm in self.paradigms]):
                     recording_day["recording_directories"].append(str(file))
             recording_day["num_recordings"] = len(
                 recording_day["recording_directories"]
@@ -108,6 +178,16 @@ class FilenameCheckerInterface:
             )
 
     def add_recording_manually(self, file: Path, recording_day: str) -> None:
+        """
+        Adds recordings to metadata that don't match directory name structure.
+
+        Parameters
+        ----------
+        file: Path or str
+            The path to the recording directory, that should be added.
+        recording_day: str
+            The date of the recording.
+        """
         file = convert_to_path(file)
         if not file.exists() or recording_day not in self.meta["recording_days"].keys():
             print(
@@ -123,6 +203,10 @@ class FilenameCheckerInterface:
             print("added recording directory succesfully!")
 
     def create_recordings(self) -> None:
+        """
+        Create CheckRecording objects for all recording_directories
+        added to FilenameCheckerInterface.
+        """
         self.objects["check_recordings_objects"] = {}
         for recording_day in self.meta["recording_days"]:
             plot = True
@@ -137,15 +221,26 @@ class FilenameCheckerInterface:
                     project_config_filepath=self.meta["project_config_filepath"],
                     plot=plot,
                 )
-                individual_key = f"{check_recordings_object.mouse_id}_{check_recordings_object.recording_date}_{check_recordings_object.paradigm}"
+                individual_key = f"{check_recordings_object.mouse_id}_" \
+                                 f"{check_recordings_object.recording_date}_" \
+                                 f"{check_recordings_object.paradigm}"
                 self.objects["check_recordings_objects"][
                     individual_key
                 ] = check_recordings_object
                 plot = False
 
     def create_calibrations(self, ground_truth_config_filepath: Path) -> None:
-        self.objects["calibration_objects"] = {}
-        self.objects["calibration_validation_objects"] = {}
+        """
+        Create CheckCalibration and CheckCalibrationValidation objects for
+        all calibration_directories added to FilenameCheckerInterface.
+
+        Parameters
+        ----------
+        ground_truth_config_filepath
+            The path to the ground_truth config file.
+        """
+        self.objects["check_calibration_objects"] = {}
+        self.objects["check_calibration_validation_objects"] = {}
         for recording_day in self.meta["recording_days"].values():
             recording_day["calibrations"]["calibration_keys"] = {}
 
@@ -155,19 +250,46 @@ class FilenameCheckerInterface:
                 recording_config_filepath=recording_day["recording_config_filepath"],
             )
 
-            cams = [video.cam_id for video in calibration_object.metadata_from_videos]
-            all_cams_key = create_calibration_key(
-                videos=cams,
-                recording_date=calibration_object.recording_date,
-                calibration_index=calibration_object.calibration_index,
-            )
+            unique_calibration_key = f'{calibration_object.recording_date}_' \
+                                     f'{calibration_object.calibration_index}'
 
-            self.objects["calibration_objects"][all_cams_key] = calibration_object
+            self.objects["check_calibration_objects"][unique_calibration_key] = calibration_object
 
-            calibration_validation_object = CheckCalibrationValidation(
+            check_calibration_validation_object = CheckCalibrationValidation(
                 calibration_validation_directory=recording_day["calibration_directory"],
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 ground_truth_config_filepath=ground_truth_config_filepath,
             )
-            self.objects["calibration_validation_objects"][all_cams_key] = calibration_validation_object
+            self.objects["check_calibration_validation_objects"][unique_calibration_key] = check_calibration_validation_object
+
+    def _read_project_config(self) -> List[str]:
+        if self.project_config_filepath.exists():
+            with open(self.project_config_filepath, "r") as ymlfile:
+                project_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+
+        for key in [
+            "paradigms",
+        ]:
+            try:
+                project_config[key]
+            except KeyError:
+                raise KeyError(
+                    f"Missing metadata information in the project_config_file {self.project_config_filepath} for {key}."
+                )
+        return project_config["paradigms"]
+
+    def _read_recording_config(self, recording_config_filepath: Path) -> Tuple[str, str]:
+        if recording_config_filepath.exists():
+            with open(recording_config_filepath, "r") as ymlfile:
+                recording_config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+
+        for key in ["recording_date"]:
+            try:
+                recording_config[key]
+            except KeyError:
+                raise KeyError(
+                    f"Missing metadata information in the recording_config_file {recording_config_filepath} for {key}."
+                )
+        self.recording_dates.append(recording_config["recording_date"])
+        return str(recording_config["recording_date"]), str(recording_config["calibration_index"])
