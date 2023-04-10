@@ -6,7 +6,7 @@ on:
 
 jobs:
   pages:
-    runs-on: ubuntu-20.04
+    runs-on: macos-latest
     environment:
       name: retune-commons/let_it_be_3D
       url: ${{ steps.deployment.outputs.page_url }}
