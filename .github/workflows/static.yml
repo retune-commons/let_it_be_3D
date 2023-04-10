@@ -5,14 +5,22 @@ on:
     branches: [main] # branch to trigger deployment
 
 jobs:
-  pages:
-    runs-on: macos-latest
-    environment:
-      name: github-pages
-      url: https://retune-commons.github.io/let_it_be_3D/
-    permissions:
-      pages: write
-      id-token: write
+  docs:
+    runs-on: ubuntu-latest
     steps:
-    - id: deployment
-      uses: actions/checkout@main
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - name: Install dependencies
+        run: |
+          pip install sphinx sphinx_rtd_theme
+      - name: Sphinx build
+        run: |
+          sphinx-build doc _build
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: _build/
+          force_orphan: true
