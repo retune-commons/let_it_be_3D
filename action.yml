@@ -49,3 +49,65 @@ outputs:
   artifact:
     description: 'Directory where artifact (HTML documentation) is stored, user can use it to deploy GitHub Pages manually'
     value: ${{ steps.build.outputs.artifact }}
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      if: ${{ inputs.checkout == 'true' && inputs.cache == 'true' }}
+      with:
+        fetch-depth: 0 # Required by git-restore-mtime
+    - name: Checkout
+      uses: actions/checkout@v3
+      if: ${{ inputs.checkout == 'true' && inputs.cache == 'false' }}
+
+    - name: Setup python
+      uses: actions/setup-python@v4
+      if: ${{ inputs.cache == 'true' }}
+      with:
+        python-version: ${{ inputs.python_version }}
+        cache: 'pip'
+    - name: Setup python
+      uses: actions/setup-python@v4
+      if: ${{ inputs.cache == 'false' }}
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      if: ${{ inputs.cache == 'true' }}
+      with:
+        path: /tmp/sphinxnotes-pages
+        # https://github.com/actions/cache/blob/main/tips-and-workarounds.md#update-a-cache
+        key: sphinxnotes-pages-${{ runner.os }}-${{ github.run_id }}
+        restore-keys: |
+          sphinxnotes-pages-${{ runner.os }}
+    - id: build
+      name: Build documentation
+      run: ${{ github.action_path }}/main.sh
+      shell: bash
+      env:
+        # See https://github.com/actions/runner/issues/665
+        INPUT_DOCUMENTATION_PATH: ${{ inputs.documentation_path }}
+        INPUT_REQUIREMENTS_PATH: ${{ inputs.requirements_path }}
+        INPUT_PYPROJECT_EXTRAS: ${{ inputs.pyproject_extras }}
+        INPUT_SPHINX_VERSION: ${{ inputs.sphinx_version }}
+        INPUT_CACHE: ${{ inputs.cache }}
+        INPUT_SPHINX_BUILD_OPTIONS: ${{ inputs.sphinx_build_options }}
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v2
+      if: ${{ inputs.publish == 'true' }}
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v1
+      if: ${{ inputs.publish == 'true' }}
+      with:
+        path: ${{ steps.build.outputs.artifact }}
+      
+    - id: deployment
+      name: Deploy to GitHub Pages
+      uses: actions/deploy-pages@v1
+      if: ${{ inputs.publish == 'true' }}
