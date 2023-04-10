@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>core.utils &mdash; let_it_be_3D test documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            let_it_be_3D
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">core</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">let_it_be_3D</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">core.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for core.utils</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span><span class="p">,</span> <span class="n">PosixPath</span><span class="p">,</span> <span class="n">WindowsPath</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">imageio</span> <span class="k">as</span> <span class="nn">iio</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+
+
+<div class="viewcode-block" id="convert_to_path"><a class="viewcode-back" href="../../core.html#core.utils.convert_to_path">[docs]</a><span class="k">def</span> <span class="nf">convert_to_path</span><span class="p">(</span><span class="n">attribute</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert strings to Path and returns them.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span> <span class="o">==</span> <span class="n">PosixPath</span> <span class="ow">or</span> <span class="nb">type</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span> <span class="o">==</span> <span class="n">WindowsPath</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">attribute</span>
+    <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span> <span class="o">==</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="check_keys"><a class="viewcode-back" href="../../core.html#core.utils.check_keys">[docs]</a><span class="k">def</span> <span class="nf">check_keys</span><span class="p">(</span><span class="n">dictionary</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">list_of_keys</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Check, whether list_of_keys are in a dictionary and returns a list of</span>
+<span class="sd">    keys missing in the dictionary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">missing_keys</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">list_of_keys</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dictionary</span><span class="p">:</span>
+            <span class="n">missing_keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">missing_keys</span></div>
+
+
+<div class="viewcode-block" id="read_config"><a class="viewcode-back" href="../../core.html#core.utils.read_config">[docs]</a><span class="k">def</span> <span class="nf">read_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read structured config file defining a project.&quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.yaml&quot;</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ymlfile</span><span class="p">:</span>
+            <span class="n">cfg</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">ymlfile</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">SafeLoader</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Could not open the yaml file at </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please make sure the path is correct and the file exists!&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">cfg</span></div>
+
+
+<div class="viewcode-block" id="Coordinates"><a class="viewcode-back" href="../../core.html#core.utils.Coordinates">[docs]</a><span class="k">class</span> <span class="nc">Coordinates</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to store xyz coordinates.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_or_row: int</span>
+<span class="sd">    x_or_column: int</span>
+<span class="sd">    z: int</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    __________</span>
+<span class="sd">    x: int, column: int</span>
+<span class="sd">        Represent x coordinates in a system and columns in an image.</span>
+<span class="sd">    y, row: int</span>
+<span class="sd">        Represent y coordinates in a system and rows in an image.</span>
+<span class="sd">    z: int</span>
+<span class="sd">        Represent z coordinates in a system.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">y_or_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">x_or_column</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct attributes for Class Coordinates.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y_or_row: int</span>
+<span class="sd">        x_or_column: int</span>
+<span class="sd">        z: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">y_or_row</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">row</span> <span class="o">=</span> <span class="n">y_or_row</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">x_or_column</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">column</span> <span class="o">=</span> <span class="n">x_or_column</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">z</span></div>
+
+
+<div class="viewcode-block" id="get_3D_df_keys"><a class="viewcode-back" href="../../core.html#core.utils.get_3D_df_keys">[docs]</a><span class="k">def</span> <span class="nf">get_3D_df_keys</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Construct a tuple of strings representing keys in a aniposelib created 3</span>
+<span class="sd">    dimensional DataFrame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">key</span> <span class="o">+</span> <span class="s2">&quot;_x&quot;</span><span class="p">,</span> <span class="n">key</span> <span class="o">+</span> <span class="s2">&quot;_y&quot;</span><span class="p">,</span> <span class="n">key</span> <span class="o">+</span> <span class="s2">&quot;_z&quot;</span></div>
+
+
+<div class="viewcode-block" id="create_calibration_key"><a class="viewcode-back" href="../../core.html#core.utils.create_calibration_key">[docs]</a><span class="k">def</span> <span class="nf">create_calibration_key</span><span class="p">(</span>
+        <span class="n">videos</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">recording_date</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">calibration_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">iteration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">videos</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">videos</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">key</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">elem</span>
+    <span class="k">if</span> <span class="n">iteration</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">calibration_key</span> <span class="o">=</span> <span class="n">recording_date</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">calibration_index</span><span class="p">)</span> <span class="o">+</span> <span class="n">key</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">calibration_key</span> <span class="o">=</span> <span class="n">recording_date</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">calibration_index</span><span class="p">)</span> <span class="o">+</span> <span class="n">key</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">iteration</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">calibration_key</span></div>
+
+
+<div class="viewcode-block" id="get_3D_array"><a class="viewcode-back" href="../../core.html#core.utils.get_3D_array">[docs]</a><span class="k">def</span> <span class="nf">get_3D_array</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Construct a ndarray of shape (3, N) representing one marker in a 3</span>
+<span class="sd">    dimensional DataFrame with N number of indices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">get_3D_df_keys</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">df</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="n">y</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="n">z</span><span class="p">]])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">df</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="n">index</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="n">y</span><span class="p">][</span><span class="n">index</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="n">z</span><span class="p">][</span><span class="n">index</span><span class="p">]])</span></div>
+
+
+<div class="viewcode-block" id="get_multi_index"><a class="viewcode-back" href="../../core.html#core.utils.get_multi_index">[docs]</a><span class="k">def</span> <span class="nf">get_multi_index</span><span class="p">(</span><span class="n">markers</span><span class="p">:</span> <span class="n">List</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">:</span>
+    <span class="n">multi_index_column_names</span> <span class="o">=</span> <span class="p">[[],</span> <span class="p">[],</span> <span class="p">[]]</span>
+    <span class="k">for</span> <span class="n">marker_id</span> <span class="ow">in</span> <span class="n">markers</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">column_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;likelihood&quot;</span><span class="p">):</span>
+            <span class="n">multi_index_column_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;annotated_markers&quot;</span><span class="p">)</span>
+            <span class="n">multi_index_column_names</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">marker_id</span><span class="p">)</span>
+            <span class="n">multi_index_column_names</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_arrays</span><span class="p">(</span>
+        <span class="n">multi_index_column_names</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;scorer&quot;</span><span class="p">,</span> <span class="s2">&quot;bodyparts&quot;</span><span class="p">,</span> <span class="s2">&quot;coords&quot;</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="construct_dlc_output_style_df_from_dictionary"><a class="viewcode-back" href="../../core.html#core.utils.construct_dlc_output_style_df_from_dictionary">[docs]</a><span class="k">def</span> <span class="nf">construct_dlc_output_style_df_from_dictionary</span><span class="p">(</span><span class="n">marker_predictions</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a DataFrame from dictionary with DLC-like multi-index.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    marker_predictions: {str: {str: list of int}}</span>
+<span class="sd">        Dictionary containing markers as keys and dictionaries as values with</span>
+<span class="sd">        x, y and z as keys and lists of int as values. The length of the lists</span>
+<span class="sd">        is equivalent to the number of frames annotated.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    df: pd.DataFrame</span>
+<span class="sd">        The dataframe with DLC-like multiindex and data from input dictionary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">multi_index</span> <span class="o">=</span> <span class="n">get_multi_index</span><span class="p">(</span>
+        <span class="n">markers</span><span class="o">=</span><span class="n">marker_predictions</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{},</span> <span class="n">columns</span><span class="o">=</span><span class="n">multi_index</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">scorer</span><span class="p">,</span> <span class="n">marker_id</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span><span class="p">[(</span><span class="n">scorer</span><span class="p">,</span> <span class="n">marker_id</span><span class="p">,</span> <span class="n">key</span><span class="p">)]</span> <span class="o">=</span> <span class="n">marker_predictions</span><span class="p">[</span>
+            <span class="n">marker_id</span>
+        <span class="p">][</span><span class="n">key</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="load_image"><a class="viewcode-back" href="../../core.html#core.utils.load_image">[docs]</a><span class="k">def</span> <span class="nf">load_image</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="n">iio_reader</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">get_reader</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">iio_reader</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="load_single_frame_of_video"><a class="viewcode-back" href="../../core.html#core.utils.load_single_frame_of_video">[docs]</a><span class="k">def</span> <span class="nf">load_single_frame_of_video</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">frame_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">load_image</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="n">frame_idx</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="plot_image"><a class="viewcode-back" href="../../core.html#core.utils.plot_image">[docs]</a><span class="k">def</span> <span class="nf">plot_image</span><span class="p">(</span>
+        <span class="n">filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">plot_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="n">plot_size</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s2">&quot;white&quot;</span><span class="p">)</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">load_image</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">image</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="plot_single_frame_of_video"><a class="viewcode-back" href="../../core.html#core.utils.plot_single_frame_of_video">[docs]</a><span class="k">def</span> <span class="nf">plot_single_frame_of_video</span><span class="p">(</span>
+        <span class="n">filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">frame_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">plot_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">plot_image</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="n">frame_idx</span><span class="p">,</span> <span class="n">plot_size</span><span class="o">=</span><span class="n">plot_size</span><span class="p">)</span></div>
+
+
+<span class="n">KEYS_TO_CHECK_PROJECT</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;valid_cam_ids&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;paradigms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;animal_lines&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;led_extraction_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;led_extraction_filepath&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;max_calibration_frames&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;max_cpu_cores_to_pool&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;max_ram_digestible_frames&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;rapid_aligner_path&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;use_gpu&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;load_calibration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;calibration_tag&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;calibration_validation_tag&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;allowed_num_diverging_frames&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;handle_synchro_fails&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;default_offset_ms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;start_pattern_match_ms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;end_pattern_match_ms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;synchro_error_threshold&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;synchro_marker&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;led_box_size&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;use_2D_filter&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;score_threshold&quot;</span><span class="p">,</span>
+    <span class="s1">&#39;num_frames_to_pick&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;triangulation_type&#39;</span>
+<span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Keys</span>
+<span class="sd">____</span>
+<span class="sd">calibration_evaluation_filepath: {str: str} </span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the filepath to the </span>
+<span class="sd">    file to use for marker detection for calibration_validation per cam.</span>
+<span class="sd">calibration_evaluation_type: {str: str}</span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the type of marker </span>
+<span class="sd">    detection to use per cam for calibration_evaluation files. Values: DLC, manual</span>
+<span class="sd">processing_filepath: {str: str} </span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the filepath to the </span>
+<span class="sd">    file to use for marker detection for recordings per cam.</span>
+<span class="sd">processing_type: {str: str}</span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the type of marker </span>
+<span class="sd">    detection to use per cam for recordings. Values: DLC, manual</span>
+<span class="sd">led_extraction_filepath: {str: str}</span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the filepath to the </span>
+<span class="sd">    file to use for marker detection for synchronization per cam.</span>
+<span class="sd">led_extraction_type: {str: str}</span>
+<span class="sd">    Dictionary with keys for all valid cam_ids, defining the type of marker </span>
+<span class="sd">    detection to use per cam for synchronization. Values: DLC, manual</span>
+<span class="sd">animal_lines: list of str</span>
+<span class="sd">    List of all animal_lines to search for in recording filenames.</span>
+<span class="sd">    If the lines are numbers, you need to set the lines as str.</span>
+<span class="sd">paradigms: list of str</span>
+<span class="sd">    List of all paradigms to search for in filenames and directories.</span>
+<span class="sd">valid_cam_ids: list of str</span>
+<span class="sd">    List of all cam_ids to search for in filenames.</span>
+<span class="sd">calibration_tag: str</span>
+<span class="sd">    Filename tag to search for in the calibration files.</span>
+<span class="sd">    &quot;Calvin&quot; is an invalid value.</span>
+<span class="sd">calibration_validation_tag: str </span>
+<span class="sd">    Filename tag to search for in the calibration_validation files.</span>
+<span class="sd">    &quot;Calvin&quot; is an invalid value.</span>
+<span class="sd">use_gpu: str, default &quot;&quot;</span>
+<span class="sd">    Whether to restrict the usage of GPU for DLC analyses. Values: &quot;&quot;, &quot;prevent&quot;,</span>
+<span class="sd">    &quot;low&quot;, &quot;full&quot;</span>
+<span class="sd">    &quot;prevent&quot; disables GPU usage</span>
+<span class="sd">    &quot;low&quot; restricts GPU memory for synchronization </span>
+<span class="sd">    &quot;full&quot; uses entire GPU capacity, equivalent to &quot;&quot;</span>
+<span class="sd">intrinsic_calibration_directory: str</span>
+<span class="sd">    The directory, in which the intrinsic calibration pickle .p files or the </span>
+<span class="sd">    intrinsic calibration checkerboard videos are stored. Intrinsic calibration </span>
+<span class="sd">    videos have to have &quot;checkerboard&quot; and a valid cam_id in their filename. </span>
+<span class="sd">    They have to be recorded in same resolution as the recording/calibration </span>
+<span class="sd">    videos without cropping, using a 6x6 checkerboard.</span>
+<span class="sd">load_calibration: bool</span>
+<span class="sd">    If True, then use this package to set the intrinsics of the cameras instead</span>
+<span class="sd">    of using the aniposelib function to calibrate intrinsics.</span>
+<span class="sd">    Requires checkerboard videos or .p pickle files for all cameras in </span>
+<span class="sd">    intrinsic_calibration_directory. </span>
+<span class="sd">triangulation_type: str, default &quot;triangulate&quot;</span>
+<span class="sd">    Specify the method of aniposelib triangulation to use.</span>
+<span class="sd">    Values: &quot;triangulate&quot;, &quot;triangulate_optim_ransac_True&quot;, </span>
+<span class="sd">    &quot;triangulate_optim_ransac_False&quot;</span>
+<span class="sd">allowed_num_diverging_frames: int</span>
+<span class="sd">    Specify how many frames a synchronized file can differ from the median of</span>
+<span class="sd">    all synchronized files before it will be excluded from analysis.</span>
+<span class="sd">handle_synchro_fails: str, default error</span>
+<span class="sd">    How to proceed if the first synchronisation try exceeds </span>
+<span class="sd">    synchro_error_threshold. Values: &quot;repeat&quot;, &quot;default&quot;, &quot;manual&quot;, &quot;error&quot;</span>
+<span class="sd">    &quot;repeat&quot; run the same method of synchronisation again.</span>
+<span class="sd">    &quot;default&quot; using default value default_offset_ms as synchro offset.</span>
+<span class="sd">    &quot;manual&quot; using manual marker detection for synchronisation</span>
+<span class="sd">    &quot;error&quot; raises an error and breaks the analysis</span>
+<span class="sd">default_offset_ms: int</span>
+<span class="sd">    Synchro offset to use if first synchro try fails and handle_synchro_fails is</span>
+<span class="sd">    &quot;default&quot;. In milliseconds.</span>
+<span class="sd">start_pattern_match_ms: int, default 0</span>
+<span class="sd">    Start of time range in which to search for matching synchro pattern. In milliseconds.</span>
+<span class="sd">end_pattern_match_ms: int</span>
+<span class="sd">    End of time range in which to search for matching synchro pattern. In milliseconds.</span>
+<span class="sd">synchro_error_threshold: int, default 100</span>
+<span class="sd">    Below this threshold, a synchro patter alignment error will be considered as</span>
+<span class="sd">    good synchro, above, as failed synchro. </span>
+<span class="sd">synchro_marker: str</span>
+<span class="sd">    The marker to use for synchronisation. Has to be detectable by the </span>
+<span class="sd">    led_extraction method.</span>
+<span class="sd">led_box_size: int</span>
+<span class="sd">    Pixel range around predicted synchro marker position to calculate mean pixel</span>
+<span class="sd">    intensity for blinking pattern from.</span>
+<span class="sd">use_2D_filter: bool, default True</span>
+<span class="sd">    Whether to use filtering on 2D marker detection predictions in recordings. </span>
+<span class="sd">    At the moment only available for DLC.</span>
+<span class="sd">score_threshold: float, default 0.9</span>
+<span class="sd">    Only predictions with likelihood above this threshold will be taken into </span>
+<span class="sd">    account for triangulation.</span>
+<span class="sd">num_frames_to_pick: int, default 5</span>
+<span class="sd">    The number of frames to use to find optimal prediction for the synchro_marker.</span>
+<span class="sd">max_ram_digestible_frames: int, default 3000</span>
+<span class="sd">    Maximum number of frames to keep in RAM during writing of synchronised videos. </span>
+<span class="sd">    Increase to speed up analysis, reduce to adapt to available RAM.</span>
+<span class="sd">max_cpu_cores_to_pool: int, default 0</span>
+<span class="sd">    If 0, then no multiprocessing will be used for writing of synchronised videos.</span>
+<span class="sd">    Set to as many CPU cores, as you would like to use for multiprocessing.</span>
+<span class="sd">max_calibration_frames: int</span>
+<span class="sd">    Number of frames to take into account for intrinsic calibration. 300 works </span>
+<span class="sd">    well, depending on CPU speed, it can be necessary to reduce.</span>
+<span class="sd">rapid_aligner_path: str, default &quot;&quot;</span>
+<span class="sd">    If &quot;&quot;, then no rapid_aligner (GPU based pattern alignment) will be used. </span>
+<span class="sd">    Insert path to locally installed clone of the rapid_aligner package to use </span>
+<span class="sd">    GPU for pattern synchronisation.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">KEYS_TO_CHECK_RECORDING</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;led_pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;target_fps&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;calibration_index&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;recording_date&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">led_pattern: dict</span>
+<span class="sd">    Blinking pattern to use for temporal synchronisation.</span>
+<span class="sd">target_fps: int</span>
+<span class="sd">    Fps rate, to which the videos should be synchronized.</span>
+<span class="sd">calibration_index: int, default 0</span>
+<span class="sd">    Index of a calibration.</span>
+<span class="sd">    Together with recording_date, it creates a unique calibration key.</span>
+<span class="sd">recording_date: str</span>
+<span class="sd">    Date at which the calibration was done.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># ToDo: default values</span>
+<span class="c1"># fps not necessary if all cams have the same fps</span>
+<span class="c1"># offsets not necessary if no cropping was performed or use_intrinsic_calibration False</span>
+<span class="c1"># fisheye not necessary if no camera is fisheye</span>
+<span class="n">KEYS_TO_CHECK_CAMERA_RECORDING</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;fps&quot;</span><span class="p">,</span> <span class="s2">&quot;offset_row_idx&quot;</span><span class="p">,</span> <span class="s2">&quot;offset_col_idx&quot;</span><span class="p">,</span>
+                                  <span class="s2">&quot;flip_h&quot;</span><span class="p">,</span> <span class="s2">&quot;flip_v&quot;</span><span class="p">,</span> <span class="s2">&quot;fisheye&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">fps: int</span>
+<span class="sd">    The framerate of the camera.</span>
+<span class="sd">offset_row_idx: int, default 0</span>
+<span class="sd">    If cropping was performed, specify the row or y index initial here.</span>
+<span class="sd">offset_col_idx: int, default 0</span>
+<span class="sd">    If cropping was performed, specify the col or x index initial here.</span>
+<span class="sd">flip_h: bool, default False</span>
+<span class="sd">    Based on the size from uncropped intrinsic calibration videos, the row or y</span>
+<span class="sd">    index end is calculated and used instead of offset_row_idx.</span>
+<span class="sd">flip_v: bool, default False</span>
+<span class="sd">    Based on the size from uncropped intrinsic calibration videos, the col or x</span>
+<span class="sd">    index end is calculated and used instead of offset_col_idx.</span>
+<span class="sd">fisheye: bool, default False</span>
+<span class="sd">    If a fisheye lens was used, set True.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">KEYS_TO_CHECK_CAMERA_PROJECT</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;processing_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;calibration_evaluation_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;processing_filepath&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;calibration_evaluation_filepath&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;led_extraction_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;led_extraction_filepath&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">STANDARD_ATTRIBUTES_TRIANGULATION</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;all_cameras&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;markers_excluded_manually&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;calibration_toml_filepath&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;csv_output_filepath&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;triangulation_dlc_cams_filepaths&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;project_config_filepath&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;output_directory&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;normalised_dataframe&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;anipose_io&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;video_plotting_config&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;rotated_filepath&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;rotation_error&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;synchronization_individuals&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;led_detection_individuals&quot;</span><span class="p">,</span>
+                                     <span class="s2">&quot;ground_truth_config&quot;</span><span class="p">]</span>
+
+<span class="n">STANDARD_ATTRIBUTES_CALIBRATION</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;camera_group&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;report_filepath&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;reprojerr&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;valid_videos&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;synchronized_charuco_videofiles&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;camera_objects&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;synchronization_individuals&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;led_detection_individuals&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;project_config_filepath&quot;</span><span class="p">,</span>
+                                   <span class="s2">&quot;output_directory&quot;</span><span class="p">]</span>
+
+<span class="n">SYNCHRO_METADATA_KEYS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;handle_synchro_fails&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;default_offset_ms&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;start_pattern_match_ms&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;end_pattern_match_ms&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;synchro_error_threshold&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;synchro_marker&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;use_2D_filter&quot;</span><span class="p">,</span>
+                         <span class="s1">&#39;num_frames_to_pick&#39;</span><span class="p">,</span>
+                         <span class="s2">&quot;rapid_aligner_path&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;use_gpu&quot;</span><span class="p">,</span>
+                         <span class="s2">&quot;led_box_size&quot;</span><span class="p">]</span>
+
+<span class="n">KEYS_PER_CAM_PROJECT</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;processing_type&quot;</span><span class="p">,</span> <span class="s2">&quot;calibration_evaluation_type&quot;</span><span class="p">,</span> <span class="s2">&quot;processing_filepath&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;calibration_evaluation_filepath&quot;</span><span class="p">,</span> <span class="s2">&quot;led_extraction_type&quot;</span><span class="p">,</span> <span class="s2">&quot;led_extraction_filepath&quot;</span><span class="p">]</span>
+
+<span class="n">KEYS_VIDEOMETADATA_PROJECT</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;valid_cam_ids&quot;</span><span class="p">,</span> <span class="s2">&quot;paradigms&quot;</span><span class="p">,</span> <span class="s2">&quot;load_calibration&quot;</span><span class="p">,</span> <span class="s2">&quot;max_calibration_frames&quot;</span><span class="p">,</span>
+                          <span class="s2">&quot;max_ram_digestible_frames&quot;</span><span class="p">,</span> <span class="s2">&quot;max_cpu_cores_to_pool&quot;</span><span class="p">,</span> <span class="s2">&quot;animal_lines&quot;</span><span class="p">]</span>
+
+<span class="c1"># ToDo</span>
+<span class="c1"># led pattern not necessary if no synchronisation necessary</span>
+<span class="n">KEYS_VIDEOMETADATA_RECORDING</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;led_pattern&quot;</span><span class="p">,</span> <span class="s2">&quot;target_fps&quot;</span><span class="p">,</span> <span class="s2">&quot;calibration_index&quot;</span><span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

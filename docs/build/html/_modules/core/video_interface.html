@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>core.video_interface &mdash; let_it_be_3D test documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            let_it_be_3D
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">core</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">let_it_be_3D</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">core.video_interface</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for core.video_interface</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Type</span>
+
+<span class="kn">import</span> <span class="nn">aniposelib</span> <span class="k">as</span> <span class="nn">ap_lib</span>
+
+<span class="kn">from</span> <span class="nn">.plotting</span> <span class="kn">import</span> <span class="n">Intrinsics</span>
+<span class="kn">from</span> <span class="nn">.video_metadata</span> <span class="kn">import</span> <span class="n">VideoMetadata</span>
+
+
+<div class="viewcode-block" id="VideoInterface"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface">[docs]</a><span class="k">class</span> <span class="nc">VideoInterface</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">video_metadata</span><span class="p">:</span> <span class="n">VideoMetadata</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span> <span class="o">=</span> <span class="n">video_metadata</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">calibration</span><span class="p">:</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">&quot;</span> \
+                       <span class="sa">f</span><span class="s2">&quot;_charuco_undistorted_image&quot;</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">recording</span><span class="p">:</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">mouse_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">&quot;</span> \
+                       <span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">paradigm</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">_undistorted_image&quot;</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">calvin</span><span class="p">:</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">&quot;</span> \
+                       <span class="sa">f</span><span class="s2">&quot;_calvin_undistorted_image&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plot_camera_intrinsics</span> <span class="o">=</span> <span class="n">Intrinsics</span><span class="p">(</span><span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span>
+                                                 <span class="n">intrinsic_calibration</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">,</span>
+                                                 <span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span> <span class="n">fisheye</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">fisheye</span><span class="p">,</span>
+                                                 <span class="n">output_directory</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plot_camera_intrinsics</span><span class="o">.</span><span class="n">create_plot</span><span class="p">(</span><span class="n">save</span><span class="o">=</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="VideoInterface.run_synchronizer"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface.run_synchronizer">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronizer</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">synchronizer</span><span class="p">:</span> <span class="n">Type</span><span class="p">,</span>
+            <span class="n">output_directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+            <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+            <span class="n">synchro_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synchronizer_object</span> <span class="o">=</span> <span class="n">synchronizer</span><span class="p">(</span>
+            <span class="n">video_metadata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="p">,</span>
+            <span class="n">output_directory</span><span class="o">=</span><span class="n">output_directory</span><span class="p">,</span>
+            <span class="n">synchro_metadata</span><span class="o">=</span><span class="n">synchro_metadata</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">marker_detection_filepath</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">synchronized_video_filepath</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synchronizer_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span>
+            <span class="n">synchronize_only</span><span class="o">=</span><span class="n">synchronize_only</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="VideoInterface.export_for_aniposelib"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface.export_for_aniposelib">[docs]</a>    <span class="k">def</span> <span class="nf">export_for_aniposelib</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">calibration</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">marker_detection_filepath</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_export_as_aniposelib_camera_object</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="VideoInterface.inspect_intrinsic_calibration"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface.inspect_intrinsic_calibration">[docs]</a>    <span class="k">def</span> <span class="nf">inspect_intrinsic_calibration</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plot_camera_intrinsics</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span></div>
+
+    <span class="k">def</span> <span class="nf">_export_as_aniposelib_camera_object</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">fisheye</span><span class="p">:</span>
+            <span class="n">camera</span> <span class="o">=</span> <span class="n">ap_lib</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">FisheyeCamera</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">,</span>
+                <span class="n">matrix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;K&quot;</span><span class="p">],</span>
+                <span class="n">dist</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;D&quot;</span><span class="p">],</span>
+                <span class="n">extra_dist</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">camera</span> <span class="o">=</span> <span class="n">ap_lib</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">Camera</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">,</span>
+                <span class="n">matrix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;K&quot;</span><span class="p">],</span>
+                <span class="n">dist</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;D&quot;</span><span class="p">],</span>
+                <span class="n">extra_dist</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">camera</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

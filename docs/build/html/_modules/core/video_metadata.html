@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>core.video_metadata &mdash; let_it_be_3D test documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            let_it_be_3D
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">core</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">let_it_be_3D</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">core.video_metadata</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for core.video_metadata</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">imageio</span> <span class="k">as</span> <span class="nn">iio</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.camera_intrinsics</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">IntrinsicCalibratorFisheyeCamera</span><span class="p">,</span>
+    <span class="n">IntrinsicCalibratorRegularCameraCheckerboard</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.user_specific_rules</span> <span class="kn">import</span> <span class="n">user_specific_rules_on_videometadata</span>
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">check_keys</span><span class="p">,</span> <span class="n">convert_to_path</span><span class="p">,</span> \
+    <span class="n">KEYS_TO_CHECK_CAMERA_RECORDING</span><span class="p">,</span> \
+    <span class="n">KEYS_PER_CAM_PROJECT</span><span class="p">,</span> \
+    <span class="n">KEYS_VIDEOMETADATA_PROJECT</span><span class="p">,</span> \
+    <span class="n">KEYS_VIDEOMETADATA_RECORDING</span>
+
+
+<div class="viewcode-block" id="VideoMetadata"><a class="viewcode-back" href="../../core.html#core.video_metadata.VideoMetadata">[docs]</a><span class="k">class</span> <span class="nc">VideoMetadata</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to store metadata for videos.</span>
+
+<span class="sd">    Metadata is read from the filepath and the recording and project config</span>
+<span class="sd">    dictionaries.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    video_filepath: str or Path</span>
+<span class="sd">        The path to the video, which metadata will be stored here.</span>
+<span class="sd">    recording_config_dict: Dict</span>
+<span class="sd">        The recording config dictionary as read from the .yaml file.</span>
+<span class="sd">    project_config_dict: Dict</span>
+<span class="sd">        The project config dictionary as read from the .yaml file.</span>
+<span class="sd">    tag: str</span>
+<span class="sd">        Depending on the type of video. Values: &quot;calvin&quot; for calibration</span>
+<span class="sd">        validation, &quot;recording&quot; for recording and &quot;calibration&quot; for</span>
+<span class="sd">        calibration videos.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    __________</span>
+<span class="sd">    self.intrinsic_calibration</span>
+<span class="sd">        The intrinsic calibration assigned to the camera, consisting of camera</span>
+<span class="sd">        matrix and distortion coefficient.</span>
+<span class="sd">    self.intrinsic_calibration_filepath</span>
+<span class="sd">        The filepath to the intrinisc calibration saved as .p pickle file.</span>
+<span class="sd">    self.calvin</span>
+<span class="sd">        Boolean argument, whether VideoMetadata belongs to calibration validation.</span>
+<span class="sd">    self.recording</span>
+<span class="sd">        Boolean argument, whether VideoMetadata belongs to recording video.</span>
+<span class="sd">    self.calibration</span>
+<span class="sd">        Boolean argument, whether VideoMetadata belongs to calibration video.</span>
+<span class="sd">    self.exclusion_state</span>
+<span class="sd">        &quot;Valid&quot;, if video has not to be excluded for any reasons, &quot;exclude&quot;, if</span>
+<span class="sd">        it has to be excluded.</span>
+<span class="sd">    self.filepath</span>
+<span class="sd">        The path to the video, which metadata will be stored here.</span>
+<span class="sd">    self.recording_date</span>
+<span class="sd">        Date at which the calibration was done based on recording_config and as</span>
+<span class="sd">        read from the filenames.</span>
+<span class="sd">    self.mouse_id</span>
+<span class="sd">        The mouse_id as read from the filename.</span>
+<span class="sd">    self.mouse_line</span>
+<span class="sd">        The mouse line as read from the filename.</span>
+<span class="sd">    self.mouse_number</span>
+<span class="sd">        The mouse number as read from the filename.</span>
+<span class="sd">    self.cam_id</span>
+<span class="sd">        The cam_id as read from the filename.</span>
+<span class="sd">    self.paradigm</span>
+<span class="sd">        The paradigm as read from the filename.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    ________</span>
+<span class="sd">    core.utils.KEYS_TO_CHECK_CAMERA_RECORDING</span>
+<span class="sd">    core.utils.KEYS_TO_CHECK_RECORDING</span>
+<span class="sd">    core.utils.KEYS_TO_CHECK_PROJECT</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    _____</span>
+<span class="sd">    The Attributes described in the docstring are only those ones, that are not</span>
+<span class="sd">    keys from recording or project config. For explanation of these attributes,</span>
+<span class="sd">    we refer to KEYS_TO_CHECK_CAMERA_RECORDING, KEYS_TO_CHECK_RECORDING and</span>
+<span class="sd">    KEYS_TO_CHECK_PROJECT.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
+            <span class="n">recording_config_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">project_config_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct all necessary attributes for the VideoMetadata class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        video_filepath: str or Path</span>
+<span class="sd">            The path to the video, which metadata will be stored here.</span>
+<span class="sd">        recording_config_dict: Dict</span>
+<span class="sd">            The recording config dictionary as read from the .yaml file.</span>
+<span class="sd">        project_config_dict: Dict</span>
+<span class="sd">            The project config dictionary as read from the .yaml file.</span>
+<span class="sd">        tag: str</span>
+<span class="sd">            Depending on the type of video. Values: &quot;calvin&quot; for calibration</span>
+<span class="sd">            validation, &quot;recording&quot; for recording and &quot;calibration&quot; for</span>
+<span class="sd">            calibration videos.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calvin</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">calibration</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">tag</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;calvin&quot;</span><span class="p">,</span> <span class="s2">&quot;recording&quot;</span><span class="p">,</span> <span class="s2">&quot;calibration&quot;</span><span class="p">]:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tag</span><span class="si">}</span><span class="s2"> is not a valid tag for VideoMetadata!</span><span class="se">\n</span><span class="s2">&quot;</span>
+                           <span class="sa">f</span><span class="s2">&quot;Only [calvin, recording, calibration] are valid.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exclusion_state</span> <span class="o">=</span> <span class="s2">&quot;valid&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_filepaths</span><span class="p">(</span><span class="n">video_filepath</span><span class="o">=</span><span class="n">convert_to_path</span><span class="p">(</span><span class="n">video_filepath</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="n">KEYS_VIDEOMETADATA_PROJECT</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">,</span> <span class="n">project_config_dict</span><span class="p">[</span><span class="n">attribute</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">project_config_dict</span><span class="p">[</span><span class="s2">&quot;intrinsic_calibration_directory&quot;</span><span class="p">])</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_metadata</span><span class="p">(</span><span class="n">recording_config_dict</span><span class="o">=</span><span class="n">recording_config_dict</span><span class="p">,</span>
+                                     <span class="n">video_filepath</span><span class="o">=</span><span class="n">video_filepath</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">KEYS_TO_CHECK_CAMERA_RECORDING</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">recording_config_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">KEYS_PER_CAM_PROJECT</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">project_config_dict</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">KEYS_VIDEOMETADATA_RECORDING</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">recording_config_dict</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">state</span> <span class="o">==</span> <span class="s2">&quot;del&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;This video_metadata has problems. Use the filename checker to resolve!&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_intrinsic_parameters</span><span class="p">(</span>
+                <span class="n">max_calibration_frames</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">calvin</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">framenum</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">framenum</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v2</span><span class="o">.</span><span class="n">get_reader</span><span class="p">(</span><span class="n">video_filepath</span><span class="p">)</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_check_filepaths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">video_filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.mp4&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">,</span> <span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.avi&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpg&quot;</span><span class="p">,</span> <span class="s2">&quot;.png&quot;</span><span class="p">,</span> <span class="s2">&quot;.tiff&quot;</span><span class="p">,</span>
+                                      <span class="s2">&quot;.bmp&quot;</span><span class="p">])</span> <span class="ow">and</span> <span class="n">video_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">video_filepath</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The filepath is not linked to a video or image.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_check_metadata</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">recording_config_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">undefined_attributes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_filepath_metadata</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">undefined_attributes</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_print_message</span><span class="p">(</span><span class="n">attributes</span><span class="o">=</span><span class="n">undefined_attributes</span><span class="p">)</span>
+                <span class="n">delete</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rename_file</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">delete</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+                    <span class="k">return</span> <span class="s2">&quot;del&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%y%m</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mouse_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mouse_line</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mouse_number</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">!=</span> <span class="n">recording_config_dict</span><span class="p">[</span><span class="s2">&quot;recording_date&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The date of the recording_config_file and the provided video </span><span class="si">{</span><span class="n">video_filepath</span><span class="si">}</span><span class="s2"> do not match! &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Did you pass the right config-file and check the filename carefully?&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">metadata_dict</span> <span class="o">=</span> <span class="n">recording_config_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="p">]</span>
+        <span class="n">missing_keys</span> <span class="o">=</span> <span class="n">check_keys</span><span class="p">(</span><span class="n">dictionary</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">,</span> <span class="n">list_of_keys</span><span class="o">=</span><span class="n">KEYS_TO_CHECK_CAMERA_RECORDING</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">missing_keys</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Missing metadata information in the recording_config_file for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">missing_keys</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;valid&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_extract_filepath_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts metadata from the given video filepath.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            empty list</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ______</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            Error, if filenames are invalid. To prevent Errors, use the</span>
+<span class="sd">            filename_checker before and follow the explanations in the Notes</span>
+<span class="sd">            section below.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        _____</span>
+<span class="sd">        Demands for filenames are specific for calibration, recording or</span>
+<span class="sd">        calibration_validation files.</span>
+<span class="sd">        calibration:</span>
+<span class="sd">            - has to be a video [&quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mov&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD), calibration_tag (as defined</span>
+<span class="sd">            in project_config) and cam_id (element of valid_cam_ids in</span>
+<span class="sd">            project_config)</span>
+<span class="sd">            - recording_date and calibration_tag have to be separated by an</span>
+<span class="sd">            underscore (&quot;_&quot;)</span>
+<span class="sd">            - f&quot;{recording_date}_{calibration_tag}_{cam_id}&quot; =</span>
+<span class="sd">            Example: &quot;220922_charuco_Front.mp4&quot;</span>
+<span class="sd">        calibration_validation:</span>
+<span class="sd">            - has to be a video or image [&quot;.bmp&quot;, &quot;.tiff&quot;, &quot;.png&quot;, &quot;.jpg&quot;,</span>
+<span class="sd">            &quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD), calibration_validation_tag</span>
+<span class="sd">            (as defined in project_config) and cam_id (element of valid_cam_ids</span>
+<span class="sd">            in project_config)</span>
+<span class="sd">            - recording_date and calibration_validation_tag have to be separated</span>
+<span class="sd">            by an underscore (&quot;_&quot;)</span>
+<span class="sd">            - calibration_validation_tag mustn&#39;t be &quot;calvin&quot;</span>
+<span class="sd">            - f&quot;{recording_date}_{calibration_validation_tag}&quot; =</span>
+<span class="sd">            Example: &quot;220922_position_Top.jpg&quot;</span>
+<span class="sd">        recording:</span>
+<span class="sd">            - has to be a video [&quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mov&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD),</span>
+<span class="sd">            cam_id (element of valid_cam_ids in project_config),</span>
+<span class="sd">            mouse_line (element of animal_lines in project_config),</span>
+<span class="sd">            animal_id (beginning with F, split by &quot;-&quot; and followed by a number)</span>
+<span class="sd">            and paradigm (element of paradigms in project_config)</span>
+<span class="sd">            - recording_date, cam_id, mouse_line, animal_id and paradigm have</span>
+<span class="sd">            to be separated by an underscore (&quot;_&quot;)</span>
+<span class="sd">            -f&quot;{recording_date}_{cam_id}_{mouse_line}_{animal_id}_{paradigm}.mp4&quot; =</span>
+<span class="sd">            Example: &quot;220922_Side_206_F2-12_OTT.mp4&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">user_specific_rules_on_videometadata</span><span class="p">(</span><span class="n">videometadata</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">calibration</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cam_id&quot;</span><span class="p">,</span> <span class="s2">&quot;recording_date&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">attribute</span><span class="si">}</span><span class="s2"> was not found in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">! &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Rename the path manually or use the filename_checker!&quot;</span>
+                    <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">calvin</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cam_id&quot;</span><span class="p">,</span> <span class="s2">&quot;recording_date&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">attribute</span><span class="si">}</span><span class="s2"> was not found in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">! &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Rename the path manually or use the filename_checker!&quot;</span>
+                    <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">elif</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigms</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span> <span class="o">=</span> <span class="n">piece</span>
+                    <span class="k">elif</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">animal_lines</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">mouse_line</span> <span class="o">=</span> <span class="n">piece</span>
+                    <span class="k">elif</span> <span class="n">piece</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;F&quot;</span><span class="p">):</span>
+                        <span class="n">sub_pieces</span> <span class="o">=</span> <span class="n">piece</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_pieces</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="nb">int</span><span class="p">(</span><span class="n">sub_pieces</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">mouse_number</span> <span class="o">=</span> <span class="n">piece</span>
+                            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                                <span class="k">pass</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span>
+                <span class="s2">&quot;cam_id&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;recording_date&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;paradigm&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mouse_line&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mouse_number&quot;</span><span class="p">,</span>
+            <span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">attribute</span><span class="si">}</span><span class="s2"> was not found in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">! &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Rename the path manually or use the filename_checker!&quot;</span>
+                    <span class="p">)</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">_get_intrinsic_parameters</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">max_calibration_frames</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="n">Path</span><span class="p">]:</span>
+        <span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration</span><span class="p">(</span>
+            <span class="n">max_calibration_frames</span><span class="o">=</span><span class="n">max_calibration_frames</span><span class="p">)</span>
+        <span class="n">adjusting_required</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_adjusting_of_intrinsic_calibration_required</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">adjusting_required</span><span class="p">:</span>
+            <span class="n">intrinsic_calibration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adjust_intrinsic_calibration</span><span class="p">(</span>
+                <span class="n">unadjusted_intrinsic_calibration</span><span class="o">=</span><span class="n">intrinsic_calibration</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="n">intrinsic_calibration_filepath</span>
+
+    <span class="k">def</span> <span class="nf">_get_filepath_to_intrinsic_calibration_and_read_intrinsic_calibration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                                                                              <span class="n">max_calibration_frames</span><span class="p">:</span> <span class="nb">int</span>
+                                                                              <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="n">Path</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fisheye</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_calibration</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">file</span>
+                        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.p&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                    <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">intrinsic_calibration_filepath</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">io</span><span class="p">:</span>
+                        <span class="n">intrinsic_calibration</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">io</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Could not find a file for an intrinsic calibration .p file for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;It is required having a pickle file including came_id in the intrinsic_calibrations_directory</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="si">}</span><span class="s2">) if you use load_calibration = True</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Use &#39;load_calibration = False&#39; in project_config to calibrate now!&quot;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">intrinsic_calibration_checkerboard_video_filepath</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">file</span>
+                        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.mp4&quot;</span><span class="p">,</span> <span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">]</span>
+                           <span class="ow">and</span> <span class="s2">&quot;checkerboard&quot;</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                           <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                    <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Could not find a file for a checkerboard video for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;It is required having a checkerboard video .mp4 including checkerboard and cam_id</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;in the intrinsic_calibrations_directory (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="si">}</span><span class="s2">) &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;if you use load_calibration = False!&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">calibrator</span> <span class="o">=</span> <span class="n">IntrinsicCalibratorFisheyeCamera</span><span class="p">(</span>
+                    <span class="n">filepath_calibration_video</span><span class="o">=</span><span class="n">intrinsic_calibration_checkerboard_video_filepath</span><span class="p">,</span>
+                    <span class="n">max_calibration_frames</span><span class="o">=</span><span class="n">max_calibration_frames</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">intrinsic_calibration</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+                <span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;checkerboard_intrinsiccalibrationresultsfisheye_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.p&quot;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">intrinsic_calibration_filepath</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">io</span><span class="p">:</span>
+                    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="n">io</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_calibration</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">file</span>
+                        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.p&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                    <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">intrinsic_calibration_filepath</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">io</span><span class="p">:</span>
+                        <span class="n">intrinsic_calibration</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">io</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Could not find a file for an intrinsic calibration .p file for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;It is required having a pickle file including came_id in the intrinsic_calibrations_directory</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="si">}</span><span class="s2">) if you use load_calibration = True</span><span class="se">\n</span><span class="s2">‚&quot;</span>
+                        <span class="sa">f</span><span class="s1">&#39;Use &quot;load_calibration = False&quot; in project_config to calibrate now!&#39;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">intrinsic_calibration_checkerboard_video_filepath</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">file</span>
+                        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.mp4&quot;</span><span class="p">,</span> <span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">]</span>
+                           <span class="ow">and</span> <span class="s2">&quot;checkerboard&quot;</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                           <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">stem</span>
+                    <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Could not find a filepath for an intrinsic calibration or a checkerboard video for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;It is required having a intrinsic_calibration .p file &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;or a checkerboard video in the intrinsic_calibrations_directory &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="si">}</span><span class="s2">) for a fisheye-camera!&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">calibrator</span> <span class="o">=</span> <span class="n">IntrinsicCalibratorRegularCameraCheckerboard</span><span class="p">(</span>
+                    <span class="n">filepath_calibration_video</span><span class="o">=</span><span class="n">intrinsic_calibration_checkerboard_video_filepath</span><span class="p">,</span>
+                    <span class="n">max_calibration_frames</span><span class="o">=</span><span class="n">max_calibration_frames</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">intrinsic_calibration</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+                <span class="n">intrinsic_calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">intrinsic_calibration_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;checkerboard_intrinsiccalibrationresults_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.p&quot;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">intrinsic_calibration_filepath</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">io</span><span class="p">:</span>
+                    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="n">io</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">intrinsic_calibration</span><span class="p">,</span> <span class="n">intrinsic_calibration_filepath</span>
+
+    <span class="k">def</span> <span class="nf">_is_adjusting_of_intrinsic_calibration_required</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">adjusting_required</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">flip_h</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">flip_v</span><span class="p">,</span>
+                <span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">adjusting_required</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">adjusting_required</span>
+
+    <span class="k">def</span> <span class="nf">_adjust_intrinsic_calibration</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">unadjusted_intrinsic_calibration</span><span class="p">:</span> <span class="n">Dict</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+        <span class="n">intrinsic_calibration_video_size</span> <span class="o">=</span> <span class="n">unadjusted_intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span>
+        <span class="n">new_video_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_cropped_video_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_correct_x_y_offsets</span><span class="p">(</span>
+            <span class="n">intrinsic_calibration_video_size</span><span class="o">=</span><span class="n">intrinsic_calibration_video_size</span><span class="p">,</span>
+            <span class="n">new_video_size</span><span class="o">=</span><span class="n">new_video_size</span><span class="p">,</span>
+            <span class="n">offset_col_idx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span><span class="p">,</span>
+            <span class="n">offset_row_idx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span>
+        <span class="p">)</span>
+        <span class="n">adjusted_K</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_adjusted_K</span><span class="p">(</span><span class="n">K</span><span class="o">=</span><span class="n">unadjusted_intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;K&quot;</span><span class="p">])</span>
+        <span class="n">adjusted_intrinsic_calibration</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_incorporate_adjustments_in_intrinsic_calibration</span><span class="p">(</span>
+                <span class="n">intrinsic_calibration</span><span class="o">=</span><span class="n">unadjusted_intrinsic_calibration</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+                <span class="n">new_size</span><span class="o">=</span><span class="n">new_video_size</span><span class="p">,</span>
+                <span class="n">adjusted_K</span><span class="o">=</span><span class="n">adjusted_K</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">adjusted_intrinsic_calibration</span>
+
+    <span class="k">def</span> <span class="nf">_get_cropped_video_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v3</span><span class="o">.</span><span class="n">immeta</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">exclude_applied</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v3</span><span class="o">.</span><span class="n">immeta</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">exclude_applied</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="s2">&quot;shape&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">size</span>
+
+    <span class="k">def</span> <span class="nf">_get_correct_x_y_offsets</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">intrinsic_calibration_video_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+            <span class="n">new_video_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+            <span class="n">offset_row_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+            <span class="n">offset_col_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">flip_v</span><span class="p">:</span>
+            <span class="n">offset_row_idx</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">intrinsic_calibration_video_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="o">-</span> <span class="n">new_video_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="o">-</span> <span class="n">offset_row_idx</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">flip_h</span><span class="p">:</span>
+            <span class="n">offset_col_idx</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">intrinsic_calibration_video_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="o">-</span> <span class="n">new_video_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="o">-</span> <span class="n">offset_col_idx</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">offset_row_idx</span><span class="p">,</span> <span class="n">offset_col_idx</span>
+
+    <span class="k">def</span> <span class="nf">_get_adjusted_K</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">K</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="n">adjusted_K</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span>
+        <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span>
+        <span class="k">return</span> <span class="n">adjusted_K</span>
+
+    <span class="k">def</span> <span class="nf">_incorporate_adjustments_in_intrinsic_calibration</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">intrinsic_calibration</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">new_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+            <span class="n">adjusted_K</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+        <span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_size</span>
+        <span class="n">intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;K&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adjusted_K</span>
+        <span class="k">return</span> <span class="n">intrinsic_calibration</span>
+
+    <span class="k">def</span> <span class="nf">_print_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attributes</span><span class="p">:</span> <span class="n">List</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">_rename_file</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="VideoMetadataChecker"><a class="viewcode-back" href="../../core.html#core.video_metadata.VideoMetadataChecker">[docs]</a><span class="k">class</span> <span class="nc">VideoMetadataChecker</span><span class="p">(</span><span class="n">VideoMetadata</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to verify metadata for videos and rename filenames if necessary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_extract_filepath_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts metadata from the given video filepath.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        undefined_attributes: list of str</span>
+<span class="sd">            Attributes, that could not be extracted from the filepath and that</span>
+<span class="sd">            should be corrected before analysis.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        _____</span>
+<span class="sd">        Demands for filenames are specific for calibration, recording or</span>
+<span class="sd">        calibration_validation files.</span>
+<span class="sd">        calibration:</span>
+<span class="sd">            - has to be a video [&quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mov&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD), calibration_tag (as defined</span>
+<span class="sd">            in project_config) and cam_id (element of valid_cam_ids in</span>
+<span class="sd">            project_config)</span>
+<span class="sd">            - recording_date and calibration_tag have to be separated by an</span>
+<span class="sd">            underscore (&quot;_&quot;)</span>
+<span class="sd">            - f&quot;{recording_date}_{calibration_tag}_{cam_id}&quot; =</span>
+<span class="sd">            Example: &quot;220922_charuco_Front.mp4&quot;</span>
+<span class="sd">        calibration_validation:</span>
+<span class="sd">            - has to be a video or image [&quot;.bmp&quot;, &quot;.tiff&quot;, &quot;.png&quot;, &quot;.jpg&quot;,</span>
+<span class="sd">            &quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD), calibration_validation_tag</span>
+<span class="sd">            (as defined in project_config) and cam_id (element of valid_cam_ids</span>
+<span class="sd">            in project_config)</span>
+<span class="sd">            - recording_date and calibration_validation_tag have to be separated</span>
+<span class="sd">            by an underscore (&quot;_&quot;)</span>
+<span class="sd">            - calibration_validation_tag mustn&#39;t be &quot;calvin&quot;</span>
+<span class="sd">            - f&quot;{recording_date}_{calibration_validation_tag}&quot; =</span>
+<span class="sd">            Example: &quot;220922_position_Top.jpg&quot;</span>
+<span class="sd">        recording:</span>
+<span class="sd">            - has to be a video [&quot;.AVI&quot;, &quot;.avi&quot;, &quot;.mov&quot;, &quot;.mp4&quot;]</span>
+<span class="sd">            - including recording_date (YYMMDD),</span>
+<span class="sd">            cam_id (element of valid_cam_ids in project_config),</span>
+<span class="sd">            mouse_line (element of animal_lines in project_config),</span>
+<span class="sd">            animal_id (beginning with F, split by &quot;-&quot; and followed by a number)</span>
+<span class="sd">            and paradigm (element of paradigms in project_config)</span>
+<span class="sd">            - recording_date, cam_id, mouse_line, animal_id and paradigm have</span>
+<span class="sd">            to be separated by an underscore (&quot;_&quot;)</span>
+<span class="sd">            -f&quot;{recording_date}_{cam_id}_{mouse_line}_{animal_id}_{paradigm}.mp4&quot; =</span>
+<span class="sd">            Example: &quot;220922_Side_206_F2-12_OTT.mp4&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">undefined_attributes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">user_specific_rules_on_videometadata</span><span class="p">(</span><span class="n">videometadata</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">calibration</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cam_id&quot;</span><span class="p">,</span> <span class="s2">&quot;recording_date&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="n">undefined_attributes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">calvin</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cam_id&quot;</span><span class="p">,</span> <span class="s2">&quot;recording_date&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="n">undefined_attributes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">recording</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">piece</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">cam</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cam_id</span> <span class="o">=</span> <span class="n">cam</span>
+                    <span class="k">elif</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigms</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span> <span class="o">=</span> <span class="n">piece</span>
+                    <span class="k">elif</span> <span class="n">piece</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">animal_lines</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">mouse_line</span> <span class="o">=</span> <span class="n">piece</span>
+                    <span class="k">elif</span> <span class="n">piece</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;F&quot;</span><span class="p">):</span>
+                        <span class="n">sub_pieces</span> <span class="o">=</span> <span class="n">piece</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_pieces</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="nb">int</span><span class="p">(</span><span class="n">sub_pieces</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">mouse_number</span> <span class="o">=</span> <span class="n">piece</span>
+                            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                                <span class="k">pass</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span>
+                                <span class="n">year</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;20&quot;</span> <span class="o">+</span> <span class="n">piece</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]),</span>
+                                <span class="n">month</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]),</span>
+                                <span class="n">day</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">piece</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">6</span><span class="p">]),</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="k">pass</span>
+
+            <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="p">[</span>
+                <span class="s2">&quot;cam_id&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;recording_date&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;paradigm&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mouse_line&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mouse_number&quot;</span><span class="p">,</span>
+            <span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+                    <span class="n">undefined_attributes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attribute</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">undefined_attributes</span>
+
+    <span class="k">def</span> <span class="nf">_print_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attributes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The information </span><span class="si">{</span><span class="n">attributes</span><span class="si">}</span><span class="s2"> could not be extracted automatically from the following file:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="n">attributes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">attribute</span> <span class="o">==</span> <span class="s2">&quot;cam_id&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cam_id was not found in filename or did not match any of the defined cam_ids. </span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Please include one of the following ids into the filename: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">valid_cam_ids</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;or add the cam_id to valid_cam_ids!&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">attribute</span> <span class="o">==</span> <span class="s2">&quot;recording_date&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Recording_date was not found in filename or did not match the required structure for date. </span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Please include the date as YYMMDD , e.g., 220928, into the filename!&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">attribute</span> <span class="o">==</span> <span class="s2">&quot;paradigm&quot;</span><span class="p">:</span>
+                <span class="sa">f</span><span class="s2">&quot;Paradigm was not found in filename or did not match any of the defined paradigms. </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                <span class="sa">f</span><span class="s2">&quot;Please include one of the following paradigms into the filename: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigms</span><span class="si">}</span><span class="s2"> &quot;</span> \
+                <span class="sa">f</span><span class="s2">&quot;or add the paradigm to paradigms!&quot;</span>
+            <span class="k">elif</span> <span class="n">attribute</span> <span class="o">==</span> <span class="s2">&quot;mouse_line&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Mouse_line was not found in filename or is not supported. </span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Please include one of the following lines into the filename: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">animal_lines</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;or add the line to valid_mouse_lines!&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">attribute</span> <span class="o">==</span> <span class="s2">&quot;mouse_number&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="s2">&quot;Mouse_number was not found in filename or did not match the required structure for a mouse_number. </span><span class="se">\n</span><span class="s2"> &quot;</span>
+                    <span class="s2">&quot;Please include the mouse number as Generation-Number, e.g., F12-45, into the filename!&quot;</span>
+                <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_rename_file</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">suffix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span>
+        <span class="n">new_filename</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Enter new filename! </span><span class="se">\n</span><span class="s2">If the video is invalid, enter x and it will be deleted!</span><span class="se">\n</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;If the video belongs to another folder, enter y, and move it manually!</span><span class="se">\n</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">parent</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">new_filename</span> <span class="o">==</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2"> needs to be moved!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span>
+        <span class="k">if</span> <span class="n">new_filename</span> <span class="o">==</span> <span class="s2">&quot;x&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="n">new_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span>
+            <span class="n">Path</span><span class="p">(</span><span class="n">new_filename</span><span class="p">)</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="n">suffix</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">new_filepath</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The entered filename and the real filename are identical.&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">new_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Couldn&#39;t rename file, since the entered filename does already exist.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">new_filepath</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">new_filepath</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

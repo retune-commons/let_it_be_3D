@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>core.camera_intrinsics &mdash; let_it_be_3D test documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            let_it_be_3D
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">core</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">let_it_be_3D</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">core.camera_intrinsics</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for core.camera_intrinsics</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">cv2</span>
+<span class="kn">import</span> <span class="nn">imageio</span> <span class="k">as</span> <span class="nn">iio</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">ndarray</span>
+
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">convert_to_path</span>
+
+
+<div class="viewcode-block" id="IntrinsicCameraCalibrator"><a class="viewcode-back" href="../../core.html#core.camera_intrinsics.IntrinsicCameraCalibrator">[docs]</a><span class="k">class</span> <span class="nc">IntrinsicCameraCalibrator</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Intrinsic calibration for fisheye and regular cameras on checkerboard videos.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    __________</span>
+<span class="sd">    filepath_calibration_video: Path or str</span>
+<span class="sd">        The filepath to the intrinsic calibration videos. They have to be</span>
+<span class="sd">        recorded in same resolution as the recording/calibration videos</span>
+<span class="sd">        without cropping using a 6x6 checkerboard..</span>
+<span class="sd">    max_calibration_frames: int</span>
+<span class="sd">        Number of frames to take into account for intrinsic calibration.</span>
+<span class="sd">        300 works well, depending on CPU speed, it can be necessary to reduce.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    __________</span>
+<span class="sd">    filepath_calibration_video: Path or str</span>
+<span class="sd">        The filepath to the intrinsic calibration videos. They have to be</span>
+<span class="sd">        recorded in same resolution as the recording/calibration videos</span>
+<span class="sd">        without cropping using a 6x6 checkerboard..</span>
+<span class="sd">    max_calibration_frames: int</span>
+<span class="sd">        Number of frames to take into account for intrinsic calibration.</span>
+<span class="sd">        300 works well, depending on CPU speed, it can be necessary to reduce.</span>
+<span class="sd">    video_reader: Reader</span>
+<span class="sd">        imageio Reader object of the calibration video.</span>
+<span class="sd">    checkerboard_rows_and_columns</span>
+<span class="sd">    d: np.ndarray</span>
+<span class="sd">        Empty camera matrix.</span>
+<span class="sd">    imsize: tuple of ints</span>
+<span class="sd">        Size of the video.</span>
+<span class="sd">    k: np.ndarray</span>
+<span class="sd">        Empty camera matrix.</span>
+<span class="sd">    objp: np.ndarray</span>
+<span class="sd">        Empty object points. Shape as detected in one frame.</span>
+
+<span class="sd">    Methods</span>
+<span class="sd">    _______</span>
+<span class="sd">    run()</span>
+<span class="sd">        Detect board in frames and calibrate intrinsics.</span>
+
+<span class="sd">    References</span>
+<span class="sd">    __________</span>
+<span class="sd">    [1] Kenneth Jiang (2017).</span>
+<span class="sd">    Calibrate fisheye lens using OpenCV.</span>
+<span class="sd">    medium.com (https://medium.com/@kennethjiang/calibrate-fisheye-lens-using-opencv-333b05afa0b0)</span>
+
+<span class="sd">    Copyright Kenneth Jiang.</span>
+<span class="sd">    This class and its subclasses use code taken from [1]. Changes were made to</span>
+<span class="sd">    match our needs here.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    ________</span>
+<span class="sd">    &gt;&gt;&gt; from core.camera_intrinsics import IntrinsicCalibratorFisheyeCamera</span>
+<span class="sd">    &gt;&gt;&gt; intrinsic_calibration_object = IntrinsicCalibratorFisheyeCamera(</span>
+<span class="sd">        ... &quot;test_data/intrinsic_calibrations/Bottom_checkerboard.mp4&quot;,</span>
+<span class="sd">        ... 100)</span>
+<span class="sd">    &gt;&gt;&gt; intrinsic_calibration_object.run()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">_run_camera_type_specific_calibration</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">objpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">imgpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+        <span class="c1"># wrapper to camera type specific calibration function</span>
+        <span class="c1"># all remaining data is stored in attributes of the object</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">_detect_board_corners</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame_idxs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">checkerboard_rows_and_columns</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">d</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">imsize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">frame_in_gray_scale</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">frame_in_gray_scale</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">k</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">objp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="n">objp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="mi">1</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">checkerboard_rows_and_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">checkerboard_rows_and_columns</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="mi">3</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">objp</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span>
+                         <span class="mi">0</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">checkerboard_rows_and_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                         <span class="mi">0</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">checkerboard_rows_and_columns</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                         <span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">objp</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">filepath_calibration_video</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">max_calibration_frames</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct all necessary attributes for the IntrinsicCameraCalibrator class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        filepath_calibration_video: Path or str</span>
+<span class="sd">            The filepath to the intrinsic calibration videos. They have to be</span>
+<span class="sd">            recorded in same resolution as the recording/calibration videos</span>
+<span class="sd">            without cropping, using a 6x6 checkerboard.</span>
+<span class="sd">        max_calibration_frames: int</span>
+<span class="sd">            Number of frames to take into account for intrinsic calibration.</span>
+<span class="sd">            300 works well, depending on CPU speed, it can be necessary to reduce.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">video_filepath</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">filepath_calibration_video</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span> <span class="o">=</span> <span class="n">max_calibration_frames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v2</span><span class="o">.</span><span class="n">get_reader</span><span class="p">(</span><span class="n">filepath_calibration_video</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IntrinsicCameraCalibrator.run"><a class="viewcode-back" href="../../core.html#core.camera_intrinsics.IntrinsicCameraCalibrator.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Detect board in frames and calibrate intrinsics.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        calibration_results: dict</span>
+<span class="sd">            Intrinsic calibration results containing camera matrix and</span>
+<span class="sd">            distorsion coefficient at keys &#39;K&#39; and &#39;D&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">selected_frame_idxs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_indices_of_selected_frames</span><span class="p">()</span>
+        <span class="n">detected_board_corners_per_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_detect_board_corners</span><span class="p">(</span>
+            <span class="n">frame_idxs</span><span class="o">=</span><span class="n">selected_frame_idxs</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">detected_board_corners_per_image</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">:</span>
+            <span class="n">detected_board_corners_per_image</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_attempt_to_match_max_frame_count</span><span class="p">(</span>
+                    <span class="n">corners_per_image</span><span class="o">=</span><span class="n">detected_board_corners_per_image</span><span class="p">,</span>
+                    <span class="n">already_selected_frame_idxs</span><span class="o">=</span><span class="n">selected_frame_idxs</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">object_points</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_object_points</span><span class="p">(</span>
+            <span class="n">n_detected_boards</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">detected_board_corners_per_image</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">retval</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">rvec</span><span class="p">,</span> <span class="n">tvec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_camera_type_specific_calibration</span><span class="p">(</span>
+            <span class="n">objpoints</span><span class="o">=</span><span class="n">object_points</span><span class="p">,</span> <span class="n">imgpoints</span><span class="o">=</span><span class="n">detected_board_corners_per_image</span>
+        <span class="p">)</span>
+        <span class="n">calibration_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_calibration_results</span><span class="p">(</span>
+            <span class="n">K</span><span class="o">=</span><span class="n">K</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="n">D</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">calibration_results</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_indices_of_selected_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+        <span class="n">sampling_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_determine_sampling_rate</span><span class="p">()</span>
+        <span class="n">frame_idxs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_sampling_frame_indices</span><span class="p">(</span><span class="n">sampling_rate</span><span class="o">=</span><span class="n">sampling_rate</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">frame_idxs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_attempt_to_match_max_frame_count</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">corners_per_image</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+            <span class="n">already_selected_frame_idxs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Frames with detected checkerboard: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Trying to find some more ...&quot;</span><span class="p">)</span>
+            <span class="n">corners_per_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attempt_to_reach_max_frame_count</span><span class="p">(</span>
+                <span class="n">corners_per_image</span><span class="o">=</span><span class="n">corners_per_image</span><span class="p">,</span>
+                <span class="n">already_selected_frame_idxs</span><span class="o">=</span><span class="n">already_selected_frame_idxs</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Done. Now we are at a total of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;frames in which I could detect a checkerboard.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">:</span>
+            <span class="n">corners_per_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_limit_to_max_frame_count</span><span class="p">(</span>
+                <span class="n">all_detected_corners</span><span class="o">=</span><span class="n">corners_per_image</span>
+            <span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Limited them to only </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">corners_per_image</span>
+
+    <span class="k">def</span> <span class="nf">_compute_object_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_detected_boards</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="n">object_points</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_detected_boards</span><span class="p">):</span>
+            <span class="n">object_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objp</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">object_points</span>
+
+    <span class="k">def</span> <span class="nf">_attempt_to_reach_max_frame_count</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">corners_per_image</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+            <span class="n">already_selected_frame_idxs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="c1"># ToDo: limit time?</span>
+        <span class="n">total_frame_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">total_frame_count</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">corners_per_image</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">already_selected_frame_idxs</span><span class="p">:</span>
+                    <span class="p">(</span>
+                        <span class="n">checkerboard_detected</span><span class="p">,</span>
+                        <span class="n">predicted_corners</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_checkerboard_corner_detection</span><span class="p">(</span><span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">checkerboard_detected</span><span class="p">:</span>
+                        <span class="n">corners_per_image</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">predicted_corners</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">corners_per_image</span>
+
+    <span class="k">def</span> <span class="nf">_determine_sampling_rate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">total_frame_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">total_frame_count</span> <span class="o">&gt;=</span> <span class="mi">5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">:</span>
+            <span class="n">sampling_rate</span> <span class="o">=</span> <span class="n">total_frame_count</span> <span class="o">//</span> <span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sampling_rate</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">sampling_rate</span>
+
+    <span class="k">def</span> <span class="nf">_get_sampling_frame_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="n">total_frame_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
+        <span class="n">n_frames_to_select</span> <span class="o">=</span> <span class="n">total_frame_count</span> <span class="o">//</span> <span class="n">sampling_rate</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
+            <span class="mi">0</span><span class="p">,</span> <span class="n">total_frame_count</span><span class="p">,</span> <span class="n">n_frames_to_select</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_limit_to_max_frame_count</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">all_detected_corners</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="n">sampling_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
+            <span class="mi">0</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">all_detected_corners</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_calibration_frames</span><span class="p">,</span>
+            <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sampled_corners</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">all_detected_corners</span><span class="p">)[</span><span class="n">sampling_idxs</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">sampled_corners</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_construct_calibration_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">K</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">D</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+        <span class="n">calibration_results</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;K&quot;</span><span class="p">:</span> <span class="n">K</span><span class="p">,</span> <span class="s2">&quot;D&quot;</span><span class="p">:</span> <span class="n">D</span><span class="p">,</span> <span class="s2">&quot;size&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">imsize</span><span class="p">}</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;calibration_results&quot;</span><span class="p">,</span> <span class="n">calibration_results</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">calibration_results</span></div>
+
+
+<div class="viewcode-block" id="IntrinsicCameraCalibratorCheckerboard"><a class="viewcode-back" href="../../core.html#core.camera_intrinsics.IntrinsicCameraCalibratorCheckerboard">[docs]</a><span class="k">class</span> <span class="nc">IntrinsicCameraCalibratorCheckerboard</span><span class="p">(</span><span class="n">IntrinsicCameraCalibrator</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_detect_board_corners</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame_idxs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="n">detected_checkerboard_corners_per_image</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">frame_idxs</span><span class="p">:</span>
+            <span class="p">(</span>
+                <span class="n">checkerboard_detected</span><span class="p">,</span>
+                <span class="n">predicted_corners</span><span class="p">,</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_checkerboard_corner_detection</span><span class="p">(</span><span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">checkerboard_detected</span><span class="p">:</span>
+                <span class="n">detected_checkerboard_corners_per_image</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">predicted_corners</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">detected_checkerboard_corners_per_image</span>
+
+    <span class="k">def</span> <span class="nf">_run_checkerboard_corner_detection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">video_reader</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span>
+        <span class="n">gray_scale_image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
+        <span class="n">checkerboard_detected</span><span class="p">,</span> <span class="n">predicted_corners</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">findChessboardCorners</span><span class="p">(</span>
+            <span class="n">gray_scale_image</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">checkerboard_rows_and_columns</span><span class="p">,</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">CALIB_CB_ADAPTIVE_THRESH</span> <span class="o">+</span> <span class="n">cv2</span><span class="o">.</span><span class="n">CALIB_CB_NORMALIZE_IMAGE</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">checkerboard_detected</span><span class="p">,</span> <span class="n">predicted_corners</span></div>
+
+
+<div class="viewcode-block" id="IntrinsicCalibratorFisheyeCamera"><a class="viewcode-back" href="../../core.html#core.camera_intrinsics.IntrinsicCalibratorFisheyeCamera">[docs]</a><span class="k">class</span> <span class="nc">IntrinsicCalibratorFisheyeCamera</span><span class="p">(</span><span class="n">IntrinsicCameraCalibratorCheckerboard</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_compute_rvecs_and_tvecs</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">n_detected_boards</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">ndarray</span><span class="p">]]:</span>
+        <span class="n">rvecs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_detected_boards</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">tvecs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_detected_boards</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">rvecs</span><span class="p">,</span> <span class="n">tvecs</span>
+
+    <span class="k">def</span> <span class="nf">_run_camera_type_specific_calibration</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">objpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">imgpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+        <span class="n">rvecs</span><span class="p">,</span> <span class="n">tvecs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_rvecs_and_tvecs</span><span class="p">(</span><span class="n">n_detected_boards</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">objpoints</span><span class="p">))</span>
+        <span class="n">calibration_flags</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">fisheye</span><span class="o">.</span><span class="n">CALIB_RECOMPUTE_EXTRINSIC</span>
+                <span class="o">+</span> <span class="n">cv2</span><span class="o">.</span><span class="n">fisheye</span><span class="o">.</span><span class="n">CALIB_CHECK_COND</span>
+                <span class="o">+</span> <span class="n">cv2</span><span class="o">.</span><span class="n">fisheye</span><span class="o">.</span><span class="n">CALIB_FIX_SKEW</span>
+        <span class="p">)</span>
+        <span class="n">new_subpixel_criteria</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">TERM_CRITERIA_EPS</span> <span class="o">+</span> <span class="n">cv2</span><span class="o">.</span><span class="n">TERM_CRITERIA_MAX_ITER</span><span class="p">,</span>
+            <span class="mi">30</span><span class="p">,</span>
+            <span class="mf">1e-6</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">cv2</span><span class="o">.</span><span class="n">fisheye</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span>
+            <span class="n">objpoints</span><span class="p">,</span>
+            <span class="n">imgpoints</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">imsize</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">k</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">d</span><span class="p">,</span>
+            <span class="n">rvecs</span><span class="p">,</span>
+            <span class="n">tvecs</span><span class="p">,</span>
+            <span class="n">calibration_flags</span><span class="p">,</span>
+            <span class="n">new_subpixel_criteria</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IntrinsicCalibratorRegularCameraCheckerboard"><a class="viewcode-back" href="../../core.html#core.camera_intrinsics.IntrinsicCalibratorRegularCameraCheckerboard">[docs]</a><span class="k">class</span> <span class="nc">IntrinsicCalibratorRegularCameraCheckerboard</span><span class="p">(</span>
+    <span class="n">IntrinsicCameraCalibratorCheckerboard</span>
+<span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_run_camera_type_specific_calibration</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">objpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">imgpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cv2</span><span class="o">.</span><span class="n">calibrateCamera</span><span class="p">(</span><span class="n">objpoints</span><span class="p">,</span> <span class="n">imgpoints</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">imsize</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

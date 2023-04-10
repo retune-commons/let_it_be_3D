@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>core.angles_and_distances &mdash; let_it_be_3D test documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            let_it_be_3D
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">core</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">let_it_be_3D</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">core.angles_and_distances</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for core.angles_and_distances</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">itertools</span> <span class="k">as</span> <span class="nn">it</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+
+<div class="viewcode-block" id="get_xyz_distance_in_triangulation_space"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.get_xyz_distance_in_triangulation_space">[docs]</a><span class="k">def</span> <span class="nf">get_xyz_distance_in_triangulation_space</span><span class="p">(</span>
+        <span class="n">marker_ids</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the distance between two markers in 3D.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    marker_ids: tuple of str</span>
+<span class="sd">        The two marker_ids to calculate the distance between.</span>
+<span class="sd">    df_xyz: pd.DataFrame</span>
+<span class="sd">        DataFrame of triangulated data.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.Series or float</span>
+<span class="sd">        Distance between the two markers. float, if only one frame, else pd.Series.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">squared_differences</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">df_xyz</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">marker_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df_xyz</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">marker_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="k">for</span> <span class="n">axis</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">]</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">squared_differences</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span></div>
+
+
+<div class="viewcode-block" id="add_reprojection_errors_of_all_calibration_validation_markers"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.add_reprojection_errors_of_all_calibration_validation_markers">[docs]</a><span class="k">def</span> <span class="nf">add_reprojection_errors_of_all_calibration_validation_markers</span><span class="p">(</span><span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;reprojection_errors_calibration_validation_markers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">all_reprojection_errors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">df_xyz</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">key</span><span class="p">:</span>
+            <span class="n">reprojection_error</span> <span class="o">=</span> <span class="n">df_xyz</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">marker_id</span> <span class="o">=</span> <span class="n">key</span><span class="p">[:</span> <span class="n">key</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;_error&quot;</span><span class="p">)]</span>
+            <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;reprojection_errors_calibration_validation_markers&quot;</span><span class="p">][</span>
+                <span class="n">marker_id</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="n">reprojection_error</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">reprojection_error</span><span class="p">)</span> <span class="o">!=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">:</span>
+                <span class="c1"># ToDo:</span>
+                <span class="c1"># confirm that it would actually be a numpy nan</span>
+                <span class="c1"># or as alternative, use something like this after blindly appending all errors to drop the nan´s:</span>
+                <span class="c1"># anipose_io[&#39;reprojerr&#39;][np.logical_not(np.isnan(anipose_io[&#39;reprojerr&#39;]))]</span>
+                <span class="n">all_reprojection_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">reprojection_error</span><span class="p">)</span>
+    <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;reprojection_errors_calibration_validation_markers&quot;</span><span class="p">][</span><span class="s2">&quot;mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="n">all_reprojection_errors</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">anipose_io</span></div>
+
+
+<div class="viewcode-block" id="set_distances_and_angles_for_evaluation"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.set_distances_and_angles_for_evaluation">[docs]</a><span class="k">def</span> <span class="nf">set_distances_and_angles_for_evaluation</span><span class="p">(</span><span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute angles and distances and add them to anipose_io.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    parameters: dict</span>
+<span class="sd">        ground_truth_config</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Containing information to validate calibration in comparison with</span>
+<span class="sd">        ground truth.</span>
+<span class="sd">    df_xyz:</span>
+<span class="sd">        DataFrame of triangulated data.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Added &quot;distances_in_cm&quot; and &quot;computed_angles&quot;.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    ________</span>
+<span class="sd">    core.utils.KEYS_TO_CHECK_PROJECT</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;distances&quot;</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">:</span>
+        <span class="n">anipose_io</span> <span class="o">=</span> <span class="n">_set_distances_from_configuration</span><span class="p">(</span>
+            <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;distances&quot;</span><span class="p">],</span> <span class="n">anipose_io</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;WARNING: No distances were computed. If this is unexpected, &quot;</span>
+            <span class="s2">&quot;please edit the ground truth file accordingly&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;angles&quot;</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">:</span>
+        <span class="n">anipose_io</span> <span class="o">=</span> <span class="n">_set_computed_angles</span><span class="p">(</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;angles&quot;</span><span class="p">],</span> <span class="n">anipose_io</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;WARNING: No angles were computed. If this is unexpected, &quot;</span>
+            <span class="s2">&quot;please edit the ground truth file accordingly&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">anipose_io</span></div>
+
+
+<div class="viewcode-block" id="load_distances_from_ground_truth"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.load_distances_from_ground_truth">[docs]</a><span class="k">def</span> <span class="nf">load_distances_from_ground_truth</span><span class="p">(</span><span class="n">distances</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return distances from ground_truth_config[&quot;distances&quot;]. &quot;&quot;&quot;</span>
+    <span class="n">filled_d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">distances</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">filled_d</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">filled_d</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">filled_d</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">filled_d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">filled_d</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+    <span class="k">return</span> <span class="n">filled_d</span></div>
+
+
+<div class="viewcode-block" id="add_errors_between_computed_and_ground_truth_distances_for_different_references"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.add_errors_between_computed_and_ground_truth_distances_for_different_references">[docs]</a><span class="k">def</span> <span class="nf">add_errors_between_computed_and_ground_truth_distances_for_different_references</span><span class="p">(</span>
+        <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">ground_truth_distances</span><span class="p">:</span> <span class="n">Dict</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate errors between computed distances compared to ground_truth.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Containing information to validate calibration in comparison with</span>
+<span class="sd">        ground truth, such as &quot;bodyparts&quot;.</span>
+<span class="sd">    ground_truth_distances:</span>
+<span class="sd">        Distances defined in ground truth as returned by</span>
+<span class="sd">        load_distances_from_ground_truth.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Added &quot;distance_errors_in_cm&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">anipose_io</span> <span class="o">=</span> <span class="n">_add_distance_errors_for_different_references</span><span class="p">(</span><span class="n">anipose_io</span><span class="o">=</span><span class="n">anipose_io</span><span class="p">,</span>
+                                                               <span class="n">gt_distances</span><span class="o">=</span><span class="n">ground_truth_distances</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">anipose_io</span></div>
+
+
+<div class="viewcode-block" id="add_errors_between_computed_and_ground_truth_angles"><a class="viewcode-back" href="../../core.html#core.angles_and_distances.add_errors_between_computed_and_ground_truth_angles">[docs]</a><span class="k">def</span> <span class="nf">add_errors_between_computed_and_ground_truth_angles</span><span class="p">(</span><span class="n">gt_angles</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set the errors between the computed and ground truth angles.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gt_angles:</span>
+<span class="sd">        Angles from ground_truth = ground_truth_config[&quot;angles&quot;].</span>
+<span class="sd">    anipose_io:</span>
+<span class="sd">        Containing information to validate calibration in comparison with</span>
+<span class="sd">        ground truth.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Added &quot;angles_error_ground_truth_vs_triangulated&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">anipose_io</span><span class="p">[</span>
+        <span class="s2">&quot;angles_error_ground_truth_vs_triangulated&quot;</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_compute_differences_between_triangulated_and_gt_angles</span><span class="p">(</span><span class="n">gt_angles</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">anipose_io</span></div>
+
+
+<span class="k">def</span> <span class="nf">_get_conversion_factors_from_different_references</span><span class="p">(</span>
+        <span class="n">ground_truth_distances</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">all_conversion_factors</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">reference</span><span class="p">,</span> <span class="n">markers</span> <span class="ow">in</span> <span class="n">ground_truth_distances</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">markers</span><span class="p">:</span>
+            <span class="n">reference_marker_ids</span> <span class="o">=</span> <span class="p">(</span><span class="n">reference</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+            <span class="n">distance_in_cm</span> <span class="o">=</span> <span class="n">ground_truth_distances</span><span class="p">[</span><span class="n">reference</span><span class="p">][</span><span class="n">m</span><span class="p">]</span>
+            <span class="n">reference_distance_id</span> <span class="o">=</span> <span class="n">reference</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">m</span>
+            <span class="n">distance_to_cm_conversion_factor</span> <span class="o">=</span> <span class="n">_get_xyz_to_cm_conversion_factor</span><span class="p">(</span>
+                <span class="n">reference_marker_ids</span><span class="o">=</span><span class="n">reference_marker_ids</span><span class="p">,</span>
+                <span class="n">distance_in_cm</span><span class="o">=</span><span class="n">distance_in_cm</span><span class="p">,</span>
+                <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">all_conversion_factors</span><span class="p">[</span>
+                <span class="n">reference_distance_id</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="n">distance_to_cm_conversion_factor</span>
+
+    <span class="k">return</span> <span class="n">all_conversion_factors</span>
+
+
+<span class="k">def</span> <span class="nf">_get_xyz_to_cm_conversion_factor</span><span class="p">(</span>
+        <span class="n">reference_marker_ids</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+        <span class="n">distance_in_cm</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">distance_in_triangulation_space</span> <span class="o">=</span> <span class="n">get_xyz_distance_in_triangulation_space</span><span class="p">(</span><span class="n">marker_ids</span><span class="o">=</span><span class="n">reference_marker_ids</span><span class="p">,</span>
+                                                                              <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">distance_in_triangulation_space</span> <span class="o">/</span> <span class="n">distance_in_cm</span>
+
+
+<span class="k">def</span> <span class="nf">_add_distances_in_cm_for_each_conversion_factor</span><span class="p">(</span>
+        <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">conversion_factors</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;distances_in_cm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">reference_distance_id</span><span class="p">,</span> <span class="n">conversion_factor</span> <span class="ow">in</span> <span class="n">conversion_factors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;distances_in_cm&quot;</span><span class="p">][</span>
+            <span class="n">reference_distance_id</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="n">_convert_all_xyz_distances</span><span class="p">(</span>
+            <span class="n">anipose_io</span><span class="o">=</span><span class="n">anipose_io</span><span class="p">,</span> <span class="n">conversion_factor</span><span class="o">=</span><span class="n">conversion_factor</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">anipose_io</span>
+
+
+<span class="k">def</span> <span class="nf">_add_distance_errors_for_different_references</span><span class="p">(</span><span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">gt_distances</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;distance_errors_in_cm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">reference_distance_id</span><span class="p">,</span> <span class="n">triangulated_distances</span> <span class="ow">in</span> <span class="n">anipose_io</span><span class="p">[</span>
+        <span class="s2">&quot;distances_in_cm&quot;</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;distance_errors_in_cm&quot;</span><span class="p">][</span><span class="n">reference_distance_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">marker_ids_with_distance_error</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_compute_differences_between_triangulated_and_gt_distances</span><span class="p">(</span>
+                <span class="n">triangulated_distances</span><span class="o">=</span><span class="n">triangulated_distances</span><span class="p">,</span> <span class="n">gt_distances</span><span class="o">=</span><span class="n">gt_distances</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">all_distance_errors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">distance_error</span>
+            <span class="k">for</span> <span class="n">marker_id_a</span><span class="p">,</span> <span class="n">marker_id_b</span><span class="p">,</span> <span class="n">distance_error</span><span class="p">,</span> <span class="n">percentage_error</span> <span class="ow">in</span> <span class="n">marker_ids_with_distance_error</span>
+        <span class="p">]</span>
+        <span class="n">mean_distance_error</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">all_distance_errors</span><span class="p">))</span>
+        <span class="n">all_percentage_errors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">percentage_error</span>
+            <span class="k">for</span> <span class="n">marker_id_a</span><span class="p">,</span> <span class="n">marker_id_b</span><span class="p">,</span> <span class="n">distance_error</span><span class="p">,</span> <span class="n">percentage_error</span> <span class="ow">in</span> <span class="n">marker_ids_with_distance_error</span>
+        <span class="p">]</span>
+        <span class="n">mean_percentage_error</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">all_percentage_errors</span><span class="p">))</span>
+        <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;distance_errors_in_cm&quot;</span><span class="p">][</span><span class="n">reference_distance_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;individual_errors&quot;</span><span class="p">:</span> <span class="n">marker_ids_with_distance_error</span><span class="p">,</span>
+            <span class="s2">&quot;mean_error&quot;</span><span class="p">:</span> <span class="n">mean_distance_error</span><span class="p">,</span>
+            <span class="s2">&quot;mean_percentage_error&quot;</span><span class="p">:</span> <span class="n">mean_percentage_error</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">anipose_io</span>
+
+
+<span class="k">def</span> <span class="nf">_set_distances_from_configuration</span><span class="p">(</span><span class="n">distances_to_compute</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">conversion_factors</span> <span class="o">=</span> <span class="n">_get_conversion_factors_from_different_references</span><span class="p">(</span>
+        <span class="n">distances_to_compute</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+    <span class="p">)</span>
+    <span class="n">anipose_io</span> <span class="o">=</span> <span class="n">_add_distances_in_cm_for_each_conversion_factor</span><span class="p">(</span><span class="n">anipose_io</span><span class="p">,</span> <span class="n">conversion_factors</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">anipose_io</span>
+
+
+<span class="k">def</span> <span class="nf">_set_computed_angles</span><span class="p">(</span><span class="n">angles_to_compute</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute angles as defined in angles_to_compute and add to anipose_io.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;computed_angles&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_compute_angles</span><span class="p">(</span><span class="n">angles_to_compute</span><span class="p">,</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">anipose_io</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_differences_between_triangulated_and_gt_distances</span><span class="p">(</span>
+        <span class="n">triangulated_distances</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">gt_distances</span><span class="p">:</span> <span class="n">Dict</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+    <span class="n">marker_ids_with_distance_error</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">marker_id_a</span> <span class="ow">in</span> <span class="n">triangulated_distances</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">marker_id_b</span> <span class="ow">in</span> <span class="n">triangulated_distances</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">marker_id_a</span> <span class="ow">in</span> <span class="n">gt_distances</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">&amp;</span> <span class="p">(</span>
+                    <span class="n">marker_id_b</span> <span class="ow">in</span> <span class="n">gt_distances</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="n">ground_truth</span> <span class="o">=</span> <span class="n">gt_distances</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">][</span><span class="n">marker_id_b</span><span class="p">]</span>
+                <span class="n">triangulated_distance</span> <span class="o">=</span> <span class="n">triangulated_distances</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">][</span><span class="n">marker_id_b</span><span class="p">]</span>
+                <span class="n">distance_error</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">ground_truth</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">triangulated_distance</span><span class="p">))</span>
+                <span class="n">percentage_error</span> <span class="o">=</span> <span class="n">distance_error</span> <span class="o">/</span> <span class="n">ground_truth</span>
+                <span class="n">marker_ids_with_distance_error</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">marker_id_a</span><span class="p">,</span> <span class="n">marker_id_b</span><span class="p">,</span> <span class="n">distance_error</span><span class="p">,</span> <span class="n">percentage_error</span><span class="p">)</span>
+                <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">marker_ids_with_distance_error</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_differences_between_triangulated_and_gt_angles</span><span class="p">(</span>
+        <span class="n">gt_angles</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the difference between the triangulated angles</span>
+<span class="sd">    and the provided ground truth ones.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gt_angles: dict</span>
+<span class="sd">        ground truth angles</span>
+<span class="sd">    anipose_io: dict</span>
+<span class="sd">        Containing information to validate calibration in comparison with</span>
+<span class="sd">        ground truth.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    marker_ids_with_angles_error: dict</span>
+<span class="sd">        Markers with angle errors.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">triangulates_angles</span> <span class="o">=</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;computed_angles&quot;</span><span class="p">]</span>
+    <span class="n">marker_ids_with_angles_error</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">triangulates_angles</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">==</span> <span class="n">gt_angles</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">triangulates_angles</span><span class="p">:</span>
+            <span class="n">wrapped_tri_angle</span> <span class="o">=</span> <span class="n">_wrap_angles_360</span><span class="p">(</span><span class="n">triangulates_angles</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="n">angle_error</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">gt_angles</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s2">&quot;value&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">wrapped_tri_angle</span><span class="p">)</span>
+            <span class="n">half_pi_corrected_angle</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">angle_error</span> <span class="k">if</span> <span class="n">angle_error</span> <span class="o">&lt;</span> <span class="mi">180</span> <span class="k">else</span> <span class="n">angle_error</span> <span class="o">-</span> <span class="mi">180</span>
+            <span class="p">)</span>
+            <span class="n">marker_ids_with_angles_error</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">half_pi_corrected_angle</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Please check the ground truth angles passed. The angles needed are:&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">triangulates_angles</span><span class="p">),</span>
+            <span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> But the angles in the passed ground truth are:&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">gt_angles</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">marker_ids_with_angles_error</span>
+
+
+<span class="k">def</span> <span class="nf">_wrap_angles_360</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrap negative angle on 360 space.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    angle: float</span>
+<span class="sd">        Input angle.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    float:</span>
+<span class="sd">        Angle if positive or 360+angle if negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">angle</span> <span class="k">if</span> <span class="n">angle</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">360</span> <span class="o">+</span> <span class="n">angle</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_angles</span><span class="p">(</span><span class="n">angles_to_compute</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the angles.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    angles_to_compute: dict</span>
+<span class="sd">        Containing definition of angles.</span>
+<span class="sd">    df_xyz: pd.DataFrame</span>
+<span class="sd">        DataFrame of triangulated data.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        dictionary of the angles computed</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">triangulated_angles</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">angle</span><span class="p">,</span> <span class="n">markers_dictionary</span> <span class="ow">in</span> <span class="n">angles_to_compute</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">pt_a</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">pt_b</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">pt_c</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">triangulated_angles</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="o">=</span> <span class="n">_get_angle_between_three_points_at_PointA</span><span class="p">(</span>
+                <span class="n">PointA</span><span class="o">=</span><span class="n">pt_a</span><span class="p">,</span> <span class="n">PointB</span><span class="o">=</span><span class="n">pt_b</span><span class="p">,</span> <span class="n">PointC</span><span class="o">=</span><span class="n">pt_c</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="n">pt_a</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">pt_b</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">pt_c</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">4</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">plane_coord</span> <span class="o">=</span> <span class="n">_get_coordinates_plane_equation_from_three_points</span><span class="p">(</span>
+                <span class="n">PointA</span><span class="o">=</span><span class="n">pt_a</span><span class="p">,</span> <span class="n">PointB</span><span class="o">=</span><span class="n">pt_b</span><span class="p">,</span> <span class="n">PointC</span><span class="o">=</span><span class="n">pt_c</span>
+            <span class="p">)</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="n">_get_vector_product</span><span class="p">(</span><span class="n">A</span><span class="o">=</span><span class="n">plane_coord</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">B</span><span class="o">=</span><span class="n">plane_coord</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+            <span class="n">pt_d</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">pt_e</span> <span class="o">=</span> <span class="n">_get_vector_from_label</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span>
+            <span class="p">)</span>
+            <span class="n">triangulated_angles</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="o">=</span> <span class="n">_get_angle_between_two_points_and_plane</span><span class="p">(</span>
+                <span class="n">PointA</span><span class="o">=</span><span class="n">pt_d</span><span class="p">,</span> <span class="n">PointB</span><span class="o">=</span><span class="n">pt_e</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="n">N</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid number (</span><span class="si">%d</span><span class="s2">) of markers to compute the angle &quot;</span> <span class="o">+</span> <span class="n">angle</span><span class="p">,</span>
+                <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">markers_dictionary</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">])),</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">triangulated_angles</span>
+
+
+<span class="k">def</span> <span class="nf">_convert_all_xyz_distances</span><span class="p">(</span><span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">conversion_factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="n">marker_id_combinations</span> <span class="o">=</span> <span class="n">it</span><span class="o">.</span><span class="n">combinations</span><span class="p">(</span><span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;bodyparts&quot;</span><span class="p">],</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">all_distances_in_cm</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">marker_id_a</span><span class="p">,</span> <span class="n">marker_id_b</span> <span class="ow">in</span> <span class="n">marker_id_combinations</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">marker_id_a</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">all_distances_in_cm</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">all_distances_in_cm</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">xyz_distance</span> <span class="o">=</span> <span class="n">get_xyz_distance_in_triangulation_space</span><span class="p">(</span><span class="n">marker_ids</span><span class="o">=</span><span class="p">(</span><span class="n">marker_id_a</span><span class="p">,</span> <span class="n">marker_id_b</span><span class="p">),</span>
+                                                               <span class="n">df_xyz</span><span class="o">=</span><span class="n">df_xyz</span><span class="p">)</span>
+        <span class="n">all_distances_in_cm</span><span class="p">[</span><span class="n">marker_id_a</span><span class="p">][</span><span class="n">marker_id_b</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyz_distance</span> <span class="o">/</span> <span class="n">conversion_factor</span>
+    <span class="k">return</span> <span class="n">all_distances_in_cm</span>
+
+
+<span class="k">def</span> <span class="nf">_get_length_in_3d_space</span><span class="p">(</span><span class="n">PointA</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointB</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">PointA</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="o">+</span> <span class="p">(</span><span class="n">PointA</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="o">+</span> <span class="p">(</span><span class="n">PointA</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">length</span>
+
+
+<span class="k">def</span> <span class="nf">_get_angle_from_law_of_cosines</span><span class="p">(</span>
+        <span class="n">length_a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">length_b</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">length_c</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">cos_angle</span> <span class="o">=</span> <span class="p">(</span><span class="n">length_c</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">length_b</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">length_a</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span>
+            <span class="mi">2</span> <span class="o">*</span> <span class="n">length_b</span> <span class="o">*</span> <span class="n">length_c</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">acos</span><span class="p">(</span><span class="n">cos_angle</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_get_angle_between_three_points_at_PointA</span><span class="p">(</span>
+        <span class="n">PointA</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointB</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointC</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">length_c</span> <span class="o">=</span> <span class="n">_get_length_in_3d_space</span><span class="p">(</span><span class="n">PointA</span><span class="p">,</span> <span class="n">PointB</span><span class="p">)</span>
+    <span class="n">length_b</span> <span class="o">=</span> <span class="n">_get_length_in_3d_space</span><span class="p">(</span><span class="n">PointA</span><span class="p">,</span> <span class="n">PointC</span><span class="p">)</span>
+    <span class="n">length_a</span> <span class="o">=</span> <span class="n">_get_length_in_3d_space</span><span class="p">(</span><span class="n">PointB</span><span class="p">,</span> <span class="n">PointC</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_get_angle_from_law_of_cosines</span><span class="p">(</span><span class="n">length_a</span><span class="p">,</span> <span class="n">length_b</span><span class="p">,</span> <span class="n">length_c</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_coordinates_plane_equation_from_three_points</span><span class="p">(</span>
+        <span class="n">PointA</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointB</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointC</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+    <span class="n">R1</span> <span class="o">=</span> <span class="n">_get_vector_from_two_points</span><span class="p">(</span><span class="n">PointA</span><span class="p">,</span> <span class="n">PointB</span><span class="p">)</span>
+    <span class="n">R2</span> <span class="o">=</span> <span class="n">_get_vector_from_two_points</span><span class="p">(</span><span class="n">PointA</span><span class="p">,</span> <span class="n">PointC</span><span class="p">)</span>
+    <span class="n">plane_equation_coordinates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">PointA</span><span class="p">,</span> <span class="n">R1</span><span class="p">,</span> <span class="n">R2</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">plane_equation_coordinates</span>
+
+
+<span class="k">def</span> <span class="nf">_get_vector_product</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">B</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">A</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">A</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">A</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">A</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">A</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">A</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">N</span>
+
+
+<span class="k">def</span> <span class="nf">_get_vector_from_two_points</span><span class="p">(</span>
+        <span class="n">PointA</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointB</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+    <span class="n">vector</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">PointA</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">PointA</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">PointA</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">PointB</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">vector</span>
+
+
+<span class="k">def</span> <span class="nf">_get_vector_length</span><span class="p">(</span><span class="n">vector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">vector</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">vector</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">vector</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">length</span>
+
+
+<span class="k">def</span> <span class="nf">_get_angle_between_plane_and_line</span><span class="p">(</span><span class="n">N</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">R</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate angle between plane and line.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    N: np.array</span>
+<span class="sd">        normal vector of the plane</span>
+<span class="sd">    R: np.array</span>
+<span class="sd">        vector between two points</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    angle: float</span>
+<span class="sd">        Angle between N and R in degrees.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cosphi</span> <span class="o">=</span> <span class="n">_get_vector_length</span><span class="p">(</span><span class="n">vector</span><span class="o">=</span><span class="n">_get_vector_product</span><span class="p">(</span><span class="n">A</span><span class="o">=</span><span class="n">N</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="n">R</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span>
+            <span class="n">_get_vector_length</span><span class="p">(</span><span class="n">N</span><span class="p">)</span> <span class="o">*</span> <span class="n">_get_vector_length</span><span class="p">(</span><span class="n">R</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">acos</span><span class="p">(</span><span class="n">cosphi</span><span class="p">))</span>
+    <span class="n">angle</span> <span class="o">=</span> <span class="mi">90</span> <span class="o">-</span> <span class="n">phi</span>
+    <span class="k">return</span> <span class="n">angle</span>
+
+
+<span class="k">def</span> <span class="nf">_get_angle_between_two_points_and_plane</span><span class="p">(</span>
+        <span class="n">PointA</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointB</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="n">_get_vector_from_two_points</span><span class="p">(</span><span class="n">PointA</span><span class="p">,</span> <span class="n">PointB</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_get_angle_between_plane_and_line</span><span class="p">(</span><span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span> <span class="n">R</span><span class="o">=</span><span class="n">R</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_vector_from_label</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">df_xyz</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">df_xyz</span><span class="p">[</span><span class="n">label</span> <span class="o">+</span> <span class="s2">&quot;_x&quot;</span><span class="p">],</span>
+            <span class="n">df_xyz</span><span class="p">[</span><span class="n">label</span> <span class="o">+</span> <span class="s2">&quot;_y&quot;</span><span class="p">],</span>
+            <span class="n">df_xyz</span><span class="p">[</span><span class="n">label</span> <span class="o">+</span> <span class="s2">&quot;_z&quot;</span><span class="p">],</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_distance_between_plane_and_point</span><span class="p">(</span>
+        <span class="n">N</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">PointOnPlane</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">DistantPoint</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">N</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">PointOnPlane</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">PointOnPlane</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">PointOnPlane</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span>
+        <span class="n">N</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">DistantPoint</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">DistantPoint</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">DistantPoint</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">a</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">N</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">N</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">distance</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
