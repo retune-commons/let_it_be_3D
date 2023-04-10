@@ -1,0 +1,51 @@
+# https://help.github.com/en/articles/metadata-syntax-for-github-actions
+name: 'let_it_be_3D Sphinx Documentation to GitHub Pages'
+description: 'Deploy Sphinx documentation to GitHub Pages'
+author: 'Konstantin Kobel'
+branding:
+  color: 'green'
+  icon: 'upload-cloud'
+inputs:
+  documentation_path:
+    description: 'Path to Sphinx source files'
+    required: false
+    default: './docs'
+  requirements_path:
+    description: 'Path to requirements file, used in `pip install -r XXX` command'
+    required: false
+    default: './requirements.txt'
+  pyproject_extras:
+    description: 'Extras of Requirement Specifier, used in `pip install .[XXX]` command'
+    required: false
+    default: 'docs'
+  python_version:
+    description: 'Version of Python'
+    required: false
+    default: '3.10'
+  sphinx_version:
+    description: 'Version of Sphinx'
+    required: false
+    default: ''
+  cache:
+    description: 'Enable cache to speed up documentation building'
+    required: false
+    default: false
+  sphinx_build_options:
+    description: 'Additional options passed to sphinx-build'
+    required: false
+    default: ''
+  checkout:
+    description: 'Whether to automatically checkout the repository, if false, user need to do it byself'
+    required: false
+    default: true
+  publish:
+    description: 'Whether to automatically publish the pages, if false, user need to manually publish by self'
+    required: false
+    default: true
+outputs:
+  page_url:
+    description: 'URL to deployed GitHub Pages, only available when option publish is set to true'
+    value: ${{ steps.deployment.outputs.page_url }}
+  artifact:
+    description: 'Directory where artifact (HTML documentation) is stored, user can use it to deploy GitHub Pages manually'
+    value: ${{ steps.build.outputs.artifact }}
