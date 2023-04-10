@@ -8,7 +8,7 @@ jobs:
   pages:
     runs-on: ubuntu-20.04
     environment:
-      name: github-pages
+      name: retune-commons/let_it_be_3D
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
