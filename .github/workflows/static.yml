@@ -9,7 +9,7 @@ jobs:
     runs-on: macos-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: https://retune-commons.github.io/let_it_be_3D/
     permissions:
       pages: write
       id-token: write
