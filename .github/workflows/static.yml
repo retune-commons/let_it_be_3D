@@ -15,4 +15,4 @@ jobs:
       id-token: write
     steps:
     - id: deployment
-      uses: let_it_be_3D/main
+      uses: actions/checkout@main
