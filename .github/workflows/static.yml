@@ -8,8 +8,7 @@ jobs:
   pages:
     runs-on: macos-latest
     environment:
-      name: retune-commons/let_it_be_3D
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: github-pages
     permissions:
       pages: write
       id-token: write
