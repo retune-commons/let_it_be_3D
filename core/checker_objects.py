@@ -6,7 +6,7 @@ import imageio as iio
 from .plotting import Intrinsics
 from .user_specific_rules import user_specific_rules_on_triangulation_calibration_videos
 from .utils import convert_to_path, read_config, check_keys, KEYS_TO_CHECK_PROJECT, \
-    KEYS_TO_CHECK_RECORDING, KEYS_TO_CHECK_CAMERA
+    KEYS_TO_CHECK_RECORDING, KEYS_TO_CHECK_CAMERA_RECORDING, KEYS_TO_CHECK_CAMERA_PROJECT
 from .video_metadata import VideoMetadataChecker
 
 def _check_for_missing_or_duplicate_cameras(
@@ -125,7 +125,7 @@ Tuple[dict, dict]:
             f"in the config_file {recording_config_filepath}!"
         )
 
-    for dictionary_key in KEYS_TO_CHECK_CAMERA:
+    for dictionary_key in KEYS_TO_CHECK_CAMERA_PROJECT:
         cameras_with_missing_keys = check_keys(
             dictionary=project_config_dict[dictionary_key],
             list_of_keys=project_config_dict["valid_cam_ids"],

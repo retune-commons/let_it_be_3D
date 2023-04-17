@@ -140,7 +140,7 @@ class VideoMetadata(ABC):
         if self.calvin:
             self.framenum = 1
         else:
-            self.framenum = iio.v2.get_reader(video_filepath).count_frames()
+            self.framenum = iio.v2.get_reader(self.filepath).count_frames()
 
     def _check_filepaths(self, video_filepath: Path) -> Path:
         if (video_filepath.suffix in [".mp4", ".mov", ".AVI", ".avi", ".jpg", ".png", ".tiff",
