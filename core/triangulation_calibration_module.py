@@ -230,10 +230,10 @@ def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
 
 
 def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
-    all_normalization_markers = [config['center']]
-    for marker in config["ReferenceLengthMarkers"]:
+    all_normalization_markers = [config['CENTER']]
+    for marker in config["REFERENCE_LENGTH_MARKERS"]:
         all_normalization_markers.append(marker)
-    for marker in config["ReferenceRotationMarkers"]:
+    for marker in config["REFERENCE_ROTATION_MARKERS"]:
         all_normalization_markers.append(marker)
     all_normalization_markers = set(all_normalization_markers)
     normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
@@ -913,10 +913,12 @@ class Triangulation(ABC):
         self.all_cameras.sort()
         missing_cams_in_all_cameras = _find_non_matching_list_elements(filepath_keys,
                                                                        self.all_cameras)
-        if missing_cams_in_all_cameras:
+        missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
+                                                                         filepath_keys)
+        if missing_cams_in_filepath_keys:
             min_framenum = min([pd.read_hdf(path).shape[0] for path in
                                 self.triangulation_dlc_cams_filepaths.values()])
-            self._create_empty_files(cams_to_create_empty_files=missing_cams_in_all_cameras,
+            self._create_empty_files(cams_to_create_empty_files=missing_cams_in_filepath_keys,
                                      framenum=min_framenum,
                                      markers=self.markers)
         for cam in missing_cams_in_all_cameras:
@@ -1318,7 +1320,7 @@ class TriangulationRecordings(Triangulation):
         )
         return filepath_out
 
-    def normalize(self, normalization_config_path: Union[Path, str], test_mode: bool = False) -> Tuple[Path, float]:
+    def normalize(self, normalization_config_path: Union[Path, str], test_mode: bool = False, verbose: bool = False) -> Tuple[Path, float]:
         """
         Rotate and translate the triangulated dataframe.
 
@@ -1342,6 +1344,8 @@ class TriangulationRecordings(Triangulation):
         rotation_error: flot
             Error returned by scipy.transform.Rotation.align_vectors, representing
             whether the alignment worked well.
+        verbose: bool, default False
+            If True (default False), then the rotation visualization plot is shown.
 
         Notes
         -----
@@ -1414,7 +1418,7 @@ class TriangulationRecordings(Triangulation):
             output_filepath=self.rotated_filepath,
             rotation_error=rotation_error
         )
-        visualization.create_plot(plot=False, save=True)
+        visualization.create_plot(plot=verbose, save=True)
         return self.rotated_filepath, rotation_error
 
     def create_triangulated_video(
@@ -1716,7 +1720,7 @@ class CalibrationValidation(Triangulation):
         for reference in self.anipose_io["distance_errors_in_cm"].keys():
             all_percentage_errors = [percentage_error for *_, percentage_error
                                      in self.anipose_io["distance_errors_in_cm"][reference]["individual_errors"]]
-        all_angle_errors = list(self.anipose_io["angles_error_screws_plan"].values())
+        all_angle_errors = list(self.anipose_io["angles_error_ground_truth_vs_triangulated"].values())
 
         mean_dist_err_percentage = np.nanmean(np.asarray(all_percentage_errors))
         mean_angle_err = np.nanmean(np.asarray(all_angle_errors))

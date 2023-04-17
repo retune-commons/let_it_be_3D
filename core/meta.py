@@ -446,7 +446,7 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 4
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def synchronize_calibrations(self, test_mode: bool = False) -> None:
+    def synchronize_calibrations(self, test_mode: bool = False, verbose: bool = True) -> None:
         """
         Run get_marker_predictions for all calibration_validation objects and
         run_synchronization for all calibration objects added to MetaInterface.
@@ -456,10 +456,12 @@ class MetaInterface(ABC):
         test_mode: bool, default False
             If True (default False), then pre-existing files won't be overwritten
             during the analysis.
+        verbose: bool, default True
+            If True (default), then the attribute is passed to the Calibration objects.
         """
         for recording_day in self.meta["recording_days"].values():
             calibration_object = self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]]
-            calibration_object.run_synchronization(test_mode=test_mode)
+            calibration_object.run_synchronization(test_mode=test_mode, verbose=verbose)
             for video in recording_day["calibrations"]["videos"]:
                 recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
                     calibration_object.synchronized_charuco_videofiles[video])
@@ -600,7 +602,7 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def normalize_recordings(self, normalization_config_path: Union[Path, str], test_mode: bool = False) -> None:
+    def normalize_recordings(self, normalization_config_path: Union[Path, str], test_mode: bool = False, verbose: bool = False) -> None:
         """
         Run the function normalize for all TriangulationRecordings objects and
         saves the normalisation metadata.
@@ -612,13 +614,15 @@ class MetaInterface(ABC):
         test_mode: bool, default False
             If True (default False), then pre-existing files won't be overwritten
             during the analysis.
+        verbose: bool, default False
+            If True (default False), then the rotation visualization plot is shown.
         """
         normalization_config_path = convert_to_path(normalization_config_path)
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
                 rotated_filepath, rotation_error = self.objects["triangulation_recordings_objects"][
                     recording
-                ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode)
+                ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode, verbose=verbose)
                 recording_day["recordings"][recording]["normalised_3D_csv"] = rotated_filepath
                 recording_day["recordings"][recording]["normalisation_rotation_error"] = rotation_error
         self.meta["meta_step"] = 8
