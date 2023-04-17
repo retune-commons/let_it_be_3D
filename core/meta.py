@@ -463,10 +463,11 @@ class MetaInterface(ABC):
             calibration_object = self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]]
             calibration_object.run_synchronization(test_mode=test_mode, verbose=verbose)
             for video in recording_day["calibrations"]["videos"]:
-                recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
-                    calibration_object.synchronized_charuco_videofiles[video])
-                recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = \
-                calibration_object.metadata_from_videos[video].framenum_synchronized
+                if video in calibration_object.synchronized_charuco_videofiles:
+                    recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
+                        calibration_object.synchronized_charuco_videofiles[video])
+                    recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = \
+                    calibration_object.metadata_from_videos[video].framenum_synchronized
 
             self.objects["calibration_validation_objects"][
                 recording_day["calibrations"]["calibration_key"]

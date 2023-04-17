@@ -452,7 +452,7 @@ class Calibration:
             of frames for each camera are printed.
         """
         self.synchronized_charuco_videofiles = {}
-        self.camera_objects = []
+        camera_objects_unexcluded = []
         for video_interface in self.video_interfaces.values():
             video_interface.run_synchronizer(
                 synchronizer=CharucoVideoSynchronizer,
@@ -465,10 +465,11 @@ class Calibration:
             self.synchronized_charuco_videofiles[
                 video_interface.video_metadata.cam_id
             ] = str(video_interface.synchronized_video_filepath)
-            self.camera_objects.append(video_interface.export_for_aniposelib())
-
+            camera_objects_unexcluded.append(video_interface.export_for_aniposelib())
+        camera_objects_unexcluded.sort(key=lambda x: x.name, reverse=False)
         self._plot_synchro_crossvalidation(verbose=verbose)
-        cameras = [camera_object.name for camera_object in self.camera_objects]
+        
+        cameras = [camera_object.name for camera_object in camera_objects_unexcluded]
         duplicate_cams = _get_duplicate_elems_in_list(cameras)
         if duplicate_cams:
             raise ValueError(
@@ -476,13 +477,14 @@ class Calibration:
                 "however, all cam_ids must be unique! Please check for duplicates "
                 "in the calibration directory and rename them!"
             )
-        self.camera_objects.sort(key=lambda x: x.name, reverse=False)
+
         cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
                                                allowed_num_diverging_frames=self.allowed_num_diverging_frames)
-        self.valid_videos = [cam.name for cam in self.camera_objects if
+        self.valid_videos = [cam.name for cam in camera_objects_unexcluded if
                              cam.name not in cams_to_exclude]
+        self.camera_objects = [cam for cam in camera_objects_unexcluded if cam.name not in cams_to_exclude]
         for cam in cams_to_exclude:
-            self.camera_objects.remove(cam)
+            self.synchronized_charuco_videofiles.pop(cam)
         self.camera_group = _initialize_camera_group(camera_objects=self.camera_objects)
 
     def run_calibration(
@@ -630,12 +632,12 @@ class Calibration:
             if verbose > 0:
                 print(
                     f"Calibration {cal}\n mean percentage error: {mean_dist_err_percentage}\n "
-                    f"mean angle error: {mean_angle_err}"
+                    f"mean angle error: {mean_angle_err}\n "
                     f"ap_lib reprojerr: {self.reprojerr}")
 
             report.loc[cal, "mean_distance_error_percentage"] = mean_dist_err_percentage
             report.loc[cal, "mean_angle_error"] = mean_angle_err
-            report.loc[cal, "reprojerror"] = reprojerr_nonan_mean
+            report.loc[cal, "mean_reprojerror_calvin"] = reprojerr_nonan_mean
             report.loc[cal, "ap_lib_reprojerr"] = self.reprojerr
 
             if (mean_dist_err_percentage < p_threshold and mean_angle_err < angle_threshold):

@@ -1,4 +1,6 @@
 Side1:
+#- X1
+#- X2
 - MazeCornerClosedLeft
 - MazeCornerClosedRight
 - MazeCornerOpenRight
@@ -20,6 +22,7 @@ Side3:
 - X2
 - IliacCrestLeft
 - IliacCrestRight
+#- Screw1Top
 
 Bottom:
 - Screw1Nut
@@ -43,19 +46,19 @@ Front:
 - X2
 - Screw1Bottom
 - Screw2Bottom
-- Screw2Top
+#- Screw2Top
 - Screw3Bottom
-- Screw3Top
+#- Screw3Top
 - Screw4Bottom
 
 Ground1:
 - MazeCornerClosedLeft
 #- MazeCornerClosedRight
-- X2
+#- X2
 #- Screw1Nut
 - Screw2Top
 - Screw3Top
-- Screw4Top
+#- Screw4Top
 - IliacCrestLeft
 - IliacCrestRight
 - HipLeft
@@ -98,3 +101,4 @@ Top:
 - BackAngleRight
 - WristLeft
 - WristRight
+

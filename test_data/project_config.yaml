@@ -3,13 +3,13 @@
 # for DLC: the path to config.yaml
 # for manual: the path to the yaml with all marker_names
 calibration_evaluation_filepath:
-  Bottom: "test_data/MarkerDetection/Positions/config.yaml"
-  Ground1: "test_data/MarkerDetection/Positions/config.yaml"
-  Ground2: "test_data/MarkerDetection/Positions/config.yaml"
-  Side1: "test_data/MarkerDetection/Positions/config.yaml"
-  Side2: "test_data/MarkerDetection/Positions/config.yaml"
-  Side3: "test_data/MarkerDetection/Positions/config.yaml"
-  Top: "test_data/MarkerDetection/Positions/config.yaml"
+  Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground1: "test_data/MarkerDetection/Bottom/config.yaml"
+  Ground2: "test_data/MarkerDetection/Bottom/config.yaml"
+  Side1: "test_data/MarkerDetection/Side/config.yaml"
+  Side2: "test_data/MarkerDetection/Side/config.yaml"
+  Side3: "test_data/MarkerDetection/Side/config.yaml"
+  Top: "test_data/MarkerDetection/Top/config.yaml"
   Front: "test_data/MarkerDetection/Positions/config.yaml"
 calibration_evaluation_type:
   Bottom: DLC
