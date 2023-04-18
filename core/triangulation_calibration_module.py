@@ -646,7 +646,7 @@ class Calibration:
                 calibration_filepath = good_calibration_filepath
                 if verbose > 0:
                     print(
-                        f"Good Calibration reached at iteration {cal}!"
+                        f"Good Calibration reached at iteration {cal}!\n"
                         f"Named it {good_calibration_filepath}.")
                 break
 

@@ -416,7 +416,7 @@ class Intrinsics:
         self._create_all_images(frame_idx=0)
 
     def create_plot(self, plot: bool, save: bool) -> None:
-        fig = plt.figure(figsize=(12, 5), facecolor="white")
+        fig = plt.figure(figsize=(9, 6), facecolor="white")
         gs = fig.add_gridspec(1, 2)
         ax1 = fig.add_subplot(gs[0, 0])
         plt.imshow(self.distorted_input_image)

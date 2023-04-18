@@ -885,9 +885,10 @@ class Synchronizer(ABC):
             alignment_error = 0
             led_center_coordinates = Coordinates(0, 0)
             default_offset = self.synchro_metadata["default_offset_ms"]
-            default_start_idx = self._get_frame_index_closest_to_time(time=default_offset)
-            offset_adjusted_start_idx, remaining_offset = _adjust_start_idx_and_offset(
-                start_frame_idx=default_start_idx, offset=default_offset, fps=self.video_metadata.fps)
+            offset_in_framenum = self.video_metadata.fps*default_offset/1000
+            not_frame_matching_offset = offset_in_framenum % 1
+            remaining_offset = not_frame_matching_offset * 1000/self.video_metadata.fps
+            offset_adjusted_start_idx = int(offset_in_framenum)
         elif self.synchro_metadata["handle_synchro_fails"] == "manual":
             self.video_metadata.led_extraction_type = "manual"
             led_center_coordinates = self._get_led_center_coordinates()
@@ -976,9 +977,12 @@ class Synchronizer(ABC):
             filepath_downsampled_video = self._concatenate_individual_video_parts_on_disk(
                 filepaths_of_video_parts=filepaths_all_video_parts)
             _delete_individual_video_parts(filepaths_of_video_parts=filepaths_all_video_parts)
-        else:
+        elif len(frame_idxs_to_sample) == 1:
             filepath_downsampled_video = self._write_video_to_disk(idxs_of_frames_to_sample=frame_idxs_to_sample[0],
                                                                    target_fps=target_fps, )
+        else:
+            print ("Can't synchronize video. Check, whether the file is broken. Unsynchronized video was returned.")
+            filepath_downsampled_video = self.video_metadata.filepath
         return filepath_downsampled_video
 
     def _get_sampling_frame_idxs(

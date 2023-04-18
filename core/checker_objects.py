@@ -33,7 +33,6 @@ def _check_for_missing_or_duplicate_cameras(
                 (
                     i,
                     file,
-                    f"Size: {file.stat().st_size} bytes",
                     f"Framenum: {iio.v2.get_reader(file).count_frames()}",
                 )
                 for i, file in enumerate(files_per_cam[key])
