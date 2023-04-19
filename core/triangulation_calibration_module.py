@@ -650,9 +650,10 @@ class Calibration:
                         f"Named it {good_calibration_filepath}.")
                 break
 
-        self.report_filepath = self.output_directory.joinpath(
-            f"{self.recording_date}_calibration_report.csv")
-        report.to_csv(self.report_filepath, index=False)
+        if not test_mode:
+            self.report_filepath = self.output_directory.joinpath(
+                f"{self.recording_date}_calibration_report.csv")
+            report.to_csv(self.report_filepath, index=False)
 
         if not calibration_found:
             if verbose > 0:

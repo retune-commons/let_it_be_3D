@@ -246,7 +246,7 @@ class MetaInterface(ABC):
                 recording_day["recording_directories"]
             )
             print(
-                f"Found {recording_day['num_recordings']} recordings at "
+                f"\nFound {recording_day['num_recordings']} recordings at "
                 f"recording day {recording_day['recording_date']}!"
             )
         self.meta["meta_step"] = 1
@@ -355,7 +355,9 @@ class MetaInterface(ABC):
         """
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
-                start_time_recording = time.time()
+                if verbose: 
+                    start_time_recording = time.time()
+                    print(f"\nNow analysing {recording}!")
                 recording_object = self.objects["triangulation_recordings_objects"][recording]
                 recording_meta = recording_day["recordings"][recording]
                 recording_object.run_synchronization(
@@ -372,11 +374,11 @@ class MetaInterface(ABC):
                             recording_object.triangulation_dlc_cams_filepaths[video])
                     except:
                         pass
-                end_time_recording = time.time()
-                duration = end_time_recording - start_time_recording
                 if verbose:
+                    end_time_recording = time.time()
+                    duration = end_time_recording - start_time_recording
                     print(
-                        f"The analysis of this recording {recording} took {duration}.\n"
+                        f"The analysis of this recording {recording} took {duration}."
                     )
 
         self.meta["meta_step"] = 3
@@ -460,6 +462,8 @@ class MetaInterface(ABC):
             If True (default), then the attribute is passed to the Calibration objects.
         """
         for recording_day in self.meta["recording_days"].values():
+            if verbose:
+                print(f'\nNow analysing {recording_day["calibrations"]["calibration_key"]}!')
             calibration_object = self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]]
             calibration_object.run_synchronization(test_mode=test_mode, verbose=verbose)
             for video in recording_day["calibrations"]["videos"]:
@@ -550,6 +554,8 @@ class MetaInterface(ABC):
             overwritten during the analysis.
         """
         for recording_day in self.meta["recording_days"].values():
+            if verbose:
+                print(f"\nNow analysing {recording_day['calibrations']['calibration_key']}!")
             if calibrate_optimal:
                 recording_day["calibrations"]["toml_filepath"] = str(
                     self.objects["calibration_objects"][
@@ -575,7 +581,7 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def triangulate_recordings(self, test_mode: bool = False) -> None:
+    def triangulate_recordings(self, test_mode: bool = False, verbose: bool = True) -> None:
         """
         Run the function run_triangulation for all TriangulationRecording
         objects added to MetaInterface.
@@ -585,9 +591,15 @@ class MetaInterface(ABC):
         test_mode: bool, default False
             If True (default False), then pre-existing files won't be
             overwritten during the analysis.
+        verbose: bool, default True
+            If True (default), then the recording, that is currently analysed, and the
+            duration of an analysis will be printed.
         """
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
+                if verbose:
+                    print(f"\nNow analysing {recording}!")
+                    start_time_recording = time.time()
                 toml_filepath = recording_day['calibrations']['toml_filepath']
                 self.objects["triangulation_recordings_objects"][recording].run_triangulation(
                     calibration_toml_filepath=toml_filepath,
@@ -600,6 +612,12 @@ class MetaInterface(ABC):
                 )
                 recording_day["recordings"][recording]["reprojerr_mean"] = \
                 self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
+                if verbose:
+                    end_time_recording = time.time()
+                    duration = end_time_recording - start_time_recording
+                    print(
+                        f"The analysis of this recording {recording} took {duration}."
+                    )
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
@@ -621,6 +639,8 @@ class MetaInterface(ABC):
         normalization_config_path = convert_to_path(normalization_config_path)
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
+                if verbose:
+                    print(f"\nRotation plot for {recording}:")
                 rotated_filepath, rotation_error = self.objects["triangulation_recordings_objects"][
                     recording
                 ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode, verbose=verbose)
@@ -650,7 +670,7 @@ class MetaInterface(ABC):
                 filename = self.objects["triangulation_recordings_objects"][
                     recording
                 ].csv_output_filepath.stem
-                if data_base["recording"] == filename and not overwrite:
+                if filename in data_base["recording"].unique() and not overwrite:
                     print(
                         f"{filename} was already in test! if you want to add it anyways use overwrite=True!"
                     )
