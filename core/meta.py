@@ -472,7 +472,8 @@ class MetaInterface(ABC):
                         calibration_object.synchronized_charuco_videofiles[video])
                     recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = \
                     calibration_object.metadata_from_videos[video].framenum_synchronized
-
+            
+            recording_day["calibrations"]["cams_to_exclude"] = str(calibration_object.cams_to_exclude)
             self.objects["calibration_validation_objects"][
                 recording_day["calibrations"]["calibration_key"]
             ].get_marker_predictions(test_mode=test_mode)
@@ -612,6 +613,7 @@ class MetaInterface(ABC):
                 )
                 recording_day["recordings"][recording]["reprojerr_mean"] = \
                 self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
+                recording_day["recordings"][recording]["excluded_cams"] = self.objects["triangulation_recordings_objects"][recording].cams_to_exclude
                 if verbose:
                     end_time_recording = time.time()
                     duration = end_time_recording - start_time_recording

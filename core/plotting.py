@@ -80,7 +80,7 @@ class RotationVisualization:
             rotated_markers: List,
             config: Dict,
             rotation_error: float,
-            output_filepath: Optional[Path] = None,
+            output_filepath: Optional[Union[Path, str]] = None,
     ) -> None:
         self.rotated_markers = rotated_markers
         self.config = config
@@ -218,7 +218,7 @@ class CalibrationValidationPlot:
         plt.close()
 
     def _create_filepath(self) -> str:
-        filename = f"3D_plot_{self.filename_tag}"
+        filename = f"3D_plot_{self.filename_tag}.png"
         filepath = self.output_directory.joinpath(filename)
         return str(filepath)
 

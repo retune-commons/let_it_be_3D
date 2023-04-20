@@ -478,12 +478,12 @@ class Calibration:
                 "in the calibration directory and rename them!"
             )
 
-        cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
+        self.cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
                                                allowed_num_diverging_frames=self.allowed_num_diverging_frames)
         self.valid_videos = [cam.name for cam in camera_objects_unexcluded if
-                             cam.name not in cams_to_exclude]
-        self.camera_objects = [cam for cam in camera_objects_unexcluded if cam.name not in cams_to_exclude]
-        for cam in cams_to_exclude:
+                             cam.name not in self.cams_to_exclude]
+        self.camera_objects = [cam for cam in camera_objects_unexcluded if cam.name not in self.cams_to_exclude]
+        for cam in self.cams_to_exclude:
             self.synchronized_charuco_videofiles.pop(cam)
         self.camera_group = _initialize_camera_group(camera_objects=self.camera_objects)
 
@@ -627,14 +627,18 @@ class Calibration:
 
             calibration_validation.run_triangulation(calibration_toml_filepath=calibration_filepath)
             mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean = \
-                calibration_validation.evaluate_triangulation_of_calibration_validation_markers()
+                calibration_validation.evaluate_triangulation_of_calibration_validation_markers(verbose=bool(verbose > 2), show_3D_plot=bool(verbose))
 
-            if verbose > 0:
+            if verbose:
                 print(
                     f"Calibration {cal}\n mean percentage error: {mean_dist_err_percentage}\n "
                     f"mean angle error: {mean_angle_err}\n "
-                    f"ap_lib reprojerr: {self.reprojerr}")
-
+                    f"ap_lib reprojection error: {self.reprojerr}\n "
+                    f'Calvin mean reprojection error: {calibration_validation.anipose_io["reproj_nonan"].mean()}')
+                
+            report.loc[cal, "key"] = str(calibration_filepath)
+            report.loc[cal, "num_cams"] = len(self.camera_objects)
+            report.loc[cal, "cams_to_exclude"] = str(self.cams_to_exclude)
             report.loc[cal, "mean_distance_error_percentage"] = mean_dist_err_percentage
             report.loc[cal, "mean_angle_error"] = mean_angle_err
             report.loc[cal, "mean_reprojerror_calvin"] = reprojerr_nonan_mean
@@ -644,7 +648,7 @@ class Calibration:
                 calibration_found = True
                 calibration_filepath.rename(good_calibration_filepath)
                 calibration_filepath = good_calibration_filepath
-                if verbose > 0:
+                if verbose:
                     print(
                         f"Good Calibration reached at iteration {cal}!\n"
                         f"Named it {good_calibration_filepath}.")
@@ -672,7 +676,7 @@ class Calibration:
                     video_interface.video_metadata.cam_id
                 ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
         if list(led_timeseries_crossvalidation.keys()):
-            filename = f'{self.recording_date}_charuco_synchronization_crossvalidation_{self.target_fps}'
+            filename = f'{self.recording_date}_charuco_synchronization_crossvalidation_{self.target_fps}fps'
             synchronization_crossvalidation = AlignmentPlotCrossvalidation(
                 template=template,
                 led_timeseries=led_timeseries_crossvalidation,
@@ -884,7 +888,6 @@ class Triangulation(ABC):
                                       attributes_to_check=self._metadata_keys)
         for attribute, value in zip(self._metadata_keys, metadata):
             setattr(self, attribute, value)
-        self.csv_output_filepath = self._create_csv_filepath()
 
     def run_triangulation(
             self,
@@ -907,6 +910,7 @@ class Triangulation(ABC):
             If True (default False), then pre-existing files won't be overwritten
             during the analysis.
         """
+        self.csv_output_filepath = self._create_csv_filepath()
         calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
         self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
 
@@ -926,6 +930,7 @@ class Triangulation(ABC):
                                      markers=self.markers)
         for cam in missing_cams_in_all_cameras:
             self.triangulation_dlc_cams_filepaths.pop(cam)
+            self.cams_to_exclude.append(cam)
 
         self.anipose_io = self._preprocess_dlc_predictions_for_anipose(test_mode=test_mode)
         if self.triangulation_type == "triangulate":
@@ -1013,7 +1018,7 @@ class Triangulation(ABC):
         for cam in cams_to_create_empty_files:
             print(f"Creating empty .h5 file for {cam}!")
             h5_output_filepath = self.output_directory.joinpath(
-                self.csv_output_filepath.stem + f"empty_{cam}.h5"
+                f"empty_{cam}.h5"
             )
             cols = get_multi_index(markers)
             df = pd.DataFrame(data=np.zeros((framenum, len(cols))), columns=cols, dtype=int)
@@ -1287,10 +1292,10 @@ class TriangulationRecordings(Triangulation):
             markers = list(df.columns.levels[1])
             all_markers = all_markers.union(markers)
         self.markers = list(all_markers)
-        cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
+        self.cams_to_exclude = _exclude_by_framenum(metadata_from_videos=self.metadata_from_videos,
                                                allowed_num_diverging_frames=self.allowed_num_diverging_frames)
         for cam in self.metadata_from_videos:
-            if cam in cams_to_exclude:
+            if cam in self.cams_to_exclude:
                 self.triangulation_dlc_cams_filepaths.pop(cam)
 
     def _plot_synchro_crossvalidation(self, verbose: bool) -> None:
@@ -1305,7 +1310,7 @@ class TriangulationRecordings(Triangulation):
                     video_interface.video_metadata.cam_id
                 ] = video_interface.synchronizer_object.led_timeseries_for_cross_video_validation
         if list(led_timeseries_crossvalidation.keys()):
-            filename = f'{self.mouse_id}_{self.recording_date}_{self.paradigm}_synchronization_crossvalidation'
+            filename = f'{self.mouse_id}_{self.recording_date}_{self.paradigm}_synchronization_crossvalidation_{self.target_fps}fps'
             synchronization_crossvalidation = AlignmentPlotCrossvalidation(
                 template=template,
                 led_timeseries=led_timeseries_crossvalidation,
@@ -1416,9 +1421,10 @@ class TriangulationRecordings(Triangulation):
         self.rotated_filepath = self._create_csv_filepath()
         if (not test_mode) or (test_mode and not self.rotated_filepath.exists()):
             _save_dataframe_as_csv(filepath=str(self.rotated_filepath), df=rotated)
+        rotation_plot_filename = f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_rotation_visualization"
         visualization = RotationVisualization(
             rotated_markers=rotated_markers, config=config,
-            output_filepath=self.rotated_filepath,
+            output_filepath=rotation_plot_filename,
             rotation_error=rotation_error
         )
         visualization.create_plot(plot=verbose, save=True)
@@ -1629,7 +1635,7 @@ class CalibrationValidation(Triangulation):
             predictions.create_plot(plot=False, save=True)
 
     def evaluate_triangulation_of_calibration_validation_markers(
-            self, show_3D_plot: bool = True, verbose: int = 1
+            self, show_3D_plot: bool = True, verbose: bool = True,
     ) -> Tuple[np.float64, np.float64, np.float64]:
         """
         Evaluate the triangulated data and return mean errors.
@@ -1644,8 +1650,8 @@ class CalibrationValidation(Triangulation):
         show_3D_plot: bool, default True
             If True (default), then a plot of the triangulated
             calibration_validation data is shown.
-        verbose: int, default 1
-            If > 0, then all angles and distances compared to their ground truth
+        verbose: bool, default True
+            If True (default), then all angles and distances compared to their ground truth
             will be printed.
 
         Returns
@@ -1696,8 +1702,7 @@ class CalibrationValidation(Triangulation):
         self.anipose_io = add_errors_between_computed_and_ground_truth_angles(
             self.ground_truth_config["angles"], self.anipose_io)
 
-        if verbose > 0:
-            print(f'Mean reprojection error: {self.anipose_io["reproj_nonan"].mean()}')
+        if verbose:
             for reference_distance_id, distance_errors in self.anipose_io[
                 "distance_errors_in_cm"
             ].items():
@@ -1709,13 +1714,14 @@ class CalibrationValidation(Triangulation):
                 "angles_error_ground_truth_vs_triangulated"
             ].items():
                 print(f"Considering {angle}, the angle error is: {angle_error}")
+                
         if show_3D_plot:
             calibration_validation_plot = CalibrationValidationPlot(
                 p3d=self.anipose_io["p3ds"][0],
                 bodyparts=self.anipose_io["bodyparts"],
                 output_directory=self.output_directory,
                 marker_ids_to_connect=self.ground_truth_config["marker_ids_to_connect_in_3D_plot"],
-                filename_tag="calvin"
+                filename_tag=f"{self.csv_output_filepath.stem}"
             )
             calibration_validation_plot.create_plot(plot=True, save=True)
 
