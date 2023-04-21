@@ -1018,7 +1018,7 @@ class Triangulation(ABC):
         for cam in cams_to_create_empty_files:
             print(f"Creating empty .h5 file for {cam}!")
             h5_output_filepath = self.output_directory.joinpath(
-                f"empty_{cam}.h5"
+                f"empty_temp_{cam}.h5"
             )
             cols = get_multi_index(markers)
             df = pd.DataFrame(data=np.zeros((framenum, len(cols))), columns=cols, dtype=int)
