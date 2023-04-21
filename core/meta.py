@@ -365,15 +365,13 @@ class MetaInterface(ABC):
                 )
                 for video in recording_meta["videos"]:
                     try:
-                        recording_meta["videos"][video]["synchronized_video"] = str(
-                            recording_object.synchronized_videos[video])
-                        recording_meta["videos"][video]["framenum_synchronized"] = (
+                        recording_meta["videos"][video]["framenum_synchronized"] = int(
                             recording_object.metadata_from_videos[video].framenum_synchronized
                         )
                         recording_meta["videos"][video]["marker_detection_filepath"] = str(
                             recording_object.triangulation_dlc_cams_filepaths[video])
                     except:
-                        pass
+                        print(f"Synchronization metadata could not be added for {video}!")
                 if verbose:
                     end_time_recording = time.time()
                     duration = end_time_recording - start_time_recording
@@ -612,7 +610,7 @@ class MetaInterface(ABC):
                     ].csv_output_filepath
                 )
                 recording_day["recordings"][recording]["reprojerr_mean"] = \
-                self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean()
+                float(self.objects["triangulation_recordings_objects"][recording].anipose_io["reproj_nonan"].mean())
                 recording_day["recordings"][recording]["excluded_cams"] = self.objects["triangulation_recordings_objects"][recording].cams_to_exclude
                 if verbose:
                     end_time_recording = time.time()
@@ -646,8 +644,8 @@ class MetaInterface(ABC):
                 rotated_filepath, rotation_error = self.objects["triangulation_recordings_objects"][
                     recording
                 ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode, verbose=verbose)
-                recording_day["recordings"][recording]["normalised_3D_csv"] = rotated_filepath
-                recording_day["recordings"][recording]["normalisation_rotation_error"] = rotation_error
+                recording_day["recordings"][recording]["normalised_3D_csv"] = str(rotated_filepath)
+                recording_day["recordings"][recording]["normalisation_rotation_error"] = float(rotation_error)
         self.meta["meta_step"] = 8
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
@@ -840,8 +838,7 @@ class MetaInterface(ABC):
             "filepath": str(video.filepath),
             "fps": video.fps,
             "framenum": video.framenum,
-            "exclusion_state": video.exclusion_state,
-        }
+        }#"exclusion_state": video.exclusion_state,
         if intrinsics:
             dictionary["intrinsic_calibration_filepath"] = str(
                 video.intrinsic_calibration_filepath

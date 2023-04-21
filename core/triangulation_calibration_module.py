@@ -1421,7 +1421,7 @@ class TriangulationRecordings(Triangulation):
         self.rotated_filepath = self._create_csv_filepath()
         if (not test_mode) or (test_mode and not self.rotated_filepath.exists()):
             _save_dataframe_as_csv(filepath=str(self.rotated_filepath), df=rotated)
-        rotation_plot_filename = f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_rotation_visualization"
+        rotation_plot_filename = self.output_directory.joinpath(f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_rotation_visualization")
         visualization = RotationVisualization(
             rotated_markers=rotated_markers, config=config,
             output_filepath=rotation_plot_filename,
