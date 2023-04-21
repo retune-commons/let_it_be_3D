@@ -435,6 +435,20 @@ class VideoMetadata(ABC):
     def _adjust_intrinsic_calibration(
             self, unadjusted_intrinsic_calibration: Dict
     ) -> Dict:
+        """
+        Adjust the intrinsic calibration.
+        
+        Parameters:
+        ___________
+        unadjusted_intrinsic_calibration: Dict
+            Containing "K": camera matrix, "D": distorsion coefficient, "size": size 
+            of the intrinsic calibration video. 
+        
+        Returns:
+        ________
+        adjusted_intrinsic_calibration: Dict
+            Intrinsic calibration with for cropping adjusted camera matrix "K".
+        """
         intrinsic_calibration_video_size = unadjusted_intrinsic_calibration["size"]
         new_video_size = self._get_cropped_video_size()
         self.offset_row_idx, self.offset_col_idx = self._get_correct_x_y_offsets(
@@ -467,6 +481,28 @@ class VideoMetadata(ABC):
             offset_row_idx: int,
             offset_col_idx: int,
     ) -> Tuple[int, int]:
+        """
+        Returns either the initial or end cropping offsets, depending on flip_v and flip_h parameter.
+
+        Parameters:
+            intrinsic_calibration_video_size: Tuple of ints
+                Shape of the video (uncropped), that was used for intrinsic calibration.
+            new_video_size: Tuple of ints
+                Shape of the video (cropped), that will be undistorted based on the 
+                intrinsic calibration.
+            offset_row_idx: int
+                The row or y index initial cropping offset. 
+            offset_col_idx: int
+                The col or x index initial cropping offset.
+                
+        Returns:
+            offset_row_idx: int
+                If flip_v is True, the row or y offset index end is returned, else, the 
+                row or y index initial offset. 
+            offset_col_idx: int
+                If flip_h is True, the col or x offset index end is returned, else, the 
+                col or x index initial offset. 
+        """
         if self.flip_v:
             offset_row_idx = (
                     intrinsic_calibration_video_size[1]
@@ -482,6 +518,24 @@ class VideoMetadata(ABC):
         return offset_row_idx, offset_col_idx
 
     def _get_adjusted_K(self, K: np.ndarray) -> np.ndarray:
+        """
+        Adjust the camera matrix for cropping.
+        
+        Parameters:
+        ___________
+        K: np.ndarray
+            Camera matrix. 
+            
+        Notes:
+        ______
+        The principal point coordinates cx at K[0][2] and cy at K[1][2] (Krishna, [1]) are adjusted by the col and row cropping offsets.
+        
+        References:
+        ___________
+        [1] Krishna, Neeray (2022).
+        Camera Intrinsic Matrix with Example in Python.
+        towardsdatascience.com (https://towardsdatascience.com/camera-intrinsic-matrix-with-example-in-python-d79bf2478c12)
+        """
         adjusted_K = K.copy()
         adjusted_K[0][2] = adjusted_K[0][2] - self.offset_col_idx
         adjusted_K[1][2] = adjusted_K[1][2] - self.offset_row_idx

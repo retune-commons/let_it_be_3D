@@ -133,7 +133,7 @@ class TriangulationVisualization:
         self.filepath = self._create_filepath()
 
     def create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> Optional[np.ndarray]:
-        fig = plt.figure(figsize=(15, 15))
+        fig = plt.figure(figsize=(5, 5))
         fig.clf()
         ax_3d = fig.add_subplot(111, projection='3d')
         all_markers = {marker['name']: marker for marker in self.config["additional_markers_to_plot"]}

@@ -370,6 +370,8 @@ class MetaInterface(ABC):
                         )
                         recording_meta["videos"][video]["marker_detection_filepath"] = str(
                             recording_object.triangulation_dlc_cams_filepaths[video])
+                        recording_meta["videos"][video]["exclusion_state"] = str(
+                            recording_object.metadata_from_videos[video].exclusion_state)
                     except:
                         print(f"Synchronization metadata could not be added for {video}!")
                 if verbose:
@@ -468,8 +470,10 @@ class MetaInterface(ABC):
                 if video in calibration_object.synchronized_charuco_videofiles:
                     recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
                         calibration_object.synchronized_charuco_videofiles[video])
-                    recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = \
-                    calibration_object.metadata_from_videos[video].framenum_synchronized
+                    recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = int(
+                        calibration_object.metadata_from_videos[video].framenum_synchronized)
+                    recording_day["calibrations"]["videos"][video]["exclusion_state"] = str(
+                            calibration_object.metadata_from_videos[video].exclusion_state)
             
             recording_day["calibrations"]["cams_to_exclude"] = str(calibration_object.cams_to_exclude)
             self.objects["calibration_validation_objects"][
@@ -838,7 +842,7 @@ class MetaInterface(ABC):
             "filepath": str(video.filepath),
             "fps": video.fps,
             "framenum": video.framenum,
-        }#"exclusion_state": video.exclusion_state,
+        }
         if intrinsics:
             dictionary["intrinsic_calibration_filepath"] = str(
                 video.intrinsic_calibration_filepath
