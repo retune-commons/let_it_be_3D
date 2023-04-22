@@ -412,6 +412,8 @@ class Calibration:
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "calibration_index", "target_fps"]:
             setattr(self, attribute, recording_config_dict[attribute])
+        self.recording_date = str(self.recording_date)
+        self.calibration_index = str(self.calibration_index)
 
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
             directory=self.calibration_directory,
@@ -873,6 +875,8 @@ class Triangulation(ABC):
             setattr(self, attribute, project_config_dict[attribute])
         for attribute in ["recording_date", "led_pattern", "target_fps", "calibration_index"]:
             setattr(self, attribute, recording_config_dict[attribute])
+        self.recording_date = str(self.recording_date)
+        self.calibration_index = str(self.calibration_index)
 
         self.video_interfaces, self.metadata_from_videos = _create_video_objects(
             directory=self.directory,
