@@ -66,6 +66,8 @@ class MetaInterface(ABC):
         paradigms and recording_dates in directory name.
     add_recording_manually(file, recording_day):
         Adds recordings to metadata that don't match directory name structure.
+    remove_recordings():
+        Remove recordings from analysis via user input dialog.
     create_recordings(test_mode):
         Create TriangulationRecording objects for all recording_directories
         added to MetaInterface.
@@ -93,8 +95,6 @@ class MetaInterface(ABC):
         saves the normalisation metadata.
     add_triangulated_csv_to_database(data_base_path, overwrite):
         Add the 3D dataframes to a common data_base.
-    load_meta_from_yaml(filepath):
-        Restore MetaInterface objects from checkpoint.
     export_meta_to_yaml(filepath):
         Store MetaInterface objects as .yaml-file.
 
@@ -216,10 +216,16 @@ class MetaInterface(ABC):
                 f"The path doesn't exist or is not linked to a .yaml file!"
             )
 
-    def initialize_meta_config(self) -> None:
+    def initialize_meta_config(self, num_recording_config_parents: int = 2) -> None:
         """
         Append all directories to metadata, that match appended
         paradigms and recording_dates in directory name.
+        
+        Parameters:
+        ___________
+        num_recording_config_parents: int, default 2
+            The number of levels above the recording config file to look for matching
+            recording directories.
 
         See Also
         ________
@@ -237,8 +243,10 @@ class MetaInterface(ABC):
         use MetaInterface.add_recording_manually.
         """
         for recording_day in self.meta["recording_days"].values():
-            parents = Path(recording_day["recording_config_filepath"]).parents
-            for file in parents[len(parents)-1].glob("**"):
+            recording_config_parents = Path(recording_day["recording_config_filepath"]).parents
+            if num_recording_config_parents >= len(recording_config_parents):
+                num_recording_config_parents = len(recording_config_parents)-1
+            for file in recording_config_parents[num_recording_config_parents].glob("**"):
                 if file.name.startswith(recording_day["recording_date"]) and any(
                         [file.stem.endswith(paradigm) for paradigm in self.paradigms]):
                     recording_day["recording_directories"].append(str(file))
@@ -283,8 +291,31 @@ class MetaInterface(ABC):
                 self.meta["recording_days"][recording_day]["recording_directories"]
             )
             print("added recording directory succesfully!")
+            
+    def remove_recordings(self) -> None:
+        for recording_day in self.meta["recording_days"].values():
+            print(f"\n{recording_day['recording_date']}:\n")
+            recordings_to_remove = []
+            for recording_dir in recording_day["recording_directories"]:
+                print(recording_dir)
+                remove = input("Remove from analysis: y, keep: n, skip recording_day: x")
+                if remove == "y":
+                    recordings_to_remove.append(recording_dir)
+                elif remove == "n":
+                    pass
+                elif remove == "x":
+                    break
+                else:
+                    raise ValueError("Invalid input! Please enter 'y', 'n' or 'x'!")
+            for recording_dir in recordings_to_remove:
+                recording_day["recording_directories"].remove(recording_dir)
+                recording_day['num_recordings'] -= 1
+            print(
+                    f"\nFound {recording_day['num_recordings']} recordings at "
+                    f"recording day {recording_day['recording_date']}!"
+                )
 
-    def create_recordings(self, test_mode: bool = False) -> None:
+    def create_recordings(self, test_mode: bool = False, specify_calibration_to_use: bool = False) -> None:
         """
         Create TriangulationRecording objects for all recording_directories
         added to MetaInterface.
@@ -294,6 +325,9 @@ class MetaInterface(ABC):
         test_mode: bool, default False
             If True (default False), then pre-existing files won't be overwritten
             during the analysis.
+        specify_calibration_to_use: bool, default False
+            If True (default False), then you will be asked to specify the 
+            calibration index for each recording.
         """
         self.objects["triangulation_recordings_objects"] = {}
         for recording_day in self.meta["recording_days"]:
@@ -318,6 +352,10 @@ class MetaInterface(ABC):
                     )
                     for video in triangulation_recordings_object.metadata_from_videos
                 }
+                if specify_calibration_to_use:
+                    print(f"{individual_key}:") 
+                    calibration_index = input("Specify the calibration_index, you want to use!")
+                    triangulation_recordings_object.calibration_index = calibration_index
                 self.meta["recording_days"][recording_day]["recordings"][
                     individual_key
                 ] = {
@@ -368,10 +406,10 @@ class MetaInterface(ABC):
                         recording_meta["videos"][video]["framenum_synchronized"] = int(
                             recording_object.metadata_from_videos[video].framenum_synchronized
                         )
-                        recording_meta["videos"][video]["marker_detection_filepath"] = str(
-                            recording_object.triangulation_dlc_cams_filepaths[video])
                         recording_meta["videos"][video]["exclusion_state"] = str(
                             recording_object.metadata_from_videos[video].exclusion_state)
+                        recording_meta["videos"][video]["marker_detection_filepath"] = str(
+                            recording_object.triangulation_dlc_cams_filepaths[video])
                     except:
                         print(f"Synchronization metadata could not be added for {video}!")
                 if verbose:
@@ -470,10 +508,10 @@ class MetaInterface(ABC):
                 if video in calibration_object.synchronized_charuco_videofiles:
                     recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
                         calibration_object.synchronized_charuco_videofiles[video])
-                    recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = int(
-                        calibration_object.metadata_from_videos[video].framenum_synchronized)
                     recording_day["calibrations"]["videos"][video]["exclusion_state"] = str(
                             calibration_object.metadata_from_videos[video].exclusion_state)
+                    recording_day["calibrations"]["videos"][video]["framenum_synchronized"] = int(
+                        calibration_object.metadata_from_videos[video].framenum_synchronized)
             
             recording_day["calibrations"]["cams_to_exclude"] = str(calibration_object.cams_to_exclude)
             self.objects["calibration_validation_objects"][
@@ -714,87 +752,6 @@ class MetaInterface(ABC):
                 )
                 data_base = pd.concat([data_base, new_df])
         data_base.to_csv(data_base_path, index=False)
-
-    def load_meta_from_yaml(self, filepath: Union[Path, str]) -> None:
-        """
-        Restore MetaInterface objects from checkpoint.
-
-        .. note:: This function is not fully supported at the moment. Use
-            test_mode for all previously executed steps to restart analysis
-            from a checkpoint.
-
-        Parameters
-        ----------
-        filepath: str or Path
-            The path to the meta .yaml-file, thath should be used as checkpoint.
-        """
-        filepath = convert_to_path(filepath)
-        with open(filepath, "r") as ymlfile:
-            self.meta = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-        for recording_day in self.meta["recording_days"].values():
-            recording_day["num_recordings"] = len(
-                recording_day["recording_directories"]
-            )
-
-        if self.meta["meta_step"] == 2:
-            for recording_day in self.meta["recording_days"].values():
-                for recording in recording_day["recordings"]:
-                    self.objects["triangulation_recordings_objects"][
-                        recording
-                    ].target_fps = recording_day["recordings"][recording]["target_fps"]
-                    for video_metadata in self.objects[
-                        "triangulation_recordings_objects"
-                    ][recording].metadata_from_videos.values():
-                        video_metadata.fps = recording_day["recordings"][recording][
-                            "videos"
-                        ][video_metadata.cam_id]["fps"]
-                        video_metadata.filepath = recording_day["recordings"][
-                            recording
-                        ]["videos"][video_metadata.cam_id]["filepath"]
-
-        elif self.meta["meta_step"] == 4:
-            for recording_day in self.meta["recording_days"].values():
-                self.objects["calibration_objects"][
-                    recording_day["calibrations"]["calibration_key"]
-                ].target_fps = recording_day["calibrations"]["target_fps"]
-                for video_metadata in self.objects["calibration_objects"][
-                    recording_day["calibrations"]["calibration_key"]
-                ].metadata_from_videos.values():
-                    video_metadata.fps = recording_day["calibrations"]["videos"][
-                        video_metadata.cam_id
-                    ]["fps"]
-                    video_metadata.filepath = recording_day["calibrations"][
-                        "videos"
-                    ][video_metadata.cam_id]["filepath"]
-                for video_metadata in self.objects["calibration_validation_objects"][
-                    recording_day["calibrations"]["calibration_key"]
-                ].metadata_from_videos.values():
-                    video_metadata.filepath = recording_day["calibrations"][
-                        "videos"
-                    ][video_metadata.cam_id]["calibration_validation_image_filepath"]
-
-        """ currently not supported!
-        elif self.meta["meta_step"] == 5:
-            for recording_day in self.meta["recording_days"].values():
-                calibration_index = list(
-                    self.meta["recording_days"]["Recording_Day_220922_0"][
-                        "calibrations"
-                    ]["calibration_keys"].keys()
-                )[0]
-                full_calibrations = self.objects["calibration_objects"][
-                    calibration_index
-                ]
-
-                for calibration in recording_day["calibrations"][
-                    "calibration_keys"
-                ].values():
-                    for video_metadata in self.objects["calibration_validation_objects"][
-                        calibration
-                    ].metadata_from_video.values():
-                        video_metadata.filepath = recording_day["calibrations"][
-                            "videos"
-                        ][video_metadata.cam_id]["calibration_validation_marker_detection_filepath"]"""
 
     def export_meta_to_yaml(self, filepath: Union[str, Path]) -> None:
         """

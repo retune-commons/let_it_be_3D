@@ -90,15 +90,15 @@ def _validate_metadata(metadata_from_videos: List,
                                for video_metadata in metadata_from_videos
                                )
         sets_of_attributes.append(set_of_attribute)
-    attribute: Set[str]
     for attribute in sets_of_attributes:
         if len(attribute) > 1:
             raise ValueError(
-                f"The filenames of the calibration_validation images "
-                f"give different metadata! Reasons could be:\n"
-                f"  - image belongs to another calibration\n"
-                f"  - image filename is valid, but wrong\n"
-                f"You should run the filename_checker before to avoid such Errors!"
+                f"The filenames of the images or videos are valid,\n"
+                f"but give different metadata! Reasons could be:\n"
+                f"  - file belongs to another folder\n"
+                f"  - filename is wrong\n"
+                f"Check the directory {metadata_from_videos[0].filepath.parent}\n"
+                f"and check the filenames manually!"
             )
     return tuple(list(set_of_attribute)[0] for set_of_attribute in sets_of_attributes)
 

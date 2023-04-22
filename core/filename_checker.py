@@ -45,6 +45,8 @@ class FilenameCheckerInterface:
             paradigms and recording_dates in directory name.
         add_recording_manually(file, recording_day):
             Adds recordings to metadata that don't match directory name structure.
+        remove_recordings():
+            Remove recordings from analysis via user input dialog.
         create_recordings():
             Create CheckRecording objects for all recording_directories
             added to FilenameCheckerInterface.
@@ -144,10 +146,16 @@ class FilenameCheckerInterface:
             "calibration_index": calibration_index,
         }
 
-    def initialize_meta_config(self) -> None:
+    def initialize_meta_config(self, num_recording_config_parents: int = 2) -> None:
         """
         Append all directories to metadata, that match appended
         paradigms and recording_dates in directory name.
+
+        Parameters:
+        ___________
+        num_recording_config_parents: int, default 2
+            The number of levels above the recording config file to look for matching
+            recording directories.
 
         See Also
         ________
@@ -165,8 +173,10 @@ class FilenameCheckerInterface:
         use FilenameCheckerInterface.add_recording_manually instead.
         """
         for recording_day in self.meta["recording_days"].values():
-            parents = Path(recording_day["recording_config_filepath"]).parents
-            for file in parents[len(parents) - 1].glob("**"):
+            recording_config_parents = Path(recording_day["recording_config_filepath"]).parents
+            if num_recording_config_parents >= len(recording_config_parents):
+                num_recording_config_parents = len(recording_config_parents)-1
+            for file in recording_config_parents[num_recording_config_parents].glob("**"):
                 if file.name.startswith(recording_day["recording_date"]) and any(
                         [file.stem.endswith(paradigm) for paradigm in self.paradigms]):
                     recording_day["recording_directories"].append(str(file))
@@ -201,6 +211,29 @@ class FilenameCheckerInterface:
                 recording_day["recording_directories"]
             )
             print("added recording directory succesfully!")
+            
+    def remove_recordings(self) -> None:
+        for recording_day in self.meta["recording_days"].values():
+            print(f"\n{recording_day['recording_date']}:\n")
+            recordings_to_remove = []
+            for recording_dir in recording_day["recording_directories"]:
+                print(recording_dir)
+                remove = input("Remove from analysis: y, keep: n, skip recording_day: x")
+                if remove == "y":
+                    recordings_to_remove.append(recording_dir)
+                elif remove == "n":
+                    pass
+                elif remove == "x":
+                    break
+                else:
+                    raise ValueError("Invalid input! Please enter 'y', 'n' or 'x'!")
+            for recording_dir in recordings_to_remove:
+                recording_day["recording_directories"].remove(recording_dir)
+                recording_day['num_recordings'] -= 1
+            print(
+                    f"\nFound {recording_day['num_recordings']} recordings at "
+                    f"recording day {recording_day['recording_date']}!"
+                )
 
     def create_recordings(self) -> None:
         """
