@@ -289,6 +289,8 @@ class Calibration:
     valid_videos: list of str
         Videos, that were found in the calibration_directory and
         not excluded due to synchronization issues.
+    cams_to_exclude: list of str
+        Videos, that were excluded due to synchronization issues.
     recording_date: str
         Date at which the calibration was done.
     target_fps: int
@@ -739,6 +741,8 @@ class Triangulation(ABC):
     paradigm: str
         Only defined in TriangulationRecordings. The paradigm as read
         from the filenames.
+    cams_to_exclude: list of str
+        Videos, that were excluded due to synchronization issues.
     all_cameras: list of str
         All camera names, that are stored in the camera_group.
     self.camera_group: ap_lib.cameras.CameraGroup
@@ -776,6 +780,10 @@ class Triangulation(ABC):
         filenames in directory.
     _allowed_filetypes: list of str
         Abstract property, specify what file endings to look for in directory.
+    triangulation_visualization: TriangulationVisualization
+        Object to create plots for triangulation video.
+    video_start_s: int
+        The second, in which the triangulation video starts.
 
     Methods
     _______
@@ -1437,7 +1445,9 @@ class TriangulationRecordings(Triangulation):
     def create_triangulated_video(
             self,
             filename: str,
-            config_path: Union[Path, str]
+            config_path: Union[Path, str],
+            start_s: int,
+            end_s: int
     ) -> None:
         """
         Create video of the triangulated data.
@@ -1448,12 +1458,14 @@ class TriangulationRecordings(Triangulation):
             The filename, where the video should be saved.
         config_path: Path or str
             The path to the config used to create triangulated videos.
+        start_s:
+            The second in the recording to start video creation.
+        end_s: 
+            The second in the recording to end video creation.
 
         Notes
         _____
         The yaml file at config_path has to have the following keys:
-            start_s: float
-            end_s: float
             body_marker_size, body_label_size: int, int
             body_marker_color, body_label_color: str, str
                 matplotlib color
@@ -1489,9 +1501,13 @@ class TriangulationRecordings(Triangulation):
         """
         config_path = convert_to_path(config_path)
         self.video_plotting_config = read_config(config_path)
+        self.triangulation_visualization = TriangulationVisualization(df_3D_filepath=self.rotated_filepath,
+                                       output_directory=self.output_directory,
+                                       config=self.video_plotting_config)
+        self.triangulated_video_start_s = start_s
         triangulated_video = VideoClip(
             self._get_triangulated_plots,
-            duration=(self.video_plotting_config["end_s"] - self.video_plotting_config["start_s"]),
+            duration=(end_s - start_s),
         )
         triangulated_video.write_videofile(
             f"{filename}.mp4", fps=self.target_fps, logger=None
@@ -1499,12 +1515,9 @@ class TriangulationRecordings(Triangulation):
 
     def _get_triangulated_plots(self, idx: int) -> np.ndarray:
         idx = int(
-            (self.video_plotting_config["start_s"] + idx) * self.target_fps)
-
-        t = TriangulationVisualization(df_3D_filepath=self.rotated_filepath,
-                                       output_directory=self.output_directory,
-                                       idx=idx, config=self.video_plotting_config)
-        return t.return_fig()
+            (self.triangulated_video_start_s + idx) * self.target_fps)
+        
+        return self.triangulation_visualization.return_fig(idx=idx)
 
 
 class CalibrationValidation(Triangulation):
