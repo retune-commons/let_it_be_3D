@@ -372,7 +372,10 @@ STANDARD_ATTRIBUTES_TRIANGULATION = ["all_cameras",
                                      "rotation_error",
                                      "synchronization_individuals",
                                      "led_detection_individuals",
-                                     "ground_truth_config"]
+                                     "ground_truth_config",                      
+                                     "triangulation_visualization", 
+                                     "video_start_s", 
+                                     "excluded_videos"]
 
 STANDARD_ATTRIBUTES_CALIBRATION = ["camera_group",
                                    "report_filepath",
@@ -383,7 +386,8 @@ STANDARD_ATTRIBUTES_CALIBRATION = ["camera_group",
                                    "synchronization_individuals",
                                    "led_detection_individuals",
                                    "project_config_filepath",
-                                   "output_directory"]
+                                   "output_directory", 
+                                   "excluded_videos"]
 
 SYNCHRO_METADATA_KEYS = ["handle_synchro_fails",
                          "default_offset_ms",

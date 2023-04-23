@@ -137,6 +137,8 @@
 <span class="sd">        paradigms and recording_dates in directory name.</span>
 <span class="sd">    add_recording_manually(file, recording_day):</span>
 <span class="sd">        Adds recordings to metadata that don&#39;t match directory name structure.</span>
+<span class="sd">    remove_recordings():</span>
+<span class="sd">        Remove recordings from analysis via user input dialog.</span>
 <span class="sd">    create_recordings(test_mode):</span>
 <span class="sd">        Create TriangulationRecording objects for all recording_directories</span>
 <span class="sd">        added to MetaInterface.</span>
@@ -164,8 +166,6 @@
 <span class="sd">        saves the normalisation metadata.</span>
 <span class="sd">    add_triangulated_csv_to_database(data_base_path, overwrite):</span>
 <span class="sd">        Add the 3D dataframes to a common data_base.</span>
-<span class="sd">    load_meta_from_yaml(filepath):</span>
-<span class="sd">        Restore MetaInterface objects from checkpoint.</span>
 <span class="sd">    export_meta_to_yaml(filepath):</span>
 <span class="sd">        Store MetaInterface objects as .yaml-file.</span>
 
@@ -287,10 +287,16 @@
                 <span class="sa">f</span><span class="s2">&quot;The path doesn&#39;t exist or is not linked to a .yaml file!&quot;</span>
             <span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.initialize_meta_config"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.initialize_meta_config">[docs]</a>    <span class="k">def</span> <span class="nf">initialize_meta_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.initialize_meta_config"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.initialize_meta_config">[docs]</a>    <span class="k">def</span> <span class="nf">initialize_meta_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_recording_config_parents</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Append all directories to metadata, that match appended</span>
 <span class="sd">        paradigms and recording_dates in directory name.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">        ___________</span>
+<span class="sd">        num_recording_config_parents: int, default 2</span>
+<span class="sd">            The number of levels above the recording config file to look for matching</span>
+<span class="sd">            recording directories.</span>
 
 <span class="sd">        See Also</span>
 <span class="sd">        ________</span>
@@ -308,8 +314,10 @@
 <span class="sd">        use MetaInterface.add_recording_manually.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="n">parents</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_config_filepath&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">parents</span>
-            <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">parents</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;**&quot;</span><span class="p">):</span>
+            <span class="n">recording_config_parents</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_config_filepath&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">parents</span>
+            <span class="k">if</span> <span class="n">num_recording_config_parents</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">recording_config_parents</span><span class="p">):</span>
+                <span class="n">num_recording_config_parents</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">recording_config_parents</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
+            <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">recording_config_parents</span><span class="p">[</span><span class="n">num_recording_config_parents</span><span class="p">]</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;**&quot;</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_date&quot;</span><span class="p">])</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
                         <span class="p">[</span><span class="n">file</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span> <span class="k">for</span> <span class="n">paradigm</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigms</span><span class="p">]):</span>
                     <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">file</span><span class="p">))</span>
@@ -317,7 +325,7 @@
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]</span>
             <span class="p">)</span>
             <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;num_recordings&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> recordings at &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Found </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;num_recordings&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> recordings at &quot;</span>
                 <span class="sa">f</span><span class="s2">&quot;recording day </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">!&quot;</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
@@ -354,8 +362,31 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">][</span><span class="n">recording_day</span><span class="p">][</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]</span>
             <span class="p">)</span>
             <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;added recording directory succesfully!&quot;</span><span class="p">)</span></div>
+            
+<div class="viewcode-block" id="MetaInterface.remove_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.remove_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">remove_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">recordings_to_remove</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">recording_dir</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">recording_dir</span><span class="p">)</span>
+                <span class="n">remove</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Remove from analysis: y, keep: n, skip recording_day: x&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">remove</span> <span class="o">==</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span>
+                    <span class="n">recordings_to_remove</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">recording_dir</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">remove</span> <span class="o">==</span> <span class="s2">&quot;n&quot;</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="k">elif</span> <span class="n">remove</span> <span class="o">==</span> <span class="s2">&quot;x&quot;</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid input! Please enter &#39;y&#39;, &#39;n&#39; or &#39;x&#39;!&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">recording_dir</span> <span class="ow">in</span> <span class="n">recordings_to_remove</span><span class="p">:</span>
+                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">recording_dir</span><span class="p">)</span>
+                <span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;num_recordings&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Found </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;num_recordings&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> recordings at &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;recording day </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">!&quot;</span>
+                <span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.create_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.create_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">create_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.create_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.create_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">create_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">specify_calibration_to_use</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create TriangulationRecording objects for all recording_directories</span>
 <span class="sd">        added to MetaInterface.</span>
@@ -365,6 +396,9 @@
 <span class="sd">        test_mode: bool, default False</span>
 <span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
 <span class="sd">            during the analysis.</span>
+<span class="sd">        specify_calibration_to_use: bool, default False</span>
+<span class="sd">            If True (default False), then you will be asked to specify the </span>
+<span class="sd">            calibration index for each recording.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]:</span>
@@ -389,6 +423,10 @@
                     <span class="p">)</span>
                     <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">triangulation_recordings_object</span><span class="o">.</span><span class="n">metadata_from_videos</span>
                 <span class="p">}</span>
+                <span class="k">if</span> <span class="n">specify_calibration_to_use</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">individual_key</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span> 
+                    <span class="n">calibration_index</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Specify the calibration_index, you want to use!&quot;</span><span class="p">)</span>
+                    <span class="n">triangulation_recordings_object</span><span class="o">.</span><span class="n">calibration_index</span> <span class="o">=</span> <span class="n">calibration_index</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">][</span><span class="n">recording_day</span><span class="p">][</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span>
                     <span class="n">individual_key</span>
                 <span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
@@ -426,7 +464,9 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">]:</span>
-                <span class="n">start_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> 
+                    <span class="n">start_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Now analysing </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
                 <span class="n">recording_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span>
                 <span class="n">recording_meta</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span>
                 <span class="n">recording_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span>
@@ -434,20 +474,20 @@
                 <span class="p">)</span>
                 <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">]:</span>
                     <span class="k">try</span><span class="p">:</span>
-                        <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;synchronized_video&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
-                            <span class="n">recording_object</span><span class="o">.</span><span class="n">synchronized_videos</span><span class="p">[</span><span class="n">video</span><span class="p">])</span>
-                        <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;framenum_synchronized&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;framenum_synchronized&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
                             <span class="n">recording_object</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video</span><span class="p">]</span><span class="o">.</span><span class="n">framenum_synchronized</span>
                         <span class="p">)</span>
+                        <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;exclusion_state&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                            <span class="n">recording_object</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video</span><span class="p">]</span><span class="o">.</span><span class="n">exclusion_state</span><span class="p">)</span>
                         <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;marker_detection_filepath&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
                             <span class="n">recording_object</span><span class="o">.</span><span class="n">triangulation_dlc_cams_filepaths</span><span class="p">[</span><span class="n">video</span><span class="p">])</span>
                     <span class="k">except</span><span class="p">:</span>
-                        <span class="k">pass</span>
-                <span class="n">end_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-                <span class="n">duration</span> <span class="o">=</span> <span class="n">end_time_recording</span> <span class="o">-</span> <span class="n">start_time_recording</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Synchronization metadata could not be added for </span><span class="si">{</span><span class="n">video</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="n">end_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                    <span class="n">duration</span> <span class="o">=</span> <span class="n">end_time_recording</span> <span class="o">-</span> <span class="n">start_time_recording</span>
                     <span class="nb">print</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;The analysis of this recording </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">duration</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;The analysis of this recording </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">duration</span><span class="si">}</span><span class="s2">.&quot;</span>
                     <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
@@ -517,7 +557,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.synchronize_calibrations"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.synchronize_calibrations">[docs]</a>    <span class="k">def</span> <span class="nf">synchronize_calibrations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.synchronize_calibrations"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.synchronize_calibrations">[docs]</a>    <span class="k">def</span> <span class="nf">synchronize_calibrations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run get_marker_predictions for all calibration_validation objects and</span>
 <span class="sd">        run_synchronization for all calibration objects added to MetaInterface.</span>
@@ -527,16 +567,24 @@
 <span class="sd">        test_mode: bool, default False</span>
 <span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
 <span class="sd">            during the analysis.</span>
+<span class="sd">        verbose: bool, default True</span>
+<span class="sd">            If True (default), then the attribute is passed to the Calibration objects.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Now analysing </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">)</span>
             <span class="n">calibration_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]]</span>
-            <span class="n">calibration_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+            <span class="n">calibration_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">]:</span>
-                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;synchronized_video&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
-                    <span class="n">calibration_object</span><span class="o">.</span><span class="n">synchronized_charuco_videofiles</span><span class="p">[</span><span class="n">video</span><span class="p">])</span>
-                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;framenum_synchronized&quot;</span><span class="p">]</span> <span class="o">=</span> \
-                <span class="n">calibration_object</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video</span><span class="p">]</span><span class="o">.</span><span class="n">framenum_synchronized</span>
-
+                <span class="k">if</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">calibration_object</span><span class="o">.</span><span class="n">synchronized_charuco_videofiles</span><span class="p">:</span>
+                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;synchronized_video&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                        <span class="n">calibration_object</span><span class="o">.</span><span class="n">synchronized_charuco_videofiles</span><span class="p">[</span><span class="n">video</span><span class="p">])</span>
+                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;exclusion_state&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                            <span class="n">calibration_object</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video</span><span class="p">]</span><span class="o">.</span><span class="n">exclusion_state</span><span class="p">)</span>
+                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;framenum_synchronized&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                        <span class="n">calibration_object</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video</span><span class="p">]</span><span class="o">.</span><span class="n">framenum_synchronized</span><span class="p">)</span>
+            
+            <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;cams_to_exclude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">calibration_object</span><span class="o">.</span><span class="n">cams_to_exclude</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">][</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span>
             <span class="p">]</span><span class="o">.</span><span class="n">get_marker_predictions</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
@@ -618,6 +666,8 @@
 <span class="sd">            overwritten during the analysis.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Now analysing </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;calibrations&#39;</span><span class="p">][</span><span class="s1">&#39;calibration_key&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">calibrate_optimal</span><span class="p">:</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;toml_filepath&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span>
@@ -643,7 +693,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">6</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.triangulate_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.triangulate_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">triangulate_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.triangulate_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.triangulate_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">triangulate_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function run_triangulation for all TriangulationRecording</span>
 <span class="sd">        objects added to MetaInterface.</span>
@@ -653,9 +703,15 @@
 <span class="sd">        test_mode: bool, default False</span>
 <span class="sd">            If True (default False), then pre-existing files won&#39;t be</span>
 <span class="sd">            overwritten during the analysis.</span>
+<span class="sd">        verbose: bool, default True</span>
+<span class="sd">            If True (default), then the recording, that is currently analysed, and the</span>
+<span class="sd">            duration of an analysis will be printed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Now analysing </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+                    <span class="n">start_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
                 <span class="n">toml_filepath</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;calibrations&#39;</span><span class="p">][</span><span class="s1">&#39;toml_filepath&#39;</span><span class="p">]</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">run_triangulation</span><span class="p">(</span>
                     <span class="n">calibration_toml_filepath</span><span class="o">=</span><span class="n">toml_filepath</span><span class="p">,</span>
@@ -667,11 +723,18 @@
                     <span class="p">]</span><span class="o">.</span><span class="n">csv_output_filepath</span>
                 <span class="p">)</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;reprojerr_mean&quot;</span><span class="p">]</span> <span class="o">=</span> \
-                <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;reproj_nonan&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;reproj_nonan&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;excluded_cams&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">cams_to_exclude</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="n">end_time_recording</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                    <span class="n">duration</span> <span class="o">=</span> <span class="n">end_time_recording</span> <span class="o">-</span> <span class="n">start_time_recording</span>
+                    <span class="nb">print</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;The analysis of this recording </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">duration</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">7</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.normalize_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.normalize_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">normalize_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.normalize_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.normalize_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">normalize_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function normalize for all TriangulationRecordings objects and</span>
 <span class="sd">        saves the normalisation metadata.</span>
@@ -683,15 +746,19 @@
 <span class="sd">        test_mode: bool, default False</span>
 <span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
 <span class="sd">            during the analysis.</span>
+<span class="sd">        verbose: bool, default False</span>
+<span class="sd">            If True (default False), then the rotation visualization plot is shown.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">normalization_config_path</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">normalization_config_path</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Rotation plot for </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
                 <span class="n">rotated_filepath</span><span class="p">,</span> <span class="n">rotation_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span>
                     <span class="n">recording</span>
-                <span class="p">]</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">normalization_config_path</span><span class="o">=</span><span class="n">normalization_config_path</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
-                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalised_3D_csv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rotated_filepath</span>
-                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalisation_rotation_error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rotation_error</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">normalization_config_path</span><span class="o">=</span><span class="n">normalization_config_path</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalised_3D_csv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">rotated_filepath</span><span class="p">)</span>
+                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalisation_rotation_error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">rotation_error</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">8</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
@@ -716,7 +783,7 @@
                 <span class="n">filename</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span>
                     <span class="n">recording</span>
                 <span class="p">]</span><span class="o">.</span><span class="n">csv_output_filepath</span><span class="o">.</span><span class="n">stem</span>
-                <span class="k">if</span> <span class="n">data_base</span><span class="p">[</span><span class="s2">&quot;recording&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">filename</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">data_base</span><span class="p">[</span><span class="s2">&quot;recording&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
                     <span class="nb">print</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2"> was already in test! if you want to add it anyways use overwrite=True!&quot;</span>
                     <span class="p">)</span>
@@ -756,87 +823,6 @@
                 <span class="p">)</span>
                 <span class="n">data_base</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">data_base</span><span class="p">,</span> <span class="n">new_df</span><span class="p">])</span>
         <span class="n">data_base</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">data_base_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="MetaInterface.load_meta_from_yaml"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.load_meta_from_yaml">[docs]</a>    <span class="k">def</span> <span class="nf">load_meta_from_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Restore MetaInterface objects from checkpoint.</span>
-
-<span class="sd">        .. note:: This function is not fully supported at the moment. Use</span>
-<span class="sd">            test_mode for all previously executed steps to restart analysis</span>
-<span class="sd">            from a checkpoint.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        filepath: str or Path</span>
-<span class="sd">            The path to the meta .yaml-file, thath should be used as checkpoint.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">filepath</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
-        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ymlfile</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">ymlfile</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">SafeLoader</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;num_recordings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
-                <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_directories&quot;</span><span class="p">]</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                <span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">]:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span>
-                        <span class="n">recording</span>
-                    <span class="p">]</span><span class="o">.</span><span class="n">target_fps</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;target_fps&quot;</span><span class="p">]</span>
-                    <span class="k">for</span> <span class="n">video_metadata</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span>
-                        <span class="s2">&quot;triangulation_recordings_objects&quot;</span>
-                    <span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                        <span class="n">video_metadata</span><span class="o">.</span><span class="n">fps</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span>
-                            <span class="s2">&quot;videos&quot;</span>
-                        <span class="p">][</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">][</span><span class="s2">&quot;fps&quot;</span><span class="p">]</span>
-                        <span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span>
-                            <span class="n">recording</span>
-                        <span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">][</span><span class="s2">&quot;filepath&quot;</span><span class="p">]</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span>
-                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span>
-                <span class="p">]</span><span class="o">.</span><span class="n">target_fps</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;target_fps&quot;</span><span class="p">]</span>
-                <span class="k">for</span> <span class="n">video_metadata</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span>
-                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span>
-                <span class="p">]</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                    <span class="n">video_metadata</span><span class="o">.</span><span class="n">fps</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span>
-                        <span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span>
-                    <span class="p">][</span><span class="s2">&quot;fps&quot;</span><span class="p">]</span>
-                    <span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span>
-                        <span class="s2">&quot;videos&quot;</span>
-                    <span class="p">][</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">][</span><span class="s2">&quot;filepath&quot;</span><span class="p">]</span>
-                <span class="k">for</span> <span class="n">video_metadata</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">][</span>
-                    <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span>
-                <span class="p">]</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                    <span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span>
-                        <span class="s2">&quot;videos&quot;</span>
-                    <span class="p">][</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">][</span><span class="s2">&quot;calibration_validation_image_filepath&quot;</span><span class="p">]</span>
-
-<span class="w">        </span><span class="sd">&quot;&quot;&quot; currently not supported!</span>
-<span class="sd">        elif self.meta[&quot;meta_step&quot;] == 5:</span>
-<span class="sd">            for recording_day in self.meta[&quot;recording_days&quot;].values():</span>
-<span class="sd">                calibration_index = list(</span>
-<span class="sd">                    self.meta[&quot;recording_days&quot;][&quot;Recording_Day_220922_0&quot;][</span>
-<span class="sd">                        &quot;calibrations&quot;</span>
-<span class="sd">                    ][&quot;calibration_keys&quot;].keys()</span>
-<span class="sd">                )[0]</span>
-<span class="sd">                full_calibrations = self.objects[&quot;calibration_objects&quot;][</span>
-<span class="sd">                    calibration_index</span>
-<span class="sd">                ]</span>
-
-<span class="sd">                for calibration in recording_day[&quot;calibrations&quot;][</span>
-<span class="sd">                    &quot;calibration_keys&quot;</span>
-<span class="sd">                ].values():</span>
-<span class="sd">                    for video_metadata in self.objects[&quot;calibration_validation_objects&quot;][</span>
-<span class="sd">                        calibration</span>
-<span class="sd">                    ].metadata_from_video.values():</span>
-<span class="sd">                        video_metadata.filepath = recording_day[&quot;calibrations&quot;][</span>
-<span class="sd">                            &quot;videos&quot;</span>
-<span class="sd">                        ][video_metadata.cam_id][&quot;calibration_validation_marker_detection_filepath&quot;]&quot;&quot;&quot;</span></div>
 
 <div class="viewcode-block" id="MetaInterface.export_meta_to_yaml"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.export_meta_to_yaml">[docs]</a>    <span class="k">def</span> <span class="nf">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -884,7 +870,6 @@
             <span class="s2">&quot;filepath&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">video</span><span class="o">.</span><span class="n">filepath</span><span class="p">),</span>
             <span class="s2">&quot;fps&quot;</span><span class="p">:</span> <span class="n">video</span><span class="o">.</span><span class="n">fps</span><span class="p">,</span>
             <span class="s2">&quot;framenum&quot;</span><span class="p">:</span> <span class="n">video</span><span class="o">.</span><span class="n">framenum</span><span class="p">,</span>
-            <span class="s2">&quot;exclusion_state&quot;</span><span class="p">:</span> <span class="n">video</span><span class="o">.</span><span class="n">exclusion_state</span><span class="p">,</span>
         <span class="p">}</span>
         <span class="k">if</span> <span class="n">intrinsics</span><span class="p">:</span>
             <span class="n">dictionary</span><span class="p">[</span><span class="s2">&quot;intrinsic_calibration_filepath&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>

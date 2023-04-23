@@ -293,6 +293,9 @@ class MetaInterface(ABC):
             print("added recording directory succesfully!")
             
     def remove_recordings(self) -> None:
+        """
+        Remove recordings from analysis via user input dialog.
+        """
         for recording_day in self.meta["recording_days"].values():
             print(f"\n{recording_day['recording_date']}:\n")
             recordings_to_remove = []

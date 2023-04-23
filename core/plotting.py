@@ -113,18 +113,15 @@ class RotationVisualization:
         return filepath.parent.joinpath(filepath.stem + ".png")
 
 
-# ToDo: rework, idx as argument of create_plot, not __init!
 class TriangulationVisualization:
     def __init__(
             self,
             df_3D_filepath: Path,
             config: Dict,
-            idx: int = 0,
             filename_tag: str = "",
             output_directory: Optional[Path] = None,
     ) -> None:
         self.df_3D = pd.read_csv(df_3D_filepath)
-        self.idx = idx
         self.config = config
         self.filename_tag = filename_tag
         self.output_directory = output_directory if output_directory is not None else Path.cwd()
@@ -132,18 +129,18 @@ class TriangulationVisualization:
                                   not any([label in key for label in self.config["markers_to_exclude"]])))
         self.filepath = self._create_filepath()
 
-    def create_plot(self, plot: bool, save: bool, return_fig: bool = False) -> Optional[np.ndarray]:
+    def create_plot(self, plot: bool, save: bool, idx: int, return_fig: bool = False) -> Optional[np.ndarray]:
         fig = plt.figure(figsize=(5, 5))
         fig.clf()
         ax_3d = fig.add_subplot(111, projection='3d')
         all_markers = {marker['name']: marker for marker in self.config["additional_markers_to_plot"]}
         for bodypart in self.bodyparts:
             x, y, z = get_3D_df_keys(bodypart)
-            if not math.isnan(self.df_3D.loc[self.idx, x]):
+            if not math.isnan(self.df_3D.loc[idx, x]):
                 all_markers[bodypart] = {'name': bodypart,
-                                         'x': self.df_3D.loc[self.idx, x],
-                                         'y': self.df_3D.loc[self.idx, y],
-                                         'z': self.df_3D.loc[self.idx, z],
+                                         'x': self.df_3D.loc[idx, x],
+                                         'y': self.df_3D.loc[idx, y],
+                                         'z': self.df_3D.loc[idx, z],
                                          'alpha': self.config["body_marker_alpha"],
                                          'color': self.config["body_marker_color"],
                                          'size': self.config["body_marker_size"]}
@@ -166,8 +163,8 @@ class TriangulationVisualization:
             plt.show()
         plt.close()
 
-    def return_fig(self) -> np.ndarray:
-        return self.create_plot(plot=False, save=False, return_fig=True)
+    def return_fig(self, idx: int) -> np.ndarray:
+        return self.create_plot(plot=False, save=False, return_fig=True, idx=idx)
 
     def _create_filepath(self) -> str:
         filename = f"3D_plot_{self.filename_tag}"
@@ -175,7 +172,7 @@ class TriangulationVisualization:
         return str(filepath)
 
 
-# ToDo: rewrite function to take df_filepath instead of p3d and function to get bodyparts from df
+# ToDo: rework function to take df_filepath instead of p3d and function to get bodyparts from df
 class CalibrationValidationPlot:
     def __init__(
             self,

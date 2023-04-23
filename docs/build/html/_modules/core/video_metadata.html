@@ -211,7 +211,7 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">calvin</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">framenum</span> <span class="o">=</span> <span class="mi">1</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">framenum</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v2</span><span class="o">.</span><span class="n">get_reader</span><span class="p">(</span><span class="n">video_filepath</span><span class="p">)</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">framenum</span> <span class="o">=</span> <span class="n">iio</span><span class="o">.</span><span class="n">v2</span><span class="o">.</span><span class="n">get_reader</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span><span class="o">.</span><span class="n">count_frames</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_check_filepaths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">video_filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.mp4&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">,</span> <span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.avi&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpg&quot;</span><span class="p">,</span> <span class="s2">&quot;.png&quot;</span><span class="p">,</span> <span class="s2">&quot;.tiff&quot;</span><span class="p">,</span>
@@ -506,6 +506,20 @@
     <span class="k">def</span> <span class="nf">_adjust_intrinsic_calibration</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span> <span class="n">unadjusted_intrinsic_calibration</span><span class="p">:</span> <span class="n">Dict</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adjust the intrinsic calibration.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">        ___________</span>
+<span class="sd">        unadjusted_intrinsic_calibration: Dict</span>
+<span class="sd">            Containing &quot;K&quot;: camera matrix, &quot;D&quot;: distorsion coefficient, &quot;size&quot;: size </span>
+<span class="sd">            of the intrinsic calibration video. </span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">        ________</span>
+<span class="sd">        adjusted_intrinsic_calibration: Dict</span>
+<span class="sd">            Intrinsic calibration with for cropping adjusted camera matrix &quot;K&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">intrinsic_calibration_video_size</span> <span class="o">=</span> <span class="n">unadjusted_intrinsic_calibration</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span>
         <span class="n">new_video_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_cropped_video_size</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_correct_x_y_offsets</span><span class="p">(</span>
@@ -538,6 +552,28 @@
             <span class="n">offset_row_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">offset_col_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns either the initial or end cropping offsets, depending on flip_v and flip_h parameter.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            intrinsic_calibration_video_size: Tuple of ints</span>
+<span class="sd">                Shape of the video (uncropped), that was used for intrinsic calibration.</span>
+<span class="sd">            new_video_size: Tuple of ints</span>
+<span class="sd">                Shape of the video (cropped), that will be undistorted based on the </span>
+<span class="sd">                intrinsic calibration.</span>
+<span class="sd">            offset_row_idx: int</span>
+<span class="sd">                The row or y index initial cropping offset. </span>
+<span class="sd">            offset_col_idx: int</span>
+<span class="sd">                The col or x index initial cropping offset.</span>
+<span class="sd">                </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            offset_row_idx: int</span>
+<span class="sd">                If flip_v is True, the row or y offset index end is returned, else, the </span>
+<span class="sd">                row or y index initial offset. </span>
+<span class="sd">            offset_col_idx: int</span>
+<span class="sd">                If flip_h is True, the col or x offset index end is returned, else, the </span>
+<span class="sd">                col or x index initial offset. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">flip_v</span><span class="p">:</span>
             <span class="n">offset_row_idx</span> <span class="o">=</span> <span class="p">(</span>
                     <span class="n">intrinsic_calibration_video_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
@@ -553,6 +589,24 @@
         <span class="k">return</span> <span class="n">offset_row_idx</span><span class="p">,</span> <span class="n">offset_col_idx</span>
 
     <span class="k">def</span> <span class="nf">_get_adjusted_K</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">K</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adjust the camera matrix for cropping.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">        ___________</span>
+<span class="sd">        K: np.ndarray</span>
+<span class="sd">            Camera matrix. </span>
+<span class="sd">            </span>
+<span class="sd">        Notes:</span>
+<span class="sd">        ______</span>
+<span class="sd">        The principal point coordinates cx at K[0][2] and cy at K[1][2] (Krishna, [1]) are adjusted by the col and row cropping offsets.</span>
+<span class="sd">        </span>
+<span class="sd">        References:</span>
+<span class="sd">        ___________</span>
+<span class="sd">        [1] Krishna, Neeray (2022).</span>
+<span class="sd">        Camera Intrinsic Matrix with Example in Python.</span>
+<span class="sd">        towardsdatascience.com (https://towardsdatascience.com/camera-intrinsic-matrix-with-example-in-python-d79bf2478c12)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">adjusted_K</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_col_idx</span>
         <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">adjusted_K</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_row_idx</span>
