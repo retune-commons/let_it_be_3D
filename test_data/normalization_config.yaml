@@ -25,3 +25,5 @@ INVISIBLE_MARKERS:
  x: [0, 0, 0, 0, 0, 0, 0, 0]
  y: [0, 50, 50, 0, 0, 50, 50, 0]
  z: [0, 0, 0, 0, 50, 50, 50, 50]
+# None, x, y, z
+FLIP_AXIS_TO_ADJUST_CHIRALITY: z

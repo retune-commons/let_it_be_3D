@@ -1414,6 +1414,9 @@ class TriangulationRecordings(Triangulation):
         bp_keys = list(it.chain(*bp_keys_unflat))
         normalised = self.df.copy()
         normalised[bp_keys] *= conversionfactor
+        if config['FLIP_AXIS_TO_ADJUST_CHIRALITY'] is not None:
+            keys_to_flip = [key for key in bp_keys if config['FLIP_AXIS_TO_ADJUST_CHIRALITY'] in key]
+            normalised[bp_keys] *= -1
 
         reference_rotation_markers = []
         for marker in config['REFERENCE_ROTATION_MARKERS']:
@@ -1650,6 +1653,7 @@ class CalibrationValidation(Triangulation):
                 cam_id=cam.cam_id,
             )
             predictions.create_plot(plot=False, save=True)
+        self.cams_to_exclude = []
 
     def evaluate_triangulation_of_calibration_validation_markers(
             self, show_3D_plot: bool = True, verbose: bool = True,
