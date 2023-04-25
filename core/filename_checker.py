@@ -134,6 +134,10 @@ class FilenameCheckerInterface:
             recording_date, calibration_index = self._read_recording_config(
                 recording_config_filepath=filepath_to_recording_config
             )
+        else:
+            raise FileNotFoundError(
+                f"The path doesn't exist or is not linked to a .yaml file!"
+            )
         self.meta["recording_days"][
             f"Recording_Day_{recording_date}_{str(calibration_index)}"
         ] = {
