@@ -160,7 +160,7 @@ def _create_video_objects(
         output_directory: Path,
         filetypes: List[str],
         filename_tag: str = "",
-        test_mode: bool = False,
+        recreate_undistorted_plots: bool = True,
 ) -> Tuple[Dict, Dict]:
     videofiles = [file for file in directory.iterdir() if filename_tag.lower() in file.name.lower()
                   and "synchronized" not in file.name and file.suffix in filetypes]
@@ -178,7 +178,7 @@ def _create_video_objects(
         video_interfaces[video_metadata.cam_id] = VideoInterface(
             video_metadata=video_metadata,
             output_dir=output_directory,
-            test_mode=test_mode,
+            recreate_undistorted_plots=recreate_undistorted_plots,
         )
         metadata_from_videos[video_metadata.cam_id] = video_metadata
     return video_interfaces, metadata_from_videos
@@ -222,7 +222,7 @@ def _remove_marker_ids_not_in_ground_truth(
     return df.drop(columns=columns_to_remove)
 
 
-def _save_dataframe_as_csv(filepath: str, df: pd.DataFrame) -> None:
+def _save_dataframe_as_csv(filepath: Union[str, Path], df: pd.DataFrame) -> None:
     filepath = convert_to_path(filepath)
     if filepath.exists():
         filepath.unlink()
@@ -266,9 +266,8 @@ class Calibration:
     output_directory: Path or string, optional
         Directory, in which the files created during the analysis are saved.
         Per default it will be set the same as the calibration_directory.
-    test_mode: bool, default False
-        If True (default False), then pre-existing files won't be overwritten
-        during the analysis.
+    recreate_undistorted_plots: bool, default True
+        If True (default), then preexisting undistorted plots will be overwritten.
 
     Attributes
     __________
@@ -318,12 +317,12 @@ class Calibration:
 
     Methods
     _______
-    run_synchronization(test_mode, verbose)
+    run_synchronization(overwrite_synchronisations, verbose)
         Perform synchronization of all videos to the led_pattern and
         downsampling to target_fps.
-    run_calibration(use_own_intrinsic_calibration, charuco_calibration_board, iteration, verbose, test_mode)
+    run_calibration(use_own_intrinsic_calibration, charuco_calibration_board, iteration, verbose, overwrite_calibrations)
         Call ap_lib calibrate function.
-    calibrate_optimal(calibration_validation, max_iters, p_threshold, angle_threshold, verbose, test_mode)
+    calibrate_optimal(calibration_validation, max_iters, p_threshold, angle_threshold, verbose, overwrite_calibrations)
         Call run_calibration repeatedly and validate the quality of the
         resulting calibration on calibration_validation images and ground_truth.
 
@@ -374,7 +373,7 @@ class Calibration:
             project_config_filepath: Union[Path, str],
             recording_config_filepath: Union[Path, str],
             output_directory: Optional[Union[Path, str]] = None,
-            test_mode: bool = False,
+            recreate_undistorted_plots: bool = True,
     ) -> None:
         """
         Construct all necessary attributes for the Calibration class.
@@ -393,9 +392,8 @@ class Calibration:
         output_directory: Path or string, optional
             Directory, in which the files created during the analysis are saved.
             Per default it will be set the same as the calibration_directory.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        recreate_undistorted_plots: bool, default True
+            If True (default), then preexisting undistorted plots will be overwritten.
         """
         for attribute in STANDARD_ATTRIBUTES_CALIBRATION:
             setattr(self, attribute, None)
@@ -425,7 +423,7 @@ class Calibration:
             output_directory=self.output_directory,
             filename_tag=self.calibration_tag,
             filetypes=[".AVI", ".avi", ".mov", ".mp4"],
-            test_mode=test_mode,
+            recreate_undistorted_plots=recreate_undistorted_plots,
         )
         self.recording_date, *_ = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
                                                      attributes_to_check=['recording_date'])
@@ -435,7 +433,7 @@ class Calibration:
         for video_metadata in self.metadata_from_videos.values():
             video_metadata.target_fps = self.target_fps
 
-    def run_synchronization(self, test_mode: bool = False, verbose: bool = True) -> None:
+    def run_synchronization(self, overwrite_synchronisations: bool = False, verbose: bool = True) -> None:
         """
         Perform synchronization of all videos to the led_pattern and
         downsampling to target_fps.
@@ -448,9 +446,9 @@ class Calibration:
 
         Parameters
         ----------
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        overwrite_synchronisations: bool, default False
+            If True (default False), then pre-existing synchronisations will be
+            overwritten during analysis.
         verbose: bool, default True
             If True (default), then Crossvalidation plot and synchronised number
             of frames for each camera are printed.
@@ -462,7 +460,7 @@ class Calibration:
                 synchronizer=CharucoVideoSynchronizer,
                 output_directory=self.output_directory,
                 synchronize_only=True,
-                test_mode=test_mode,
+                overwrite_DLC_analysis_and_synchro=overwrite_synchronisations,
                 synchro_metadata=self.synchro_metadata,
                 verbose=verbose
             )
@@ -496,7 +494,7 @@ class Calibration:
             use_own_intrinsic_calibration: bool = True,
             verbose: int = 0,
             charuco_calibration_board: Optional[ap_lib.boards.CharucoBoard] = None,
-            test_mode: bool = False,
+            overwrite_calibrations: bool = True,
             iteration: Optional[int] = None,
     ) -> Path:
         """
@@ -515,8 +513,8 @@ class Calibration:
             Show ap_lib output if > 1 or no output if <= 1.
         charuco_calibration_board: ap_lib.boards.CharucoBoard, optional
             Specify the board, that was used in the calibration videos.
-        test_mode: bool, default False
-            If True, pre-existing files won't be overwritten during the analysis.
+        overwrite_calibrations: bool, default True
+            If True (default), then pre-existing calibrations will be overwritten.
         iteration: int, optional
             Variable to be included into the filename to make the
             filepath of calibration files unique for repeated calibrations.
@@ -533,8 +531,8 @@ class Calibration:
         filename = f"{calibration_key}.toml"
 
         calibration_filepath = self.output_directory.joinpath(filename)
-        if (not test_mode) or (
-                test_mode and not calibration_filepath.exists()
+        if (overwrite_calibrations) or (not
+                overwrite_calibrations and not calibration_filepath.exists()
         ):
             if charuco_calibration_board is None:
                 aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
@@ -574,7 +572,7 @@ class Calibration:
             p_threshold: float = 0.1,
             angle_threshold: float = 5.,
             verbose: int = 1,
-            test_mode: bool = False,
+            overwrite_calibrations: bool = True,
     ):
         """
         Call run_calibration repeatedly and validates the quality of the
@@ -604,9 +602,8 @@ class Calibration:
             Show ap_lib output if > 1,
             calibration_validation output if > 0
             or no output if < 1.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be
-            overwritten during the analysis.
+        overwrite_calibrations: bool, default True
+            If True (default), then pre-existing calibrations will be overwritten.
 
         Returns
         -------
@@ -622,11 +619,11 @@ class Calibration:
         good_calibration_filepath = self.output_directory.joinpath(f"{calibration_key}.toml")
         calibration_filepath = None
         for cal in range(max_iters):
-            if good_calibration_filepath.exists() and test_mode:
+            if good_calibration_filepath.exists() and not overwrite_calibrations:
                 calibration_filepath = good_calibration_filepath
                 self.reprojerr = 0
             else:
-                calibration_filepath = self.run_calibration(verbose=verbose, test_mode=test_mode,
+                calibration_filepath = self.run_calibration(verbose=verbose, overwrite_calibrations=overwrite_calibrations,
                                                             iteration=cal)
 
             calibration_validation.run_triangulation(calibration_toml_filepath=calibration_filepath)
@@ -658,7 +655,7 @@ class Calibration:
                         f"Named it {good_calibration_filepath}.")
                 break
 
-        if not test_mode:
+        if overwrite_calibrations:
             self.report_filepath = self.output_directory.joinpath(
                 f"{self.recording_date}_calibration_report.csv")
             report.to_csv(self.report_filepath, index=False)
@@ -704,9 +701,8 @@ class Triangulation(ABC):
         Directory, where the videos or images are stored.
     recording_config_filepath: Path or string
         Filepath to the recording_config .yaml file.
-    test_mode: bool, default False
-        If True (default False), then pre-existing files won't be overwritten
-        during the analysis.
+    recreate_undistorted_plots: bool, default True
+        If True (default), then preexisting undistorted plots will be overwritten.
     output_directory: Path or string, optional
         Directory, in which the files created during the analysis are saved.
         Per default it will be set the same as the directory.
@@ -787,7 +783,7 @@ class Triangulation(ABC):
 
     Methods
     _______
-    run_triangulation(calibration_toml_filepath, test_mode):
+    run_triangulation(calibration_toml_filepath, triangulate_full_recording):
         Load and validate the calibration, triangulate and create 3D df.
     exclude_marker(all_markers_to_exclude_config_path, verbose):
         Exclude markers in prediction based on markers_to_exclude config.
@@ -841,7 +837,7 @@ class Triangulation(ABC):
                  project_config_filepath: Union[Path, str],
                  directory: Union[Path, str],
                  recording_config_filepath: Union[Path, str],
-                 test_mode: bool = False,
+                 recreate_undistorted_plots: bool = True,
                  output_directory: Optional[Union[Path, str]] = None):
         """
         Construct all necessary attributes for the Triangulation Class.
@@ -858,9 +854,8 @@ class Triangulation(ABC):
             Directory, where the videos or images are stored.
         recording_config_filepath: Path or string
             Filepath to the recording_config .yaml file.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        recreate_undistorted_plots: bool, default True
+            If True (default), then preexisting undistorted plots will be overwritten.
         output_directory: Path or string, optional
             Directory, in which the files created during the analysis are saved.
             Per default it will be set the same as the directory.
@@ -893,7 +888,7 @@ class Triangulation(ABC):
             videometadata_tag=self._videometadata_tag,
             output_directory=self.output_directory,
             filename_tag=self.calibration_validation_tag if self._videometadata_tag == "calvin" else "",
-            test_mode=test_mode,
+            recreate_undistorted_plots=recreate_undistorted_plots,
             filetypes=self._allowed_filetypes,
         )
         metadata = _validate_metadata(metadata_from_videos=self.metadata_from_videos,
@@ -904,7 +899,7 @@ class Triangulation(ABC):
     def run_triangulation(
             self,
             calibration_toml_filepath: Union[Path, str],
-            test_mode: bool = False,
+            triangulate_full_recording: bool = True,
     ) -> None:
         """
         Load and validate the calibration, triangulate and create 3D df.
@@ -918,9 +913,9 @@ class Triangulation(ABC):
         ----------
         calibration_toml_filepath: Path or str
             Filepath to the calibration, that should be used for triangulation.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        triangulate_full_recording: bool, default True
+            If False (default True), then only the first 2 frames of the
+            recording will be triangulated and the 3D dataframe won't be saved.
         """
         self.csv_output_filepath = self._create_csv_filepath()
         calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
@@ -944,7 +939,7 @@ class Triangulation(ABC):
             self.triangulation_dlc_cams_filepaths.pop(cam)
             self.cams_to_exclude.append(cam)
 
-        self.anipose_io = self._preprocess_dlc_predictions_for_anipose(test_mode=test_mode)
+        self.anipose_io = self._preprocess_dlc_predictions_for_anipose(triangulate_full_recording=triangulate_full_recording)
         if self.triangulation_type == "triangulate":
             p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
         elif self.triangulation_type == "triangulate_optim_ransac_False":
@@ -969,7 +964,7 @@ class Triangulation(ABC):
             p3ds_flat=p3ds_flat)
 
         self.df = self._get_dataframe_of_triangulated_points(anipose_io=self.anipose_io)
-        if (not test_mode) or (test_mode and not self.csv_output_filepath.exists()):
+        if (triangulate_full_recording) or (not self.csv_output_filepath.exists()):
             _save_dataframe_as_csv(filepath=self.csv_output_filepath, df=self.df)
         self._delete_temp_files()
 
@@ -1084,18 +1079,18 @@ class Triangulation(ABC):
                 "Make sure, that you enter the correct path!"
             )
 
-    def _preprocess_dlc_predictions_for_anipose(self, test_mode: bool = False) -> Dict:
+    def _preprocess_dlc_predictions_for_anipose(self, triangulate_full_recording: bool = True) -> Dict:
         anipose_io = ap_lib.utils.load_pose2d_fnames(
             fname_dict=self.triangulation_dlc_cams_filepaths
         )
         return self._add_additional_information_and_continue_preprocessing(anipose_io=anipose_io,
-                                                                           test_mode=test_mode)
+                                                                           triangulate_full_recording=triangulate_full_recording)
 
     def _add_additional_information_and_continue_preprocessing(
-            self, anipose_io: Dict, test_mode: bool = False
+            self, anipose_io: Dict, triangulate_full_recording: bool = True
     ) -> Dict:
         n_cams, anipose_io["n_points"], anipose_io["n_joints"], _ = anipose_io["points"].shape
-        if test_mode:
+        if not triangulate_full_recording:
             start_idx, end_idx = 0, 2
             anipose_io["points"] = anipose_io["points"][:, start_idx:end_idx, :, :]
             anipose_io["n_points"] = (end_idx - start_idx) if end_idx < anipose_io['n_points'] else anipose_io['n_points']
@@ -1191,12 +1186,12 @@ class TriangulationRecordings(Triangulation):
 
     Methods
     _______
-    run_synchronization(test_mode, verbose):
+    run_synchronization(overwrite_DLC_analysis_and_synchro, verbose):
         Perform analysis of all videos using DLC or other methods,
         synchronization to the led_pattern and downsampling to target_fps.
     create_triangulated_video(filename, config_path):
         Create video of the triangulated data.
-    normalize(normalization_config_path, test_mode):
+    normalize(normalization_config_path, save_dataframe):
         Rotate and translate the triangulated dataframe.
 
     See Also
@@ -1225,7 +1220,7 @@ class TriangulationRecordings(Triangulation):
         ... directory=directory,
         ... recording_config_filepath=rec_config,
         ... project_config_filepath="test_data/project_config.yaml",
-        ... test_mode = False,
+        ... recreate_undistorted_plots = True,
         ... output_directory=directory
         ... )
     >>> triangulation_object.run_synchronization()
@@ -1253,7 +1248,7 @@ class TriangulationRecordings(Triangulation):
         return [".AVI", ".avi", ".mov", ".mp4"]
 
     def run_synchronization(
-            self, test_mode: bool = False, verbose: bool = True
+            self, overwrite_DLC_analysis_and_synchro: bool = False, verbose: bool = True
     ) -> None:
         """
         Perform analysis of all videos using DLC or other methods,
@@ -1267,9 +1262,9 @@ class TriangulationRecordings(Triangulation):
 
         Parameters
         ----------
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        overwrite_DLC_analysis_and_synchro: bool, default False
+            If True (default False), then pre-existing DLC files and
+            synchronisations will be overwritten during analysis.
         verbose: bool, default True
             If True (default), then Crossvalidation plot and synchronised number
             of frames for each camera are printed.
@@ -1286,7 +1281,7 @@ class TriangulationRecordings(Triangulation):
                 synchronizer=synchronizer,
                 output_directory=self.output_directory,
                 synchronize_only=False,
-                test_mode=test_mode,
+                overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro,
                 synchro_metadata=self.synchro_metadata,
                 verbose=verbose
             )
@@ -1340,7 +1335,7 @@ class TriangulationRecordings(Triangulation):
         )
         return filepath_out
 
-    def normalize(self, normalization_config_path: Union[Path, str], test_mode: bool = False, verbose: bool = False) -> Tuple[Path, float]:
+    def normalize(self, normalization_config_path: Union[Path, str], save_dataframe: bool = True, verbose: bool = False) -> Tuple[Path, float]:
         """
         Rotate and translate the triangulated dataframe.
 
@@ -1353,9 +1348,9 @@ class TriangulationRecordings(Triangulation):
         ----------
         normalization_config_path: Path or str
             The path to the config used for normalisation.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        save_dataframe: bool, default True
+            If True (default), then the dataframe will be saved and overwrites
+            the pre-existing one.
 
         Returns
         -------
@@ -1434,7 +1429,7 @@ class TriangulationRecordings(Triangulation):
 
         self.normalised_dataframe = True
         self.rotated_filepath = self._create_csv_filepath()
-        if (not test_mode) or (test_mode and not self.rotated_filepath.exists()):
+        if (save_dataframe) or (not self.rotated_filepath.exists()):
             _save_dataframe_as_csv(filepath=str(self.rotated_filepath), df=rotated)
         rotation_plot_filename = self.output_directory.joinpath(f"{self.mouse_id}_{self.recording_date}_{self.paradigm}_rotation_visualization")
         visualization = RotationVisualization(
@@ -1534,7 +1529,7 @@ class CalibrationValidation(Triangulation):
     add_ground_truth_config(ground_truth_config_filepath)
         Read the metadata from ground_truth_config_filepath and create list of
         markers.
-    get_marker_predictions(test_mode)
+    get_marker_predictions(overwrite_analysed_markers)
         Run marker detection for all images in metadata_from_videos.
     evaluate_triangulation_of_calibration_validation_markers(show_3D_plot, verbose)
         Evaluate the triangulated data and return mean errors.
@@ -1564,12 +1559,12 @@ class CalibrationValidation(Triangulation):
     >>> calibration_validation_object = CalibrationValidation(
         ... project_config_filepath="test_data/project_config.yaml",
         ... directory=rec_config.parent, recording_config_filepath=rec_config,
-        ... test_mode = False, output_directory=rec_config.parent)
+        ... recreate_undistorted_plots = True, output_directory=rec_config.parent)
     >>> calibration_validation_object.add_ground_truth_config("test_data/ground_truth_config.yaml")
     >>> calibration_validation_object.get_marker_predictions()
     >>> calibration_validation_object.run_triangulation(
         ... calibration_toml_filepath="test_data/Server_structure/Calibrations/220922/220922_0_Bottom_Ground1_Ground2_Side1_Side2_Side3.toml",
-        ... test_mode = False)
+        ... triangulate_full_recording = True)
     >>> mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean = calibration_validation_object.evaluate_triangulation_of_calibration_validation_markers()
     """
     @property
@@ -1623,7 +1618,7 @@ class CalibrationValidation(Triangulation):
         self.ground_truth_config = read_config(ground_truth_config_filepath)
         self.markers = self.ground_truth_config["unique_ids"]
 
-    def get_marker_predictions(self, test_mode: bool = False) -> None:
+    def get_marker_predictions(self, overwrite_analysed_markers: bool = False) -> None:
         """
         Run marker detection for all images in metadata_from_videos.
 
@@ -1632,14 +1627,14 @@ class CalibrationValidation(Triangulation):
 
         Parameters
         ----------
-        test_mode: bool, default False
+        overwrite_analysed_markers: bool, default False
             If True (default False), then pre-existing files won't be overwritten
             during the analysis.
         """
         self.markers_excluded_manually = False
         self.triangulation_dlc_cams_filepaths = {}
         for cam in self.metadata_from_videos.values():
-            h5_output_filepath = self._run_marker_detection(cam=cam, test_mode=test_mode)
+            h5_output_filepath = self._run_marker_detection(cam=cam, overwrite_analysed_markers=overwrite_analysed_markers)
             self.triangulation_dlc_cams_filepaths[cam.cam_id] = h5_output_filepath
             self._validate_triangulation_marker_ids(
                 triangulation_markers_df_filepath=h5_output_filepath,
@@ -1763,11 +1758,11 @@ class CalibrationValidation(Triangulation):
             f"{self.markers_excluded_manually}_filteredFalse_{self.triangulation_type}.csv")
         return filepath_out
 
-    def _run_marker_detection(self, cam: VideoMetadata, test_mode: bool=False) -> Path:
+    def _run_marker_detection(self, cam: VideoMetadata, overwrite_analysed_markers: bool=False) -> Path:
         h5_output_filepath = self.output_directory.joinpath(
             f"Calvin_{self.recording_date}_{cam.cam_id}.h5"
         )
-        if not test_mode or (test_mode and not h5_output_filepath.exists()):
+        if overwrite_analysed_markers or (not h5_output_filepath.exists()):
             if cam.calibration_evaluation_type == "manual":
                 config = cam.calibration_evaluation_filepath
                 manual_interface = ManualAnnotation(
