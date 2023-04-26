@@ -139,29 +139,29 @@
 <span class="sd">        Adds recordings to metadata that don&#39;t match directory name structure.</span>
 <span class="sd">    remove_recordings():</span>
 <span class="sd">        Remove recordings from analysis via user input dialog.</span>
-<span class="sd">    create_recordings(test_mode):</span>
+<span class="sd">    create_recordings(recreate_undistorted_plots):</span>
 <span class="sd">        Create TriangulationRecording objects for all recording_directories</span>
 <span class="sd">        added to MetaInterface.</span>
-<span class="sd">    synchronize_recordings(verbose, test_mode):</span>
+<span class="sd">    synchronize_recordings(verbose, overwrite_DLC_analysis_and_synchro):</span>
 <span class="sd">        Run the function run_synchronization for all TriangulationRecording</span>
 <span class="sd">        objects added to MetaInterface.</span>
-<span class="sd">    create_calibrations(ground_truth_config_filepath, test_mode):</span>
+<span class="sd">    create_calibrations(ground_truth_config_filepath, recreate_undistorted_plots):</span>
 <span class="sd">        Create Calibration and CalibrationValidation objects and add</span>
 <span class="sd">        ground_truth_config for all calibration_directories added to</span>
 <span class="sd">        MetaInterface.</span>
-<span class="sd">    synchronize_calibrations(test_mode):</span>
+<span class="sd">    synchronize_calibrations(overwrite_synchronisations_and_calvin_predictions):</span>
 <span class="sd">        Run get_marker_predictions for all calibration_validation objects and</span>
 <span class="sd">        run_synchronization for all calibration objects added to MetaInterface.</span>
-<span class="sd">    calibrate(p_threshold, angle_threshold, max_iters, calibrate_optimal, verbose, test_mode):</span>
+<span class="sd">    calibrate(p_threshold, angle_threshold, max_iters, calibrate_optimal, verbose, overwrite_calibrations):</span>
 <span class="sd">        Run the function run_calibration or calibrate_optimal for all</span>
 <span class="sd">        calibration objects added to MetaInterface.</span>
-<span class="sd">    triangulate_recordings(test_mode):</span>
+<span class="sd">    triangulate_recordings(triangulate_full_recording):</span>
 <span class="sd">        Run the function run_triangulation for all TriangulationRecording</span>
 <span class="sd">        objects added to MetaInterface.</span>
 <span class="sd">    exclude_markers(all_markers_to_exclude_config_path, verbose):</span>
 <span class="sd">        Run the function exclude_marker for all TriangulationRecordings and</span>
 <span class="sd">        CalibrationValidation objects added to MetaInterface.</span>
-<span class="sd">    normalize_recordings(normalization_config_path, test_mode):</span>
+<span class="sd">    normalize_recordings(normalization_config_path, save_dataframe):</span>
 <span class="sd">        Run the function normalize for all TriangulationRecordings objects and</span>
 <span class="sd">        saves the normalisation metadata.</span>
 <span class="sd">    add_triangulated_csv_to_database(data_base_path, overwrite):</span>
@@ -364,6 +364,9 @@
             <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;added recording directory succesfully!&quot;</span><span class="p">)</span></div>
             
 <div class="viewcode-block" id="MetaInterface.remove_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.remove_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">remove_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove recordings from analysis via user input dialog.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="n">recordings_to_remove</span> <span class="o">=</span> <span class="p">[]</span>
@@ -386,16 +389,15 @@
                     <span class="sa">f</span><span class="s2">&quot;recording day </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">!&quot;</span>
                 <span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.create_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.create_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">create_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">specify_calibration_to_use</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.create_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.create_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">create_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">specify_calibration_to_use</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create TriangulationRecording objects for all recording_directories</span>
 <span class="sd">        added to MetaInterface.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        recreate_undistorted_plots</span>
+<span class="sd">            If True (default), then preexisting undistorted plots will be overwritten.</span>
 <span class="sd">        specify_calibration_to_use: bool, default False</span>
 <span class="sd">            If True (default False), then you will be asked to specify the </span>
 <span class="sd">            calibration index for each recording.</span>
@@ -410,7 +412,7 @@
                     <span class="n">recording_config_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">][</span><span class="n">recording_day</span><span class="p">][</span><span class="s2">&quot;recording_config_filepath&quot;</span><span class="p">],</span>
                     <span class="n">project_config_filepath</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;project_config_filepath&quot;</span><span class="p">]),</span>
                     <span class="n">output_directory</span><span class="o">=</span><span class="n">recording</span><span class="p">,</span>
-                    <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                    <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="n">individual_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">triangulation_recordings_object</span><span class="o">.</span><span class="n">mouse_id</span><span class="si">}</span><span class="s2">_&quot;</span> \
                                  <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">triangulation_recordings_object</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_&quot;</span> \
@@ -447,7 +449,7 @@
 <div class="viewcode-block" id="MetaInterface.synchronize_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.synchronize_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">synchronize_recordings</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function run_synchronization for all TriangulationRecording</span>
@@ -458,9 +460,9 @@
 <span class="sd">        verbose: bool, default True:</span>
 <span class="sd">            If True (default), then the duration of a analysis is printed and</span>
 <span class="sd">            the attribute is passed to the TriangulationRecordings objects.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        overwrite_DLC_analysis_and_synchro: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing DLC files and</span>
+<span class="sd">            synchronisations will be overwritten during analysis.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">]:</span>
@@ -470,7 +472,7 @@
                 <span class="n">recording_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span>
                 <span class="n">recording_meta</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span>
                 <span class="n">recording_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span>
-                    <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+                    <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
                 <span class="p">)</span>
                 <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">recording_meta</span><span class="p">[</span><span class="s2">&quot;videos&quot;</span><span class="p">]:</span>
                     <span class="k">try</span><span class="p">:</span>
@@ -494,7 +496,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="MetaInterface.create_calibrations"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.create_calibrations">[docs]</a>    <span class="k">def</span> <span class="nf">create_calibrations</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">ground_truth_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">],</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">ground_truth_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">],</span> <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create Calibration and CalibrationValidation objects and add</span>
@@ -505,9 +507,8 @@
 <span class="sd">        ----------</span>
 <span class="sd">        ground_truth_config_filepath: Path or str</span>
 <span class="sd">            The path to the ground_truth config file.</span>
-<span class="sd">        test_mode</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        recreate_undistorted_plots</span>
+<span class="sd">            If True (default), then preexisting undistorted plots will be overwritten.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -517,7 +518,7 @@
                 <span class="n">project_config_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_config_filepath</span><span class="p">,</span>
                 <span class="n">recording_config_filepath</span><span class="o">=</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_config_filepath&quot;</span><span class="p">],</span>
                 <span class="n">output_directory</span><span class="o">=</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibration_directory&quot;</span><span class="p">],</span>
-                <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">unique_calibration_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">calibration_object</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s1">_&#39;</span> \
@@ -541,8 +542,7 @@
                 <span class="n">recording_config_filepath</span><span class="o">=</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recording_config_filepath&quot;</span><span class="p">],</span>
                 <span class="n">project_config_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_config_filepath</span><span class="p">,</span>
                 <span class="n">output_directory</span><span class="o">=</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibration_directory&quot;</span><span class="p">],</span>
-                <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
-            <span class="p">)</span>
+                <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">)</span>
             <span class="n">calibration_validation_object</span><span class="o">.</span><span class="n">add_ground_truth_config</span><span class="p">(</span>
                 <span class="n">ground_truth_config_filepath</span><span class="o">=</span><span class="n">ground_truth_config_filepath</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">][</span><span class="n">unique_calibration_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">calibration_validation_object</span>
@@ -557,16 +557,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.synchronize_calibrations"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.synchronize_calibrations">[docs]</a>    <span class="k">def</span> <span class="nf">synchronize_calibrations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.synchronize_calibrations"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.synchronize_calibrations">[docs]</a>    <span class="k">def</span> <span class="nf">synchronize_calibrations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overwrite_synchronisations_and_calvin_predictions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run get_marker_predictions for all calibration_validation objects and</span>
 <span class="sd">        run_synchronization for all calibration objects added to MetaInterface.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        overwrite_synchronisations_and_calvin_predictions: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing synchronisations and</span>
+<span class="sd">            calvin predictions will be overwritten during analysis.</span>
 <span class="sd">        verbose: bool, default True</span>
 <span class="sd">            If True (default), then the attribute is passed to the Calibration objects.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -574,7 +574,7 @@
             <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
                 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Now analysing </span><span class="si">{</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">)</span>
             <span class="n">calibration_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span><span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]]</span>
-            <span class="n">calibration_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+            <span class="n">calibration_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span><span class="n">overwrite_synchronisations</span><span class="o">=</span><span class="n">overwrite_synchronisations_and_calvin_predictions</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">]:</span>
                 <span class="k">if</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">calibration_object</span><span class="o">.</span><span class="n">synchronized_charuco_videofiles</span><span class="p">:</span>
                     <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">][</span><span class="n">video</span><span class="p">][</span><span class="s2">&quot;synchronized_video&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
@@ -587,7 +587,7 @@
             <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;cams_to_exclude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">calibration_object</span><span class="o">.</span><span class="n">cams_to_exclude</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">][</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]</span>
-            <span class="p">]</span><span class="o">.</span><span class="n">get_marker_predictions</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">get_marker_predictions</span><span class="p">(</span><span class="n">overwrite_analysed_markers</span><span class="o">=</span><span class="n">overwrite_synchronisations_and_calvin_predictions</span><span class="p">)</span>
 
             <span class="k">for</span> <span class="n">video</span> <span class="ow">in</span> <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;videos&quot;</span><span class="p">]:</span>
                 <span class="k">try</span><span class="p">:</span>
@@ -634,7 +634,7 @@
 
 <div class="viewcode-block" id="MetaInterface.calibrate"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.calibrate">[docs]</a>    <span class="k">def</span> <span class="nf">calibrate</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span> <span class="n">p_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">angle_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.</span><span class="p">,</span> <span class="n">max_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-            <span class="n">calibrate_optimal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">calibrate_optimal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">overwrite_calibrations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function run_calibration or calibrate_optimal for all</span>
@@ -661,9 +661,8 @@
 <span class="sd">            Show ap_lib output if &gt; 1,</span>
 <span class="sd">            calibration_validation output if &gt; 0</span>
 <span class="sd">            or no output if &lt; 1.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be</span>
-<span class="sd">            overwritten during the analysis.</span>
+<span class="sd">        overwrite_calibrations: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing calibrations will be overwritten.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">recording_day</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;recording_days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
@@ -676,7 +675,7 @@
                         <span class="n">calibration_validation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_validation_objects&quot;</span><span class="p">][</span>
                             <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]],</span>
                         <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
-                        <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                        <span class="n">overwrite_calibrations</span><span class="o">=</span><span class="n">overwrite_calibrations</span><span class="p">,</span>
                         <span class="n">max_iters</span><span class="o">=</span><span class="n">max_iters</span><span class="p">,</span>
                         <span class="n">p_threshold</span><span class="o">=</span><span class="n">p_threshold</span><span class="p">,</span>
                         <span class="n">angle_threshold</span><span class="o">=</span><span class="n">angle_threshold</span><span class="p">))</span>
@@ -687,22 +686,22 @@
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;toml_filepath&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span>
                     <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span>
                         <span class="s2">&quot;calibration_key&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">run_calibration</span><span class="p">(</span>
-                    <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">))</span>
+                    <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">overwrite_calibrations</span><span class="o">=</span><span class="n">overwrite_calibrations</span><span class="p">))</span>
             <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s1">&#39;reprojerr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;calibration_objects&quot;</span><span class="p">][</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;calibrations&quot;</span><span class="p">][</span><span class="s2">&quot;calibration_key&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">reprojerr</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">6</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.triangulate_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.triangulate_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">triangulate_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.triangulate_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.triangulate_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">triangulate_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">triangulate_full_recording</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function run_triangulation for all TriangulationRecording</span>
 <span class="sd">        objects added to MetaInterface.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be</span>
-<span class="sd">            overwritten during the analysis.</span>
+<span class="sd">        triangulate_full_recording: bool, default True</span>
+<span class="sd">            If False (default True), then only the first 2 frames of the</span>
+<span class="sd">            recording will be triangulated and the 3D dataframe won&#39;t be saved.</span>
 <span class="sd">        verbose: bool, default True</span>
 <span class="sd">            If True (default), then the recording, that is currently analysed, and the</span>
 <span class="sd">            duration of an analysis will be printed.</span>
@@ -715,7 +714,7 @@
                 <span class="n">toml_filepath</span> <span class="o">=</span> <span class="n">recording_day</span><span class="p">[</span><span class="s1">&#39;calibrations&#39;</span><span class="p">][</span><span class="s1">&#39;toml_filepath&#39;</span><span class="p">]</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">]</span><span class="o">.</span><span class="n">run_triangulation</span><span class="p">(</span>
                     <span class="n">calibration_toml_filepath</span><span class="o">=</span><span class="n">toml_filepath</span><span class="p">,</span>
-                    <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                    <span class="n">triangulate_full_recording</span><span class="o">=</span><span class="n">triangulate_full_recording</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;3D_csv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span>
@@ -734,7 +733,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">7</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">export_meta_to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">standard_yaml_filepath</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="MetaInterface.normalize_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.normalize_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">normalize_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="MetaInterface.normalize_recordings"><a class="viewcode-back" href="../../core.html#core.meta.MetaInterface.normalize_recordings">[docs]</a>    <span class="k">def</span> <span class="nf">normalize_recordings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">save_dataframe</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the function normalize for all TriangulationRecordings objects and</span>
 <span class="sd">        saves the normalisation metadata.</span>
@@ -743,9 +742,9 @@
 <span class="sd">        ----------</span>
 <span class="sd">        normalization_config_path: Path or str</span>
 <span class="sd">            The path to the config used for normalisation.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        save_dataframe: bool, default True</span>
+<span class="sd">            If True (default), then the dataframe will be saved and overwrites</span>
+<span class="sd">            the pre-existing one.</span>
 <span class="sd">        verbose: bool, default False</span>
 <span class="sd">            If True (default False), then the rotation visualization plot is shown.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -756,7 +755,7 @@
                     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Rotation plot for </span><span class="si">{</span><span class="n">recording</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
                 <span class="n">rotated_filepath</span><span class="p">,</span> <span class="n">rotation_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;triangulation_recordings_objects&quot;</span><span class="p">][</span>
                     <span class="n">recording</span>
-                <span class="p">]</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">normalization_config_path</span><span class="o">=</span><span class="n">normalization_config_path</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">normalization_config_path</span><span class="o">=</span><span class="n">normalization_config_path</span><span class="p">,</span> <span class="n">save_dataframe</span><span class="o">=</span><span class="n">save_dataframe</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalised_3D_csv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">rotated_filepath</span><span class="p">)</span>
                 <span class="n">recording_day</span><span class="p">[</span><span class="s2">&quot;recordings&quot;</span><span class="p">][</span><span class="n">recording</span><span class="p">][</span><span class="s2">&quot;normalisation_rotation_error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">rotation_error</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;meta_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">8</span>

@@ -38,7 +38,7 @@ def _check_for_missing_or_duplicate_cameras(
                 for i, file in enumerate(files_per_cam[key])
             ]
             print(
-                f"Found {len(files_per_cam[key])} videos for {key} in {directory}!"
+                f"\nFound {len(files_per_cam[key])} videos for {key} in {directory}!"
                 f"\n {information_duplicates}"
             )
             file_idx_to_keep = input(
@@ -72,11 +72,11 @@ def _check_for_missing_or_duplicate_cameras(
             cameras_missing_in_recording_config.remove(cam)
     if cams_not_found:
         print(
-            f"At {directory}\nFound no video for {cams_not_found}!"
+            f"\nAt {directory}\nFound no video for {cams_not_found}!"
         )
     if cameras_missing_in_recording_config:
         print(
-            f"No information for {cameras_missing_in_recording_config} "
+            f"\nNo information for {cameras_missing_in_recording_config} "
             f"in the config_file {recording_config_filepath}!"
         )
     return metadata_from_videos
@@ -93,7 +93,7 @@ def _validate_metadata(metadata_from_videos: List,
     for attribute in sets_of_attributes:
         if len(attribute) > 1:
             raise ValueError(
-                f"The filenames of the images or videos are valid,\n"
+                f"\nThe filenames of the images or videos are valid,\n"
                 f"but give different metadata! Reasons could be:\n"
                 f"  - file belongs to another folder\n"
                 f"  - filename is wrong\n"
@@ -154,7 +154,7 @@ def _create_video_objects(
             iio.v3.imread(filepath, index=0)
         except:
             print(
-                f"Could not open file {filepath}. Check, whether the file is corrupted and delete it manually!"
+                f"\nCould not open file {filepath}. Check, whether the file is corrupted and delete it manually!"
             )
             videofiles.remove(filepath)
     for filepath in videofiles:

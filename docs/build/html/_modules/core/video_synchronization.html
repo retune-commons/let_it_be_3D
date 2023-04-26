@@ -493,7 +493,7 @@
 
 <span class="sd">    Methods</span>
 <span class="sd">    _______</span>
-<span class="sd">    run_synchronization(synchronize_only, test_mode, verbose)</span>
+<span class="sd">    run_synchronization(synchronize_only, overwrite_DLC_analysis_and_synchro, verbose)</span>
 <span class="sd">        Run alignment between template and detected led blinking pattern.</span>
 <span class="sd">        Select frames to adjust framerate. Start marker detection or write video.</span>
 
@@ -519,7 +519,7 @@
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">_adjust_video_to_target_fps_and_run_marker_detection</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]]:</span>
         <span class="k">pass</span>
 
@@ -568,7 +568,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">synchro_metadata</span> <span class="o">=</span> <span class="n">synchro_metadata</span>
 
 <div class="viewcode-block" id="Synchronizer.run_synchronization"><a class="viewcode-back" href="../../core.html#core.video_synchronization.Synchronizer.run_synchronization">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronization</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run alignment between template and detected led blinking pattern.</span>
@@ -579,9 +579,9 @@
 <span class="sd">        synchronize_only: bool, default False</span>
 <span class="sd">            To be used by calibration videos only. If True, then only</span>
 <span class="sd">            synchronized videos are created and no marker detection is run.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the synchronisation.</span>
+<span class="sd">        overwrite_DLC_analysis_and_synchro: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing DLC files and</span>
+<span class="sd">            synchronisations will be overwritten during analysis.</span>
 <span class="sd">        verbose: bool, default True</span>
 <span class="sd">            If True (default), then the number of synchronized frames is printed.</span>
 
@@ -598,14 +598,14 @@
         <span class="n">preexisting_output_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_preexisting_output_filepath</span><span class="p">()</span>
         <span class="n">synchro_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_synchro_filepath</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="n">test_mode</span> <span class="ow">and</span> <span class="n">preexisting_output_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite_DLC_analysis_and_synchro</span> <span class="ow">and</span> <span class="n">preexisting_output_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="n">marker_detection_filepath</span><span class="p">,</span> <span class="n">synchronized_video_filepath</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="n">preexisting_output_file</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.h5&quot;</span><span class="p">:</span>
                 <span class="n">marker_detection_filepath</span><span class="p">,</span> <span class="n">synchronized_video_filepath</span> <span class="o">=</span> <span class="n">preexisting_output_file</span><span class="p">,</span> <span class="kc">None</span>
             <span class="k">elif</span> <span class="n">preexisting_output_file</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.mp4&quot;</span><span class="p">:</span>
                 <span class="n">synchronized_video_filepath</span><span class="p">,</span> <span class="n">marker_detection_filepath</span> <span class="o">=</span> <span class="n">preexisting_output_file</span><span class="p">,</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">test_mode</span> <span class="ow">and</span> <span class="n">synchro_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite_DLC_analysis_and_synchro</span> <span class="ow">and</span> <span class="n">synchro_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
                 <span class="n">led_center_coordinates</span><span class="p">,</span> <span class="n">offset_adjusted_start_idx</span><span class="p">,</span> <span class="n">remaining_offset</span><span class="p">,</span> <span class="n">alignment_error</span> <span class="o">=</span> <span class="n">_load_synchro</span><span class="p">(</span>
                     <span class="n">filepath</span><span class="o">=</span><span class="n">synchro_file</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
@@ -633,7 +633,7 @@
                                                                           <span class="n">start_idx</span><span class="o">=</span><span class="n">offset_adjusted_start_idx</span><span class="p">,</span>
                                                                           <span class="n">offset</span><span class="o">=</span><span class="n">remaining_offset</span><span class="p">,</span>
                                                                           <span class="n">synchronize_only</span><span class="o">=</span><span class="n">synchronize_only</span><span class="p">,</span>
-                                                                          <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+                                                                          <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">framenum_synchronized</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">duration_synchronized</span> <span class="o">=</span> \
             <span class="bp">self</span><span class="o">.</span><span class="n">_get_framenumber_of_synchronized_files</span><span class="p">(</span><span class="n">synchronize_only</span><span class="o">=</span><span class="n">synchronize_only</span><span class="p">,</span>
                                                         <span class="n">marker_detection_filepath</span><span class="o">=</span><span class="n">marker_detection_filepath</span><span class="p">,</span>
@@ -1031,9 +1031,9 @@
             <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
             <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">overwrite_video</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">test_mode</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite_video</span><span class="p">:</span>
             <span class="n">preexisting_filepath_downsampled_video</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_video_filepath</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">preexisting_filepath_downsampled_video</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
                 <span class="k">return</span> <span class="n">preexisting_filepath_downsampled_video</span>
@@ -1201,29 +1201,29 @@
             <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+            <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
             <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Path</span><span class="p">]:</span>
         <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_video</span><span class="p">(</span>
             <span class="n">start_idx</span><span class="o">=</span><span class="n">start_idx</span><span class="p">,</span>
             <span class="n">offset</span><span class="o">=</span><span class="n">offset</span><span class="p">,</span>
             <span class="n">target_fps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target_fps</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+            <span class="n">overwrite_video</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">,</span>
         <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="RecordingVideoSynchronizer"><a class="viewcode-back" href="../../core.html#core.video_synchronization.RecordingVideoSynchronizer">[docs]</a><span class="k">class</span> <span class="nc">RecordingVideoSynchronizer</span><span class="p">(</span><span class="n">Synchronizer</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">_adjust_video_to_target_fps_and_run_marker_detection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-                                                             <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span>
+                                                             <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span>
         <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]]:</span>
         <span class="k">pass</span>
 
     <span class="k">def</span> <span class="nf">_run_deep_lab_cut_for_marker_detection</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
         <span class="n">output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_h5_filepath</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">overwrite_DLC_analysis</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
             <span class="n">config_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_filepath</span>
             <span class="n">dlc_interface</span> <span class="o">=</span> <span class="n">DeeplabcutInterface</span><span class="p">(</span>
                 <span class="n">object_to_analyse</span><span class="o">=</span><span class="n">video_filepath</span><span class="p">,</span>
@@ -1235,22 +1235,18 @@
         <span class="k">return</span> <span class="n">output_filepath</span>
 
     <span class="k">def</span> <span class="nf">_run_manual_marker_detection</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">video_filepath</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
         <span class="n">output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_h5_filepath</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-            <span class="n">inp</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span>
-                <span class="s2">&quot;Are you sure, you want to overwrite the existing file and label a new one? (y/n)&quot;</span>
+        <span class="k">if</span> <span class="n">overwrite_DLC_analysis</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+            <span class="n">config_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_filepath</span>
+            <span class="n">manual_interface</span> <span class="o">=</span> <span class="n">ManualAnnotation</span><span class="p">(</span>
+                <span class="n">object_to_analyse</span><span class="o">=</span><span class="n">video_filepath</span><span class="p">,</span>
+                <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
+                <span class="n">marker_detection_directory</span><span class="o">=</span><span class="n">config_filepath</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">if</span> <span class="n">inp</span> <span class="o">==</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span>
-                <span class="n">config_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_filepath</span>
-                <span class="n">manual_interface</span> <span class="o">=</span> <span class="n">ManualAnnotation</span><span class="p">(</span>
-                    <span class="n">object_to_analyse</span><span class="o">=</span><span class="n">video_filepath</span><span class="p">,</span>
-                    <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
-                    <span class="n">marker_detection_directory</span><span class="o">=</span><span class="n">config_filepath</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="n">manual_interface</span><span class="o">.</span><span class="n">analyze_objects</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">output_filepath</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.h5&quot;</span><span class="p">))</span>
+            <span class="n">manual_interface</span><span class="o">.</span><span class="n">analyze_objects</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">output_filepath</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.h5&quot;</span><span class="p">))</span>
 
         <span class="k">return</span> <span class="n">output_filepath</span>
 
@@ -1275,7 +1271,7 @@
             <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
             <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
             <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 
@@ -1283,13 +1279,13 @@
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_type</span> <span class="o">==</span> <span class="s2">&quot;DLC&quot;</span><span class="p">:</span>
             <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_deep_lab_cut_for_marker_detection</span><span class="p">(</span>
-                <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span>
+                <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span>
             <span class="p">)</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">synchro_metadata</span><span class="p">[</span><span class="s2">&quot;use_2D_filter&quot;</span><span class="p">]:</span>
                 <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_h5_filepath</span><span class="p">(</span><span class="n">filtered</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_type</span> <span class="o">==</span> <span class="s2">&quot;manual&quot;</span><span class="p">:</span>
             <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_manual_marker_detection</span><span class="p">(</span>
-                <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span>
+                <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;For processing only DLC and manual are supported!&quot;</span><span class="p">)</span>
@@ -1307,23 +1303,23 @@
             <span class="n">target_fps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">start_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+            <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
             <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 
         <span class="n">upsynchronized_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_h5_filepath</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;_temp&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">upsynchronized_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">upsynchronized_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_type</span> <span class="o">==</span> <span class="s2">&quot;DLC&quot;</span><span class="p">:</span>
                 <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_deep_lab_cut_for_marker_detection</span><span class="p">(</span>
-                    <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span>
+                    <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span>
                 <span class="p">)</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">synchro_metadata</span><span class="p">[</span><span class="s2">&quot;use_2D_filter&quot;</span><span class="p">]:</span>
                     <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_h5_filepath</span><span class="p">(</span><span class="n">filtered</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">processing_type</span> <span class="o">==</span> <span class="s2">&quot;manual&quot;</span><span class="p">:</span>
                 <span class="n">full_h5_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_manual_marker_detection</span><span class="p">(</span>
-                    <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span>
+                    <span class="n">video_filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;For processing only DLC and manual are supported!&quot;</span><span class="p">)</span>

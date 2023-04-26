@@ -9,7 +9,7 @@ from .video_metadata import VideoMetadata
 
 class VideoInterface:
     def __init__(
-            self, video_metadata: VideoMetadata, output_dir: Path, test_mode: bool = False
+            self, video_metadata: VideoMetadata, output_dir: Path, recreate_undistorted_plots: bool = True
     ) -> None:
         self.video_metadata = video_metadata
         if self.video_metadata.calibration:
@@ -25,14 +25,14 @@ class VideoInterface:
                                                  intrinsic_calibration=self.video_metadata.intrinsic_calibration,
                                                  filename=filename, fisheye=self.video_metadata.fisheye,
                                                  output_directory=output_dir)
-        self.plot_camera_intrinsics.create_plot(save=not test_mode, plot=False)
+        self.plot_camera_intrinsics.create_plot(save=recreate_undistorted_plots, plot=False)
 
     def run_synchronizer(
             self,
             synchronizer: Type,
             output_directory: Path,
             synchronize_only: bool,
-            test_mode: bool,
+            overwrite_DLC_analysis_and_synchro: bool,
             synchro_metadata: Dict,
             verbose: bool = True
     ) -> None:
@@ -45,7 +45,7 @@ class VideoInterface:
             self.marker_detection_filepath,
             self.synchronized_video_filepath,
         ) = self.synchronizer_object.run_synchronization(
-            synchronize_only=synchronize_only, test_mode=test_mode, verbose=verbose
+            synchronize_only=synchronize_only, overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro, verbose=verbose
         )
 
     def export_for_aniposelib(self) -> Union:

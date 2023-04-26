@@ -68,29 +68,29 @@ class MetaInterface(ABC):
         Adds recordings to metadata that don't match directory name structure.
     remove_recordings():
         Remove recordings from analysis via user input dialog.
-    create_recordings(test_mode):
+    create_recordings(recreate_undistorted_plots):
         Create TriangulationRecording objects for all recording_directories
         added to MetaInterface.
-    synchronize_recordings(verbose, test_mode):
+    synchronize_recordings(verbose, overwrite_DLC_analysis_and_synchro):
         Run the function run_synchronization for all TriangulationRecording
         objects added to MetaInterface.
-    create_calibrations(ground_truth_config_filepath, test_mode):
+    create_calibrations(ground_truth_config_filepath, recreate_undistorted_plots):
         Create Calibration and CalibrationValidation objects and add
         ground_truth_config for all calibration_directories added to
         MetaInterface.
-    synchronize_calibrations(test_mode):
+    synchronize_calibrations(overwrite_synchronisations_and_calvin_predictions):
         Run get_marker_predictions for all calibration_validation objects and
         run_synchronization for all calibration objects added to MetaInterface.
-    calibrate(p_threshold, angle_threshold, max_iters, calibrate_optimal, verbose, test_mode):
+    calibrate(p_threshold, angle_threshold, max_iters, calibrate_optimal, verbose, overwrite_calibrations):
         Run the function run_calibration or calibrate_optimal for all
         calibration objects added to MetaInterface.
-    triangulate_recordings(test_mode):
+    triangulate_recordings(triangulate_full_recording):
         Run the function run_triangulation for all TriangulationRecording
         objects added to MetaInterface.
     exclude_markers(all_markers_to_exclude_config_path, verbose):
         Run the function exclude_marker for all TriangulationRecordings and
         CalibrationValidation objects added to MetaInterface.
-    normalize_recordings(normalization_config_path, test_mode):
+    normalize_recordings(normalization_config_path, save_dataframe):
         Run the function normalize for all TriangulationRecordings objects and
         saves the normalisation metadata.
     add_triangulated_csv_to_database(data_base_path, overwrite):
@@ -318,16 +318,15 @@ class MetaInterface(ABC):
                     f"recording day {recording_day['recording_date']}!"
                 )
 
-    def create_recordings(self, test_mode: bool = False, specify_calibration_to_use: bool = False) -> None:
+    def create_recordings(self, recreate_undistorted_plots: bool = True, specify_calibration_to_use: bool = False) -> None:
         """
         Create TriangulationRecording objects for all recording_directories
         added to MetaInterface.
 
         Parameters
         ----------
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        recreate_undistorted_plots
+            If True (default), then preexisting undistorted plots will be overwritten.
         specify_calibration_to_use: bool, default False
             If True (default False), then you will be asked to specify the 
             calibration index for each recording.
@@ -342,7 +341,7 @@ class MetaInterface(ABC):
                     recording_config_filepath=self.meta["recording_days"][recording_day]["recording_config_filepath"],
                     project_config_filepath=Path(self.meta["project_config_filepath"]),
                     output_directory=recording,
-                    test_mode=test_mode,
+                    recreate_undistorted_plots=recreate_undistorted_plots,
                 )
                 individual_key = f"{triangulation_recordings_object.mouse_id}_" \
                                  f"{triangulation_recordings_object.recording_date}_" \
@@ -379,7 +378,7 @@ class MetaInterface(ABC):
     def synchronize_recordings(
             self,
             verbose: bool = True,
-            test_mode: bool = False,
+            overwrite_DLC_analysis_and_synchro: bool = False,
     ) -> None:
         """
         Run the function run_synchronization for all TriangulationRecording
@@ -390,9 +389,9 @@ class MetaInterface(ABC):
         verbose: bool, default True:
             If True (default), then the duration of a analysis is printed and
             the attribute is passed to the TriangulationRecordings objects.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        overwrite_DLC_analysis_and_synchro: bool, default False
+            If True (default False), then pre-existing DLC files and
+            synchronisations will be overwritten during analysis.
         """
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
@@ -402,7 +401,7 @@ class MetaInterface(ABC):
                 recording_object = self.objects["triangulation_recordings_objects"][recording]
                 recording_meta = recording_day["recordings"][recording]
                 recording_object.run_synchronization(
-                    test_mode=test_mode, verbose=verbose
+                    overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro, verbose=verbose
                 )
                 for video in recording_meta["videos"]:
                     try:
@@ -426,7 +425,7 @@ class MetaInterface(ABC):
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
     def create_calibrations(
-            self, ground_truth_config_filepath: Union[Path or str], test_mode: bool = False
+            self, ground_truth_config_filepath: Union[Path or str], recreate_undistorted_plots: bool = True
     ) -> None:
         """
         Create Calibration and CalibrationValidation objects and add
@@ -437,9 +436,8 @@ class MetaInterface(ABC):
         ----------
         ground_truth_config_filepath: Path or str
             The path to the ground_truth config file.
-        test_mode
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        recreate_undistorted_plots
+            If True (default), then preexisting undistorted plots will be overwritten.
         """
         self.objects["calibration_objects"] = {}
         self.objects["calibration_validation_objects"] = {}
@@ -449,7 +447,7 @@ class MetaInterface(ABC):
                 project_config_filepath=self.project_config_filepath,
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 output_directory=recording_day["calibration_directory"],
-                test_mode=test_mode,
+                recreate_undistorted_plots=recreate_undistorted_plots,
             )
 
             unique_calibration_key = f'{calibration_object.recording_date}_' \
@@ -473,8 +471,7 @@ class MetaInterface(ABC):
                 recording_config_filepath=recording_day["recording_config_filepath"],
                 project_config_filepath=self.project_config_filepath,
                 output_directory=recording_day["calibration_directory"],
-                test_mode=test_mode,
-            )
+                recreate_undistorted_plots=recreate_undistorted_plots)
             calibration_validation_object.add_ground_truth_config(
                 ground_truth_config_filepath=ground_truth_config_filepath)
             self.objects["calibration_validation_objects"][unique_calibration_key] = calibration_validation_object
@@ -489,16 +486,16 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 4
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def synchronize_calibrations(self, test_mode: bool = False, verbose: bool = True) -> None:
+    def synchronize_calibrations(self, overwrite_synchronisations_and_calvin_predictions: bool = False, verbose: bool = True) -> None:
         """
         Run get_marker_predictions for all calibration_validation objects and
         run_synchronization for all calibration objects added to MetaInterface.
 
         Parameters
         ----------
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        overwrite_synchronisations_and_calvin_predictions: bool, default False
+            If True (default False), then pre-existing synchronisations and
+            calvin predictions will be overwritten during analysis.
         verbose: bool, default True
             If True (default), then the attribute is passed to the Calibration objects.
         """
@@ -506,7 +503,7 @@ class MetaInterface(ABC):
             if verbose:
                 print(f'\nNow analysing {recording_day["calibrations"]["calibration_key"]}!')
             calibration_object = self.objects["calibration_objects"][recording_day["calibrations"]["calibration_key"]]
-            calibration_object.run_synchronization(test_mode=test_mode, verbose=verbose)
+            calibration_object.run_synchronization(overwrite_synchronisations=overwrite_synchronisations_and_calvin_predictions, verbose=verbose)
             for video in recording_day["calibrations"]["videos"]:
                 if video in calibration_object.synchronized_charuco_videofiles:
                     recording_day["calibrations"]["videos"][video]["synchronized_video"] = str(
@@ -519,7 +516,7 @@ class MetaInterface(ABC):
             recording_day["calibrations"]["cams_to_exclude"] = str(calibration_object.cams_to_exclude)
             self.objects["calibration_validation_objects"][
                 recording_day["calibrations"]["calibration_key"]
-            ].get_marker_predictions(test_mode=test_mode)
+            ].get_marker_predictions(overwrite_analysed_markers=overwrite_synchronisations_and_calvin_predictions)
 
             for video in recording_day["calibrations"]["videos"]:
                 try:
@@ -566,7 +563,7 @@ class MetaInterface(ABC):
 
     def calibrate(
             self, p_threshold: float = 0.1, angle_threshold: float = 5., max_iters: int = 5,
-            calibrate_optimal: bool = True, verbose: int = 1, test_mode: bool = False
+            calibrate_optimal: bool = True, verbose: int = 1, overwrite_calibrations: bool = False
     ) -> None:
         """
         Run the function run_calibration or calibrate_optimal for all
@@ -593,9 +590,8 @@ class MetaInterface(ABC):
             Show ap_lib output if > 1,
             calibration_validation output if > 0
             or no output if < 1.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be
-            overwritten during the analysis.
+        overwrite_calibrations: bool, default False
+            If True (default False), then pre-existing calibrations will be overwritten.
         """
         for recording_day in self.meta["recording_days"].values():
             if verbose:
@@ -608,7 +604,7 @@ class MetaInterface(ABC):
                         calibration_validation=self.objects["calibration_validation_objects"][
                             recording_day["calibrations"]["calibration_key"]],
                         verbose=verbose,
-                        test_mode=test_mode,
+                        overwrite_calibrations=overwrite_calibrations,
                         max_iters=max_iters,
                         p_threshold=p_threshold,
                         angle_threshold=angle_threshold))
@@ -619,22 +615,22 @@ class MetaInterface(ABC):
                 recording_day["calibrations"]["toml_filepath"] = str(self.objects["calibration_objects"][
                     recording_day["calibrations"][
                         "calibration_key"]].run_calibration(
-                    verbose=verbose, test_mode=test_mode))
+                    verbose=verbose, overwrite_calibrations=overwrite_calibrations))
             recording_day["calibrations"]['reprojerr'] = self.objects["calibration_objects"][
                 recording_day["calibrations"]["calibration_key"]].reprojerr
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def triangulate_recordings(self, test_mode: bool = False, verbose: bool = True) -> None:
+    def triangulate_recordings(self, triangulate_full_recording: bool = True, verbose: bool = True) -> None:
         """
         Run the function run_triangulation for all TriangulationRecording
         objects added to MetaInterface.
 
         Parameters
         ----------
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be
-            overwritten during the analysis.
+        triangulate_full_recording: bool, default True
+            If False (default True), then only the first 2 frames of the
+            recording will be triangulated and the 3D dataframe won't be saved.
         verbose: bool, default True
             If True (default), then the recording, that is currently analysed, and the
             duration of an analysis will be printed.
@@ -647,7 +643,7 @@ class MetaInterface(ABC):
                 toml_filepath = recording_day['calibrations']['toml_filepath']
                 self.objects["triangulation_recordings_objects"][recording].run_triangulation(
                     calibration_toml_filepath=toml_filepath,
-                    test_mode=test_mode,
+                    triangulate_full_recording=triangulate_full_recording,
                 )
                 recording_day["recordings"][recording]["3D_csv"] = str(
                     self.objects["triangulation_recordings_objects"][
@@ -666,7 +662,7 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def normalize_recordings(self, normalization_config_path: Union[Path, str], test_mode: bool = False, verbose: bool = False) -> None:
+    def normalize_recordings(self, normalization_config_path: Union[Path, str], save_dataframe: bool = True, verbose: bool = False) -> None:
         """
         Run the function normalize for all TriangulationRecordings objects and
         saves the normalisation metadata.
@@ -675,9 +671,9 @@ class MetaInterface(ABC):
         ----------
         normalization_config_path: Path or str
             The path to the config used for normalisation.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the analysis.
+        save_dataframe: bool, default True
+            If True (default), then the dataframe will be saved and overwrites
+            the pre-existing one.
         verbose: bool, default False
             If True (default False), then the rotation visualization plot is shown.
         """
@@ -688,7 +684,7 @@ class MetaInterface(ABC):
                     print(f"\nRotation plot for {recording}:")
                 rotated_filepath, rotation_error = self.objects["triangulation_recordings_objects"][
                     recording
-                ].normalize(normalization_config_path=normalization_config_path, test_mode=test_mode, verbose=verbose)
+                ].normalize(normalization_config_path=normalization_config_path, save_dataframe=save_dataframe, verbose=verbose)
                 recording_day["recordings"][recording]["normalised_3D_csv"] = str(rotated_filepath)
                 recording_day["recordings"][recording]["normalisation_rotation_error"] = float(rotation_error)
         self.meta["meta_step"] = 8

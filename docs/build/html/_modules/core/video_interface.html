@@ -80,7 +80,7 @@
 
 <div class="viewcode-block" id="VideoInterface"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface">[docs]</a><span class="k">class</span> <span class="nc">VideoInterface</span><span class="p">:</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">video_metadata</span><span class="p">:</span> <span class="n">VideoMetadata</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">video_metadata</span><span class="p">:</span> <span class="n">VideoMetadata</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span> <span class="o">=</span> <span class="n">video_metadata</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">calibration</span><span class="p">:</span>
@@ -96,14 +96,14 @@
                                                  <span class="n">intrinsic_calibration</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">intrinsic_calibration</span><span class="p">,</span>
                                                  <span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span> <span class="n">fisheye</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">fisheye</span><span class="p">,</span>
                                                  <span class="n">output_directory</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">plot_camera_intrinsics</span><span class="o">.</span><span class="n">create_plot</span><span class="p">(</span><span class="n">save</span><span class="o">=</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plot_camera_intrinsics</span><span class="o">.</span><span class="n">create_plot</span><span class="p">(</span><span class="n">save</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
 <div class="viewcode-block" id="VideoInterface.run_synchronizer"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface.run_synchronizer">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronizer</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">synchronizer</span><span class="p">:</span> <span class="n">Type</span><span class="p">,</span>
             <span class="n">output_directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
             <span class="n">synchronize_only</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+            <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
             <span class="n">synchro_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
             <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -116,7 +116,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">marker_detection_filepath</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">synchronized_video_filepath</span><span class="p">,</span>
         <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synchronizer_object</span><span class="o">.</span><span class="n">run_synchronization</span><span class="p">(</span>
-            <span class="n">synchronize_only</span><span class="o">=</span><span class="n">synchronize_only</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+            <span class="n">synchronize_only</span><span class="o">=</span><span class="n">synchronize_only</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="VideoInterface.export_for_aniposelib"><a class="viewcode-back" href="../../core.html#core.video_interface.VideoInterface.export_for_aniposelib">[docs]</a>    <span class="k">def</span> <span class="nf">export_for_aniposelib</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">:</span>

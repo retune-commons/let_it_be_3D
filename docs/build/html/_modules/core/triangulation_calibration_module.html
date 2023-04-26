@@ -231,7 +231,7 @@
         <span class="n">output_directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
         <span class="n">filetypes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
         <span class="n">filename_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-        <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]:</span>
     <span class="n">videofiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">file</span> <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">directory</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()</span> <span class="k">if</span> <span class="n">filename_tag</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
                   <span class="ow">and</span> <span class="s2">&quot;synchronized&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">file</span><span class="o">.</span><span class="n">name</span> <span class="ow">and</span> <span class="n">file</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="n">filetypes</span><span class="p">]</span>
@@ -249,7 +249,7 @@
         <span class="n">video_interfaces</span><span class="p">[</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">VideoInterface</span><span class="p">(</span>
             <span class="n">video_metadata</span><span class="o">=</span><span class="n">video_metadata</span><span class="p">,</span>
             <span class="n">output_dir</span><span class="o">=</span><span class="n">output_directory</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+            <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="n">metadata_from_videos</span><span class="p">[</span><span class="n">video_metadata</span><span class="o">.</span><span class="n">cam_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">video_metadata</span>
     <span class="k">return</span> <span class="n">video_interfaces</span><span class="p">,</span> <span class="n">metadata_from_videos</span>
@@ -293,7 +293,7 @@
     <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">columns_to_remove</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_save_dataframe_as_csv</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="k">def</span> <span class="nf">_save_dataframe_as_csv</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="n">filepath</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
         <span class="n">filepath</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
@@ -337,9 +337,8 @@
 <span class="sd">    output_directory: Path or string, optional</span>
 <span class="sd">        Directory, in which the files created during the analysis are saved.</span>
 <span class="sd">        Per default it will be set the same as the calibration_directory.</span>
-<span class="sd">    test_mode: bool, default False</span>
-<span class="sd">        If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">        during the analysis.</span>
+<span class="sd">    recreate_undistorted_plots: bool, default True</span>
+<span class="sd">        If True (default), then preexisting undistorted plots will be overwritten.</span>
 
 <span class="sd">    Attributes</span>
 <span class="sd">    __________</span>
@@ -389,12 +388,12 @@
 
 <span class="sd">    Methods</span>
 <span class="sd">    _______</span>
-<span class="sd">    run_synchronization(test_mode, verbose)</span>
+<span class="sd">    run_synchronization(overwrite_synchronisations, verbose)</span>
 <span class="sd">        Perform synchronization of all videos to the led_pattern and</span>
 <span class="sd">        downsampling to target_fps.</span>
-<span class="sd">    run_calibration(use_own_intrinsic_calibration, charuco_calibration_board, iteration, verbose, test_mode)</span>
+<span class="sd">    run_calibration(use_own_intrinsic_calibration, charuco_calibration_board, iteration, verbose, overwrite_calibrations)</span>
 <span class="sd">        Call ap_lib calibrate function.</span>
-<span class="sd">    calibrate_optimal(calibration_validation, max_iters, p_threshold, angle_threshold, verbose, test_mode)</span>
+<span class="sd">    calibrate_optimal(calibration_validation, max_iters, p_threshold, angle_threshold, verbose, overwrite_calibrations)</span>
 <span class="sd">        Call run_calibration repeatedly and validate the quality of the</span>
 <span class="sd">        resulting calibration on calibration_validation images and ground_truth.</span>
 
@@ -445,7 +444,7 @@
             <span class="n">project_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
             <span class="n">recording_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
             <span class="n">output_directory</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Construct all necessary attributes for the Calibration class.</span>
@@ -464,9 +463,8 @@
 <span class="sd">        output_directory: Path or string, optional</span>
 <span class="sd">            Directory, in which the files created during the analysis are saved.</span>
 <span class="sd">            Per default it will be set the same as the calibration_directory.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        recreate_undistorted_plots: bool, default True</span>
+<span class="sd">            If True (default), then preexisting undistorted plots will be overwritten.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="n">STANDARD_ATTRIBUTES_CALIBRATION</span><span class="p">:</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
@@ -496,7 +494,7 @@
             <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
             <span class="n">filename_tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">calibration_tag</span><span class="p">,</span>
             <span class="n">filetypes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.avi&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">,</span> <span class="s2">&quot;.mp4&quot;</span><span class="p">],</span>
-            <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+            <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">_validate_metadata</span><span class="p">(</span><span class="n">metadata_from_videos</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">,</span>
                                                      <span class="n">attributes_to_check</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;recording_date&#39;</span><span class="p">])</span>
@@ -506,7 +504,7 @@
         <span class="k">for</span> <span class="n">video_metadata</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">video_metadata</span><span class="o">.</span><span class="n">target_fps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_fps</span>
 
-<div class="viewcode-block" id="Calibration.run_synchronization"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.Calibration.run_synchronization">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="Calibration.run_synchronization"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.Calibration.run_synchronization">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overwrite_synchronisations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Perform synchronization of all videos to the led_pattern and</span>
 <span class="sd">        downsampling to target_fps.</span>
@@ -519,9 +517,9 @@
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        overwrite_synchronisations: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing synchronisations will be</span>
+<span class="sd">            overwritten during analysis.</span>
 <span class="sd">        verbose: bool, default True</span>
 <span class="sd">            If True (default), then Crossvalidation plot and synchronised number</span>
 <span class="sd">            of frames for each camera are printed.</span>
@@ -533,7 +531,7 @@
                 <span class="n">synchronizer</span><span class="o">=</span><span class="n">CharucoVideoSynchronizer</span><span class="p">,</span>
                 <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
                 <span class="n">synchronize_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="o">=</span><span class="n">overwrite_synchronisations</span><span class="p">,</span>
                 <span class="n">synchro_metadata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">synchro_metadata</span><span class="p">,</span>
                 <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
             <span class="p">)</span>
@@ -567,7 +565,7 @@
             <span class="n">use_own_intrinsic_calibration</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
             <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
             <span class="n">charuco_calibration_board</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ap_lib</span><span class="o">.</span><span class="n">boards</span><span class="o">.</span><span class="n">CharucoBoard</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">overwrite_calibrations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
             <span class="n">iteration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -586,8 +584,8 @@
 <span class="sd">            Show ap_lib output if &gt; 1 or no output if &lt;= 1.</span>
 <span class="sd">        charuco_calibration_board: ap_lib.boards.CharucoBoard, optional</span>
 <span class="sd">            Specify the board, that was used in the calibration videos.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True, pre-existing files won&#39;t be overwritten during the analysis.</span>
+<span class="sd">        overwrite_calibrations: bool, default True</span>
+<span class="sd">            If True (default), then pre-existing calibrations will be overwritten.</span>
 <span class="sd">        iteration: int, optional</span>
 <span class="sd">            Variable to be included into the filename to make the</span>
 <span class="sd">            filepath of calibration files unique for repeated calibrations.</span>
@@ -604,8 +602,8 @@
         <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">calibration_key</span><span class="si">}</span><span class="s2">.toml&quot;</span>
 
         <span class="n">calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
-        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
-                <span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">calibration_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">overwrite_calibrations</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span>
+                <span class="n">overwrite_calibrations</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">calibration_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
         <span class="p">):</span>
             <span class="k">if</span> <span class="n">charuco_calibration_board</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">aruco_dict</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">aruco</span><span class="o">.</span><span class="n">Dictionary_get</span><span class="p">(</span><span class="n">cv2</span><span class="o">.</span><span class="n">aruco</span><span class="o">.</span><span class="n">DICT_6X6_250</span><span class="p">)</span>
@@ -645,7 +643,7 @@
             <span class="n">p_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
             <span class="n">angle_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.</span><span class="p">,</span>
             <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">overwrite_calibrations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Call run_calibration repeatedly and validates the quality of the</span>
@@ -675,9 +673,8 @@
 <span class="sd">            Show ap_lib output if &gt; 1,</span>
 <span class="sd">            calibration_validation output if &gt; 0</span>
 <span class="sd">            or no output if &lt; 1.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be</span>
-<span class="sd">            overwritten during the analysis.</span>
+<span class="sd">        overwrite_calibrations: bool, default True</span>
+<span class="sd">            If True (default), then pre-existing calibrations will be overwritten.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -693,11 +690,11 @@
         <span class="n">good_calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">calibration_key</span><span class="si">}</span><span class="s2">.toml&quot;</span><span class="p">)</span>
         <span class="n">calibration_filepath</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">cal</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_iters</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">good_calibration_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="n">test_mode</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">good_calibration_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite_calibrations</span><span class="p">:</span>
                 <span class="n">calibration_filepath</span> <span class="o">=</span> <span class="n">good_calibration_filepath</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">reprojerr</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_calibration</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                <span class="n">calibration_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_calibration</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">overwrite_calibrations</span><span class="o">=</span><span class="n">overwrite_calibrations</span><span class="p">,</span>
                                                             <span class="n">iteration</span><span class="o">=</span><span class="n">cal</span><span class="p">)</span>
 
             <span class="n">calibration_validation</span><span class="o">.</span><span class="n">run_triangulation</span><span class="p">(</span><span class="n">calibration_toml_filepath</span><span class="o">=</span><span class="n">calibration_filepath</span><span class="p">)</span>
@@ -729,7 +726,7 @@
                         <span class="sa">f</span><span class="s2">&quot;Named it </span><span class="si">{</span><span class="n">good_calibration_filepath</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
                 <span class="k">break</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">test_mode</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">overwrite_calibrations</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">report_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_calibration_report.csv&quot;</span><span class="p">)</span>
             <span class="n">report</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">report_filepath</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -775,9 +772,8 @@
 <span class="sd">        Directory, where the videos or images are stored.</span>
 <span class="sd">    recording_config_filepath: Path or string</span>
 <span class="sd">        Filepath to the recording_config .yaml file.</span>
-<span class="sd">    test_mode: bool, default False</span>
-<span class="sd">        If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">        during the analysis.</span>
+<span class="sd">    recreate_undistorted_plots: bool, default True</span>
+<span class="sd">        If True (default), then preexisting undistorted plots will be overwritten.</span>
 <span class="sd">    output_directory: Path or string, optional</span>
 <span class="sd">        Directory, in which the files created during the analysis are saved.</span>
 <span class="sd">        Per default it will be set the same as the directory.</span>
@@ -858,7 +854,7 @@
 
 <span class="sd">    Methods</span>
 <span class="sd">    _______</span>
-<span class="sd">    run_triangulation(calibration_toml_filepath, test_mode):</span>
+<span class="sd">    run_triangulation(calibration_toml_filepath, triangulate_full_recording):</span>
 <span class="sd">        Load and validate the calibration, triangulate and create 3D df.</span>
 <span class="sd">    exclude_marker(all_markers_to_exclude_config_path, verbose):</span>
 <span class="sd">        Exclude markers in prediction based on markers_to_exclude config.</span>
@@ -912,7 +908,7 @@
                  <span class="n">project_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
                  <span class="n">directory</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
                  <span class="n">recording_config_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
-                 <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+                 <span class="n">recreate_undistorted_plots</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
                  <span class="n">output_directory</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Construct all necessary attributes for the Triangulation Class.</span>
@@ -929,9 +925,8 @@
 <span class="sd">            Directory, where the videos or images are stored.</span>
 <span class="sd">        recording_config_filepath: Path or string</span>
 <span class="sd">            Filepath to the recording_config .yaml file.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        recreate_undistorted_plots: bool, default True</span>
+<span class="sd">            If True (default), then preexisting undistorted plots will be overwritten.</span>
 <span class="sd">        output_directory: Path or string, optional</span>
 <span class="sd">            Directory, in which the files created during the analysis are saved.</span>
 <span class="sd">            Per default it will be set the same as the directory.</span>
@@ -964,7 +959,7 @@
             <span class="n">videometadata_tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_videometadata_tag</span><span class="p">,</span>
             <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
             <span class="n">filename_tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">calibration_validation_tag</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_videometadata_tag</span> <span class="o">==</span> <span class="s2">&quot;calvin&quot;</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-            <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+            <span class="n">recreate_undistorted_plots</span><span class="o">=</span><span class="n">recreate_undistorted_plots</span><span class="p">,</span>
             <span class="n">filetypes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_allowed_filetypes</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">_validate_metadata</span><span class="p">(</span><span class="n">metadata_from_videos</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="p">,</span>
@@ -975,7 +970,7 @@
 <div class="viewcode-block" id="Triangulation.run_triangulation"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.Triangulation.run_triangulation">[docs]</a>    <span class="k">def</span> <span class="nf">run_triangulation</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">calibration_toml_filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
-            <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">triangulate_full_recording</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Load and validate the calibration, triangulate and create 3D df.</span>
@@ -989,9 +984,9 @@
 <span class="sd">        ----------</span>
 <span class="sd">        calibration_toml_filepath: Path or str</span>
 <span class="sd">            Filepath to the calibration, that should be used for triangulation.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        triangulate_full_recording: bool, default True</span>
+<span class="sd">            If False (default True), then only the first 2 frames of the</span>
+<span class="sd">            recording will be triangulated and the 3D dataframe won&#39;t be saved.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">csv_output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_csv_filepath</span><span class="p">()</span>
         <span class="n">calibration_toml_filepath</span> <span class="o">=</span> <span class="n">convert_to_path</span><span class="p">(</span><span class="n">calibration_toml_filepath</span><span class="p">)</span>
@@ -1015,7 +1010,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">triangulation_dlc_cams_filepaths</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">cam</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cams_to_exclude</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cam</span><span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">anipose_io</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_preprocess_dlc_predictions_for_anipose</span><span class="p">(</span><span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">anipose_io</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_preprocess_dlc_predictions_for_anipose</span><span class="p">(</span><span class="n">triangulate_full_recording</span><span class="o">=</span><span class="n">triangulate_full_recording</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">triangulation_type</span> <span class="o">==</span> <span class="s2">&quot;triangulate&quot;</span><span class="p">:</span>
             <span class="n">p3ds_flat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_group</span><span class="o">.</span><span class="n">triangulate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;points_flat&quot;</span><span class="p">],</span> <span class="n">progress</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">triangulation_type</span> <span class="o">==</span> <span class="s2">&quot;triangulate_optim_ransac_False&quot;</span><span class="p">:</span>
@@ -1040,7 +1035,7 @@
             <span class="n">p3ds_flat</span><span class="o">=</span><span class="n">p3ds_flat</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_dataframe_of_triangulated_points</span><span class="p">(</span><span class="n">anipose_io</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">anipose_io</span><span class="p">)</span>
-        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">csv_output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">triangulate_full_recording</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">csv_output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
             <span class="n">_save_dataframe_as_csv</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">csv_output_filepath</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_delete_temp_files</span><span class="p">()</span></div>
 
@@ -1155,18 +1150,18 @@
                 <span class="s2">&quot;Make sure, that you enter the correct path!&quot;</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_preprocess_dlc_predictions_for_anipose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_preprocess_dlc_predictions_for_anipose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">triangulate_full_recording</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
         <span class="n">anipose_io</span> <span class="o">=</span> <span class="n">ap_lib</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">load_pose2d_fnames</span><span class="p">(</span>
             <span class="n">fname_dict</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">triangulation_dlc_cams_filepaths</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_additional_information_and_continue_preprocessing</span><span class="p">(</span><span class="n">anipose_io</span><span class="o">=</span><span class="n">anipose_io</span><span class="p">,</span>
-                                                                           <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+                                                                           <span class="n">triangulate_full_recording</span><span class="o">=</span><span class="n">triangulate_full_recording</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_add_additional_information_and_continue_preprocessing</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">triangulate_full_recording</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
         <span class="n">n_cams</span><span class="p">,</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;n_points&quot;</span><span class="p">],</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;n_joints&quot;</span><span class="p">],</span> <span class="n">_</span> <span class="o">=</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;points&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
-        <span class="k">if</span> <span class="n">test_mode</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">triangulate_full_recording</span><span class="p">:</span>
             <span class="n">start_idx</span><span class="p">,</span> <span class="n">end_idx</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span>
             <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;points&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;points&quot;</span><span class="p">][:,</span> <span class="n">start_idx</span><span class="p">:</span><span class="n">end_idx</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
             <span class="n">anipose_io</span><span class="p">[</span><span class="s2">&quot;n_points&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">end_idx</span> <span class="o">-</span> <span class="n">start_idx</span><span class="p">)</span> <span class="k">if</span> <span class="n">end_idx</span> <span class="o">&lt;</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s1">&#39;n_points&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="n">anipose_io</span><span class="p">[</span><span class="s1">&#39;n_points&#39;</span><span class="p">]</span>
@@ -1262,12 +1257,12 @@
 
 <span class="sd">    Methods</span>
 <span class="sd">    _______</span>
-<span class="sd">    run_synchronization(test_mode, verbose):</span>
+<span class="sd">    run_synchronization(overwrite_DLC_analysis_and_synchro, verbose):</span>
 <span class="sd">        Perform analysis of all videos using DLC or other methods,</span>
 <span class="sd">        synchronization to the led_pattern and downsampling to target_fps.</span>
 <span class="sd">    create_triangulated_video(filename, config_path):</span>
 <span class="sd">        Create video of the triangulated data.</span>
-<span class="sd">    normalize(normalization_config_path, test_mode):</span>
+<span class="sd">    normalize(normalization_config_path, save_dataframe):</span>
 <span class="sd">        Rotate and translate the triangulated dataframe.</span>
 
 <span class="sd">    See Also</span>
@@ -1296,7 +1291,7 @@
 <span class="sd">        ... directory=directory,</span>
 <span class="sd">        ... recording_config_filepath=rec_config,</span>
 <span class="sd">        ... project_config_filepath=&quot;test_data/project_config.yaml&quot;,</span>
-<span class="sd">        ... test_mode = False,</span>
+<span class="sd">        ... recreate_undistorted_plots = True,</span>
 <span class="sd">        ... output_directory=directory</span>
 <span class="sd">        ... )</span>
 <span class="sd">    &gt;&gt;&gt; triangulation_object.run_synchronization()</span>
@@ -1324,7 +1319,7 @@
         <span class="k">return</span> <span class="p">[</span><span class="s2">&quot;.AVI&quot;</span><span class="p">,</span> <span class="s2">&quot;.avi&quot;</span><span class="p">,</span> <span class="s2">&quot;.mov&quot;</span><span class="p">,</span> <span class="s2">&quot;.mp4&quot;</span><span class="p">]</span>
 
 <div class="viewcode-block" id="TriangulationRecordings.run_synchronization"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.TriangulationRecordings.run_synchronization">[docs]</a>    <span class="k">def</span> <span class="nf">run_synchronization</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Perform analysis of all videos using DLC or other methods,</span>
@@ -1338,9 +1333,9 @@
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        overwrite_DLC_analysis_and_synchro: bool, default False</span>
+<span class="sd">            If True (default False), then pre-existing DLC files and</span>
+<span class="sd">            synchronisations will be overwritten during analysis.</span>
 <span class="sd">        verbose: bool, default True</span>
 <span class="sd">            If True (default), then Crossvalidation plot and synchronised number</span>
 <span class="sd">            of frames for each camera are printed.</span>
@@ -1357,7 +1352,7 @@
                 <span class="n">synchronizer</span><span class="o">=</span><span class="n">synchronizer</span><span class="p">,</span>
                 <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
                 <span class="n">synchronize_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">,</span>
+                <span class="n">overwrite_DLC_analysis_and_synchro</span><span class="o">=</span><span class="n">overwrite_DLC_analysis_and_synchro</span><span class="p">,</span>
                 <span class="n">synchro_metadata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">synchro_metadata</span><span class="p">,</span>
                 <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
             <span class="p">)</span>
@@ -1411,7 +1406,7 @@
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">filepath_out</span>
 
-<div class="viewcode-block" id="TriangulationRecordings.normalize"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.TriangulationRecordings.normalize">[docs]</a>    <span class="k">def</span> <span class="nf">normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<div class="viewcode-block" id="TriangulationRecordings.normalize"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.TriangulationRecordings.normalize">[docs]</a>    <span class="k">def</span> <span class="nf">normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalization_config_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">save_dataframe</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Rotate and translate the triangulated dataframe.</span>
 
@@ -1424,9 +1419,9 @@
 <span class="sd">        ----------</span>
 <span class="sd">        normalization_config_path: Path or str</span>
 <span class="sd">            The path to the config used for normalisation.</span>
-<span class="sd">        test_mode: bool, default False</span>
-<span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
-<span class="sd">            during the analysis.</span>
+<span class="sd">        save_dataframe: bool, default True</span>
+<span class="sd">            If True (default), then the dataframe will be saved and overwrites</span>
+<span class="sd">            the pre-existing one.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -1485,6 +1480,9 @@
         <span class="n">bp_keys</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">it</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">bp_keys_unflat</span><span class="p">))</span>
         <span class="n">normalised</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">normalised</span><span class="p">[</span><span class="n">bp_keys</span><span class="p">]</span> <span class="o">*=</span> <span class="n">conversionfactor</span>
+        <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;FLIP_AXIS_TO_ADJUST_CHIRALITY&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">keys_to_flip</span> <span class="o">=</span> <span class="p">[</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">bp_keys</span> <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;FLIP_AXIS_TO_ADJUST_CHIRALITY&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">key</span><span class="p">]</span>
+            <span class="n">normalised</span><span class="p">[</span><span class="n">bp_keys</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
 
         <span class="n">reference_rotation_markers</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;REFERENCE_ROTATION_MARKERS&#39;</span><span class="p">]:</span>
@@ -1502,7 +1500,7 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">normalised_dataframe</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rotated_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_csv_filepath</span><span class="p">()</span>
-        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">test_mode</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">rotated_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">save_dataframe</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">rotated_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
             <span class="n">_save_dataframe_as_csv</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rotated_filepath</span><span class="p">),</span> <span class="n">df</span><span class="o">=</span><span class="n">rotated</span><span class="p">)</span>
         <span class="n">rotation_plot_filename</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mouse_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="si">}</span><span class="s2">_rotation_visualization&quot;</span><span class="p">)</span>
         <span class="n">visualization</span> <span class="o">=</span> <span class="n">RotationVisualization</span><span class="p">(</span>
@@ -1602,7 +1600,7 @@
 <span class="sd">    add_ground_truth_config(ground_truth_config_filepath)</span>
 <span class="sd">        Read the metadata from ground_truth_config_filepath and create list of</span>
 <span class="sd">        markers.</span>
-<span class="sd">    get_marker_predictions(test_mode)</span>
+<span class="sd">    get_marker_predictions(overwrite_analysed_markers)</span>
 <span class="sd">        Run marker detection for all images in metadata_from_videos.</span>
 <span class="sd">    evaluate_triangulation_of_calibration_validation_markers(show_3D_plot, verbose)</span>
 <span class="sd">        Evaluate the triangulated data and return mean errors.</span>
@@ -1632,12 +1630,12 @@
 <span class="sd">    &gt;&gt;&gt; calibration_validation_object = CalibrationValidation(</span>
 <span class="sd">        ... project_config_filepath=&quot;test_data/project_config.yaml&quot;,</span>
 <span class="sd">        ... directory=rec_config.parent, recording_config_filepath=rec_config,</span>
-<span class="sd">        ... test_mode = False, output_directory=rec_config.parent)</span>
+<span class="sd">        ... recreate_undistorted_plots = True, output_directory=rec_config.parent)</span>
 <span class="sd">    &gt;&gt;&gt; calibration_validation_object.add_ground_truth_config(&quot;test_data/ground_truth_config.yaml&quot;)</span>
 <span class="sd">    &gt;&gt;&gt; calibration_validation_object.get_marker_predictions()</span>
 <span class="sd">    &gt;&gt;&gt; calibration_validation_object.run_triangulation(</span>
 <span class="sd">        ... calibration_toml_filepath=&quot;test_data/Server_structure/Calibrations/220922/220922_0_Bottom_Ground1_Ground2_Side1_Side2_Side3.toml&quot;,</span>
-<span class="sd">        ... test_mode = False)</span>
+<span class="sd">        ... triangulate_full_recording = True)</span>
 <span class="sd">    &gt;&gt;&gt; mean_dist_err_percentage, mean_angle_err, reprojerr_nonan_mean = calibration_validation_object.evaluate_triangulation_of_calibration_validation_markers()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="nd">@property</span>
@@ -1691,7 +1689,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">ground_truth_config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">(</span><span class="n">ground_truth_config_filepath</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">markers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ground_truth_config</span><span class="p">[</span><span class="s2">&quot;unique_ids&quot;</span><span class="p">]</span></div>
 
-<div class="viewcode-block" id="CalibrationValidation.get_marker_predictions"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.CalibrationValidation.get_marker_predictions">[docs]</a>    <span class="k">def</span> <span class="nf">get_marker_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="CalibrationValidation.get_marker_predictions"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.CalibrationValidation.get_marker_predictions">[docs]</a>    <span class="k">def</span> <span class="nf">get_marker_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overwrite_analysed_markers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run marker detection for all images in metadata_from_videos.</span>
 
@@ -1700,14 +1698,14 @@
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        test_mode: bool, default False</span>
+<span class="sd">        overwrite_analysed_markers: bool, default False</span>
 <span class="sd">            If True (default False), then pre-existing files won&#39;t be overwritten</span>
 <span class="sd">            during the analysis.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">markers_excluded_manually</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">triangulation_dlc_cams_filepaths</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">cam</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_from_videos</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="n">h5_output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_marker_detection</span><span class="p">(</span><span class="n">cam</span><span class="o">=</span><span class="n">cam</span><span class="p">,</span> <span class="n">test_mode</span><span class="o">=</span><span class="n">test_mode</span><span class="p">)</span>
+            <span class="n">h5_output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_marker_detection</span><span class="p">(</span><span class="n">cam</span><span class="o">=</span><span class="n">cam</span><span class="p">,</span> <span class="n">overwrite_analysed_markers</span><span class="o">=</span><span class="n">overwrite_analysed_markers</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">triangulation_dlc_cams_filepaths</span><span class="p">[</span><span class="n">cam</span><span class="o">.</span><span class="n">cam_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">h5_output_filepath</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_validate_triangulation_marker_ids</span><span class="p">(</span>
                 <span class="n">triangulation_markers_df_filepath</span><span class="o">=</span><span class="n">h5_output_filepath</span><span class="p">,</span>
@@ -1720,7 +1718,8 @@
                 <span class="n">output_directory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span>
                 <span class="n">cam_id</span><span class="o">=</span><span class="n">cam</span><span class="o">.</span><span class="n">cam_id</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="n">predictions</span><span class="o">.</span><span class="n">create_plot</span><span class="p">(</span><span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+            <span class="n">predictions</span><span class="o">.</span><span class="n">create_plot</span><span class="p">(</span><span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cams_to_exclude</span> <span class="o">=</span> <span class="p">[]</span></div>
 
 <div class="viewcode-block" id="CalibrationValidation.evaluate_triangulation_of_calibration_validation_markers"><a class="viewcode-back" href="../../core.html#core.triangulation_calibration_module.CalibrationValidation.evaluate_triangulation_of_calibration_validation_markers">[docs]</a>    <span class="k">def</span> <span class="nf">evaluate_triangulation_of_calibration_validation_markers</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span> <span class="n">show_3D_plot</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -1830,11 +1829,11 @@
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">markers_excluded_manually</span><span class="si">}</span><span class="s2">_filteredFalse_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">triangulation_type</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">filepath_out</span>
 
-    <span class="k">def</span> <span class="nf">_run_marker_detection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cam</span><span class="p">:</span> <span class="n">VideoMetadata</span><span class="p">,</span> <span class="n">test_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_run_marker_detection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cam</span><span class="p">:</span> <span class="n">VideoMetadata</span><span class="p">,</span> <span class="n">overwrite_analysed_markers</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
         <span class="n">h5_output_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_directory</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Calvin_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">recording_date</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">cam</span><span class="o">.</span><span class="n">cam_id</span><span class="si">}</span><span class="s2">.h5&quot;</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">test_mode</span> <span class="ow">or</span> <span class="p">(</span><span class="n">test_mode</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">h5_output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="n">overwrite_analysed_markers</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">h5_output_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()):</span>
             <span class="k">if</span> <span class="n">cam</span><span class="o">.</span><span class="n">calibration_evaluation_type</span> <span class="o">==</span> <span class="s2">&quot;manual&quot;</span><span class="p">:</span>
                 <span class="n">config</span> <span class="o">=</span> <span class="n">cam</span><span class="o">.</span><span class="n">calibration_evaluation_filepath</span>
                 <span class="n">manual_interface</span> <span class="o">=</span> <span class="n">ManualAnnotation</span><span class="p">(</span>

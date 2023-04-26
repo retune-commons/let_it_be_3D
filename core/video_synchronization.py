@@ -422,7 +422,7 @@ class Synchronizer(ABC):
 
     Methods
     _______
-    run_synchronization(synchronize_only, test_mode, verbose)
+    run_synchronization(synchronize_only, overwrite_DLC_analysis_and_synchro, verbose)
         Run alignment between template and detected led blinking pattern.
         Select frames to adjust framerate. Start marker detection or write video.
 
@@ -448,7 +448,7 @@ class Synchronizer(ABC):
 
     @abstractmethod
     def _adjust_video_to_target_fps_and_run_marker_detection(
-            self, target_fps: int, start_idx: int, offset: float, test_mode: bool, synchronize_only: bool
+            self, target_fps: int, start_idx: int, offset: float, overwrite_DLC_analysis_and_synchro: bool, synchronize_only: bool
     ) -> Tuple[Optional[Path], Optional[Path]]:
         pass
 
@@ -497,7 +497,7 @@ class Synchronizer(ABC):
         self.synchro_metadata = synchro_metadata
 
     def run_synchronization(
-            self, synchronize_only: bool=False, test_mode: bool = False, verbose: bool = True
+            self, synchronize_only: bool=False, overwrite_DLC_analysis_and_synchro: bool = False, verbose: bool = True
     ) -> Tuple[Optional[Path], Optional[Path]]:
         """
         Run alignment between template and detected led blinking pattern.
@@ -508,9 +508,9 @@ class Synchronizer(ABC):
         synchronize_only: bool, default False
             To be used by calibration videos only. If True, then only
             synchronized videos are created and no marker detection is run.
-        test_mode: bool, default False
-            If True (default False), then pre-existing files won't be overwritten
-            during the synchronisation.
+        overwrite_DLC_analysis_and_synchro: bool, default False
+            If True (default False), then pre-existing DLC files and
+            synchronisations will be overwritten during analysis.
         verbose: bool, default True
             If True (default), then the number of synchronized frames is printed.
 
@@ -527,14 +527,14 @@ class Synchronizer(ABC):
         preexisting_output_file = self._get_preexisting_output_filepath()
         synchro_file = self._get_synchro_filepath()
 
-        if test_mode and preexisting_output_file.exists():
+        if not overwrite_DLC_analysis_and_synchro and preexisting_output_file.exists():
             marker_detection_filepath, synchronized_video_filepath = None, None
             if preexisting_output_file.suffix == ".h5":
                 marker_detection_filepath, synchronized_video_filepath = preexisting_output_file, None
             elif preexisting_output_file.suffix == ".mp4":
                 synchronized_video_filepath, marker_detection_filepath = preexisting_output_file, None
         else:
-            if test_mode and synchro_file.exists():
+            if not overwrite_DLC_analysis_and_synchro and synchro_file.exists():
                 led_center_coordinates, offset_adjusted_start_idx, remaining_offset, alignment_error = _load_synchro(
                     filepath=synchro_file)
             else:
@@ -562,7 +562,7 @@ class Synchronizer(ABC):
                                                                           start_idx=offset_adjusted_start_idx,
                                                                           offset=remaining_offset,
                                                                           synchronize_only=synchronize_only,
-                                                                          test_mode=test_mode)
+                                                                          overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro)
         self.video_metadata.framenum_synchronized, self.video_metadata.duration_synchronized = \
             self._get_framenumber_of_synchronized_files(synchronize_only=synchronize_only,
                                                         marker_detection_filepath=marker_detection_filepath,
@@ -960,9 +960,9 @@ class Synchronizer(ABC):
             start_idx: int,
             offset: float,
             target_fps: int = 30,
-            test_mode: bool = False,
+            overwrite_video: bool = False,
     ) -> Path:
-        if test_mode:
+        if not overwrite_video:
             preexisting_filepath_downsampled_video = self._construct_video_filepath()
             if preexisting_filepath_downsampled_video.exists():
                 return preexisting_filepath_downsampled_video
@@ -1130,29 +1130,29 @@ class CharucoVideoSynchronizer(Synchronizer):
             target_fps: int,
             start_idx: int,
             offset: float,
-            test_mode: bool,
+            overwrite_DLC_analysis_and_synchro: bool,
             synchronize_only: bool = True,
     ) -> Tuple[None, Path]:
         return None, self._downsample_video(
             start_idx=start_idx,
             offset=offset,
             target_fps=self.target_fps,
-            test_mode=test_mode,
+            overwrite_video=overwrite_DLC_analysis_and_synchro,
         )
 
 
 class RecordingVideoSynchronizer(Synchronizer):
     def _adjust_video_to_target_fps_and_run_marker_detection(self, target_fps: int, start_idx: int, offset: float,
-                                                             test_mode: bool, synchronize_only: bool) -> Tuple[
+                                                             overwrite_DLC_analysis_and_synchro: bool, synchronize_only: bool) -> Tuple[
         Optional[Path], Optional[Path]]:
         pass
 
     def _run_deep_lab_cut_for_marker_detection(
-            self, video_filepath: Path, test_mode: bool = False
+            self, video_filepath: Path, overwrite_DLC_analysis: bool = False
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if (not test_mode) or (test_mode and not output_filepath.exists()):
+        if (overwrite_DLC_analysis) or (not output_filepath.exists()):
             config_filepath = self.video_metadata.processing_filepath
             dlc_interface = DeeplabcutInterface(
                 object_to_analyse=video_filepath,
@@ -1164,22 +1164,18 @@ class RecordingVideoSynchronizer(Synchronizer):
         return output_filepath
 
     def _run_manual_marker_detection(
-            self, video_filepath: Path, test_mode: bool = False
+            self, video_filepath: Path, overwrite_DLC_analysis: bool = False
     ) -> Path:
         output_filepath = self._create_h5_filepath()
 
-        if not test_mode and not output_filepath.exists():
-            inp = input(
-                "Are you sure, you want to overwrite the existing file and label a new one? (y/n)"
+        if overwrite_DLC_analysis or (not output_filepath.exists()):
+            config_filepath = self.video_metadata.processing_filepath
+            manual_interface = ManualAnnotation(
+                object_to_analyse=video_filepath,
+                output_directory=self.output_directory,
+                marker_detection_directory=config_filepath,
             )
-            if inp == "y":
-                config_filepath = self.video_metadata.processing_filepath
-                manual_interface = ManualAnnotation(
-                    object_to_analyse=video_filepath,
-                    output_directory=self.output_directory,
-                    marker_detection_directory=config_filepath,
-                )
-                manual_interface.analyze_objects(filepath=output_filepath.with_suffix(".h5"))
+            manual_interface.analyze_objects(filepath=output_filepath.with_suffix(".h5"))
 
         return output_filepath
 
@@ -1204,7 +1200,7 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
             start_idx: int,
             offset: float,
             target_fps: int = 30,
-            test_mode: bool = False,
+            overwrite_DLC_analysis_and_synchro: bool = False,
             synchronize_only: bool = False
     ) -> Tuple[Path, None]:
 
@@ -1212,13 +1208,13 @@ class RecordingVideoDownSynchronizer(RecordingVideoSynchronizer):
 
         if self.video_metadata.processing_type == "DLC":
             full_h5_filepath = self._run_deep_lab_cut_for_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                video_filepath=self.video_metadata.filepath, overwrite_DLC_analysis=overwrite_DLC_analysis_and_synchro
             )
             if self.synchro_metadata["use_2D_filter"]:
                 full_h5_filepath = self._create_h5_filepath(filtered=True)
         elif self.video_metadata.processing_type == "manual":
             full_h5_filepath = self._run_manual_marker_detection(
-                video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                video_filepath=self.video_metadata.filepath, overwrite_DLC_analysis=overwrite_DLC_analysis_and_synchro
             )
         else:
             raise ValueError("For processing only DLC and manual are supported!")
@@ -1236,23 +1232,23 @@ class RecordingVideoUpSynchronizer(RecordingVideoSynchronizer):
             target_fps: int,
             start_idx: int,
             offset: float,
-            test_mode: bool,
+            overwrite_DLC_analysis_and_synchro: bool,
             synchronize_only: bool = False,
     ) -> Tuple[Path, None]:
 
         upsynchronized_filepath = self._create_h5_filepath(tag=f"_temp")
 
-        if (not test_mode) or (test_mode and not upsynchronized_filepath.exists()):
+        if (overwrite_DLC_analysis_and_synchro) or (not upsynchronized_filepath.exists()):
 
             if self.video_metadata.processing_type == "DLC":
                 full_h5_filepath = self._run_deep_lab_cut_for_marker_detection(
-                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                    video_filepath=self.video_metadata.filepath, overwrite_DLC_analysis=overwrite_DLC_analysis_and_synchro
                 )
                 if self.synchro_metadata["use_2D_filter"]:
                     full_h5_filepath = self._create_h5_filepath(filtered=True)
             elif self.video_metadata.processing_type == "manual":
                 full_h5_filepath = self._run_manual_marker_detection(
-                    video_filepath=self.video_metadata.filepath, test_mode=test_mode
+                    video_filepath=self.video_metadata.filepath, overwrite_DLC_analysis=overwrite_DLC_analysis_and_synchro
                 )
             else:
                 raise ValueError("For processing only DLC and manual are supported!")
