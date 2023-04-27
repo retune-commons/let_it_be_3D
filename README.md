@@ -1,13 +1,8 @@
 # let_it_be_3D
 
 With let_it_be_3D we want to extend the functions of aniposelib and bring them into a pipeline structure.
-As less manual steps required as possible, standardized quality assurance and collection of metadata.
-- video synchronisation
-- framerate adjustment
-- calibration validation
-- manual marker detection
-- filename checker
-- normalisation
+Our goals are having as less manual steps required as possible and standardized quality assurance/collection of metadata.
+We provide additional methods for `video synchronisation`, `adjustment for different framerates`, `validation of anipose calibration`, `adjustment of intrinsic calibrations to croppings`, `manual marker detection`, `checking and correcting filenames` and `normalisation of the 3D triangulated dataframe`.
 
 <details>
 <summary> See the pipeline flowchart! </summary>
@@ -128,7 +123,7 @@ $ jupyter lab
 
 ### Examples
 <details>
-<summary> Calibration</summary>
+<summary>Calibration</summary>
 
   ```ruby
   from pathlib import Path
@@ -200,7 +195,7 @@ $ jupyter lab
 <summary>Video filename </summary>
 
   - calibration:
-    - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+    - has to be a `video` [".AVI", ".avi", ".mov", ".mp4"]
     - including recording_date (YYMMDD), calibration_tag (as defined
     in project_config) and cam_id (element of valid_cam_ids in
     project_config)
@@ -209,7 +204,7 @@ $ jupyter lab
     - f"{recording_date}_{calibration_tag}_{cam_id}" =
     Example: "220922_charuco_Front.mp4"
   - calibration_validation:
-    - has to be a video or image [".bmp", ".tiff", ".png", ".jpg",
+    - has to be a `video` or `image` [".bmp", ".tiff", ".png", ".jpg",
     ".AVI", ".avi", ".mp4"]
     - including recording_date (YYMMDD), calibration_validation_tag
     (as defined in project_config) and cam_id (element of valid_cam_ids
@@ -220,7 +215,7 @@ $ jupyter lab
     - f"{recording_date}_{calibration_validation_tag}" =
     Example: "220922_position_Top.jpg"
   - recording:
-    - has to be a video [".AVI", ".avi", ".mov", ".mp4"]
+    - has to be a `video` [".AVI", ".avi", ".mov", ".mp4"]
     - including recording_date (YYMMDD),
     cam_id (element of valid_cam_ids in project_config),
     mouse_line (element of animal_lines in project_config),
@@ -247,8 +242,6 @@ $ jupyter lab
 
 ### API Documentation
 Please see our API-documentation [here](https://let-it-be-3d.readthedocs.io/en/latest/)!
-
-## Why 3D?
 
 ## License
 GNU General Public License v3.0
