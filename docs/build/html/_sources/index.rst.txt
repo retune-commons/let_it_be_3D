@@ -10,6 +10,7 @@ Welcome to let_it_be_3D's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   Welcome.md
    modules
 
 

@@ -178,7 +178,8 @@ $ jupyter lab
     calibration_validation_object = CalibrationValidation(
       project_config_filepath="test_data/project_config.yaml",
       directory=rec_config.parent, recording_config_filepath=rec_config,
-      recreate_undistorted_plots = True, output_directory=rec_config.parent)
+      recreate_undistorted_plots = True, output_directory=rec_config.parent
+    )
     calibration_validation_object.add_ground_truth_config("test_data/ground_truth_config.yaml")
     calibration_validation_object.get_marker_predictions()
     calibration_validation_object.run_triangulation(

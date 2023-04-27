@@ -1,4 +1,4 @@
-core package
+let_it_be_3D package
 ============
 
 Submodules

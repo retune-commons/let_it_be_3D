@@ -33,8 +33,13 @@ release = 'test'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'myst_parser',
+    "sphinx_copybutton",
+    "sphinx_togglebutton",
+    "sphinx_design",
 ]
+myst_enable_extensions = ["colon_fence"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
