@@ -235,10 +235,8 @@ class MetaInterface(ABC):
         Notes
         _____
         Demands for adding directories automatically:
-            - recording directory name has to start with a recording date
-            (YYMMDD) that is added to the MetaInterface
-            - recording directory name has to end with any of the paradigms (as
-            defined in project_config)
+            - recording directory name has to start with a recording date (YYMMDD) that is added to the MetaInterface
+            - recording directory name has to end with any of the paradigms (as defined in project_config)
         If you want to add recording directories, that don't match this structure,
         use MetaInterface.add_recording_manually.
         """
