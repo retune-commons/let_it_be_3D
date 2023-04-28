@@ -3,14 +3,12 @@ sphinx-copybutton~=0.5.2
 sphinx-togglebutton~=0.3.2
 sphinx_design~=0.4.1
 numpy
-imageio
 aniposelib==0.4.3
 ffmpeg
 openpyxl
 pingouin
 seaborn
-yaml
-aniposelib==0.4.3
+PyYAML
 ffmpeg-python==0.2.0
 imageio>=2.25.0
 imageio-ffmpeg>=0.4.8
