@@ -40,7 +40,7 @@ flowchart TD;
 
 
 ### 1) Load videos and metadata
-- read video metadata from [filename](filestructure) and recording config file
+- read video metadata from filename and recording config file
 - intrinsic calibrations
     - use anipose intrinsic calibration
     - run or load intrinsic calibration based on uncropped checkerboard videos
@@ -191,7 +191,7 @@ $ jupyter lab
   
 </details>
 
-### <a name="filestructure"></a>Required filestructure
+### Required filestructure
 <details>
 <summary>Video filename </summary>
 
