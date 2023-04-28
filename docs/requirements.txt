@@ -5,7 +5,7 @@ sphinx_design~=0.4.1
 numpy
 imageio
 aniposelib==0.4.3
-ffmpeg~=5.1.2
+ffmpeg
 openpyxl
 pingouin
 seaborn
