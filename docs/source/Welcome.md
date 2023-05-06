@@ -135,7 +135,7 @@ $ jupyter lab
 GNU General Public License v3.0
 
 ## Contributers
-The pipeline was designed by [Konstantin Kobel](https://github.com/KonKob), [Dennis Segebarth](https://github.com/DSegebarth) and [Michael Schellenberger](https://github.com/MSchellenberger).
+This is a [Defense Circuits Lab](https://www.defense-circuits-lab.com/) project. The pipeline was designed by [Konstantin Kobel](https://github.com/KonKob), [Dennis Segebarth](https://github.com/DSegebarth) and [Michael Schellenberger](https://github.com/MSchellenberger).
 At the Sfb-Retune Hackathon 2022, [Elisa Garulli](https://github.com/ELGarulli), [Robert Peach](https://github.com/peach-lucien) and [Veronika Selzam](https://github.com/vselzam)
 joined the taskforce to push the project towards completion. 
 
