@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'let_it_be_3D'
-copyright = '2023, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger'
+copyright = '2023, Defense Circuits Lab, Konstantin Kobel, Dennis Segebarth, Michael Schellenberger'
 author = 'Konstantin Kobel, Dennis Segebarth, Michael Schellenberger'
 
 # The full version, including alpha/beta/rc tags
