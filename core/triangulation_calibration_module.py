@@ -227,7 +227,7 @@ def _save_dataframe_as_csv(filepath: Union[str, Path], df: pd.DataFrame) -> None
     if filepath.exists():
         filepath.unlink()
     df.to_csv(filepath, index=False)
-
+    
 
 def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
     all_normalization_markers = [config['CENTER']]
@@ -1158,19 +1158,19 @@ class Triangulation(ABC):
         num_cams[num_cams < 2] = np.nan
 
         all_points_3d_adj = all_points_3d
-        M = np.identity(3)
-        center = np.zeros(3)
+        #M = np.identity(3)
+        #center = np.zeros(3)
         df = pd.DataFrame()
         for bp_num, bp in enumerate(anipose_io["bodyparts"]):
             for ax_num, axis in enumerate(["x", "y", "z"]):
                 df[bp + "_" + axis] = all_points_3d_adj[:, bp_num, ax_num]
             df[bp + "_error"] = anipose_io['reprojerr'][:, bp_num]
             df[bp + "_score"] = scores_3d[:, bp_num]
-        for i in range(3):
-            for j in range(3):
-                df["M_{}{}".format(i, j)] = M[i, j]
-        for i in range(3):
-            df["center_{}".format(i)] = center[i]
+        #for i in range(3):
+        #    for j in range(3):
+        #        df["M_{}{}".format(i, j)] = M[i, j]
+        #for i in range(3):
+        #    df["center_{}".format(i)] = center[i]
         df["fnum"] = np.arange(n_frames)
         return df
 
@@ -1393,11 +1393,11 @@ class TriangulationRecordings(Triangulation):
         best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
         x, y, z = get_3D_array(self.df, config['CENTER'], best_frame)
         for key in self.df.keys():
-            if '_x' in key:
+            if key.endswith('_x'):
                 self.df[key] = self.df[key] - x
-            if '_y' in key:
+            if key.endswith('_y'):
                 self.df[key] = self.df[key] - y
-            if '_z' in key:
+            if key.endswith('_z'):
                 self.df[key] = self.df[key] - z
 
         reference_length_px = get_xyz_distance_in_triangulation_space(
@@ -1410,8 +1410,9 @@ class TriangulationRecordings(Triangulation):
         normalised = self.df.copy()
         normalised[bp_keys] *= conversionfactor
         if config['FLIP_AXIS_TO_ADJUST_CHIRALITY'] is not None:
-            keys_to_flip = [key for key in bp_keys if config['FLIP_AXIS_TO_ADJUST_CHIRALITY'] in key]
-            normalised[bp_keys] *= -1
+            keys_to_flip = [key for key in bp_keys if key.endswith(config['FLIP_AXIS_TO_ADJUST_CHIRALITY'])]
+            print(keys_to_flip)
+            normalised[keys_to_flip] *= -1
 
         reference_rotation_markers = []
         for marker in config['REFERENCE_ROTATION_MARKERS']:

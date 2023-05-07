@@ -706,9 +706,9 @@ class MetaInterface(ABC):
         data_base = pd.read_csv(data_base_path, dtype="str")
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
-                filename = self.objects["triangulation_recordings_objects"][
+                filename = str(self.objects["triangulation_recordings_objects"][
                     recording
-                ].csv_output_filepath.stem
+                ].rotated_filepath)
                 if filename in data_base["recording"].unique() and not overwrite:
                     print(
                         f"{filename} was already in test! if you want to add it anyways use overwrite=True!"
