@@ -89,7 +89,7 @@ load_calibration: True
 # triangulate, triangulate_optim_ransac_True, triangulate_optim_ransac_False 
 triangulation_type: triangulate
 
-allowed_num_diverging_frames: 20
+allowed_num_diverging_frames: 15
 # repeat, default, manual, error
 handle_synchro_fails: default
 default_offset_ms: 7000
