@@ -1390,7 +1390,11 @@ class TriangulationRecordings(Triangulation):
         """
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
-        best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
+        try:
+            best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
+        except ValueError:
+            self.rotated_filepath = None
+            return Path(""), 1000
         x, y, z = get_3D_array(self.df, config['CENTER'], best_frame)
         for key in self.df.keys():
             if key.endswith('_x'):
