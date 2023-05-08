@@ -47,7 +47,11 @@ flowchart TD;
     adjust intrinsic calibration for video cropping
       <details>
       <summary>Example </summary>
-        ToDo:(undistorted image???) 
+        <p align="left">
+        <img src="https://user-images.githubusercontent.com/104254966/236782423-28c15c1e-5d33-45ae-aab3-5fb592b19b79.png" width="350">
+        </p>
+
+        
       </details>
 ### 2) Video processing
 - synchronize videos temporally based on a blinking signal 
