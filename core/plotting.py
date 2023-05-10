@@ -227,6 +227,7 @@ class PredictionsPlot:
             predictions: Path,
             cam_id: str = "",
             output_directory: Optional[Union[str, Path]] = None,
+            likelihood_threshold: float = 0.6
     ) -> None:
         self.predictions = predictions
         self.image = image
@@ -235,6 +236,10 @@ class PredictionsPlot:
             output_directory = predictions.parent
         self.output_directory = convert_to_path(output_directory)
         self.filepath = self._create_filepath()
+        if likelihood_threshold > 1:
+            likelihood_threshold = 0.6
+        self.likelihood_threshold = likelihood_threshold
+            
 
     def create_plot(self, plot: bool, save: bool) -> None:
         df = pd.read_hdf(self.predictions)
@@ -242,7 +247,7 @@ class PredictionsPlot:
         image = iio.v3.imread(self.image, index=0)
         plt.imshow(image)
         for scorer, marker, _ in df.columns:
-            if df.loc[0, (scorer, marker, "likelihood")] > 0.6:
+            if df.loc[0, (scorer, marker, "likelihood")] > self.likelihood_threshold:
                 x, y = (
                     df.loc[0, (scorer, marker, "x")],
                     df.loc[0, (scorer, marker, "y")],

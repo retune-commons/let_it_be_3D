@@ -655,9 +655,9 @@ class Calibration:
                         f"Named it {good_calibration_filepath}.")
                 break
 
-        if overwrite_calibrations:
-            self.report_filepath = self.output_directory.joinpath(
+        self.report_filepath = self.output_directory.joinpath(
                 f"{self.recording_date}_calibration_report.csv")
+        if overwrite_calibrations or not self.report_filepath.exists():
             report.to_csv(self.report_filepath, index=False)
 
         if not calibration_found:
@@ -969,9 +969,14 @@ class Triangulation(ABC):
         self._delete_temp_files()
 
     def _delete_temp_files(self) -> None:
-        for path in self.triangulation_dlc_cams_filepaths.values():
+        cams_to_delete = []
+        for cam in self.triangulation_dlc_cams_filepaths:
+            path = self.triangulation_dlc_cams_filepaths[cam]
             if "_temp" in path.name:
                 path.unlink()
+                cams_to_delete.append(cam)
+        for cam in cams_to_delete:
+            self.triangulation_dlc_cams_filepaths.pop(cam)
 
     def exclude_markers(self, all_markers_to_exclude_config_path: Union[Path, str], verbose: bool = True):
         """
@@ -1390,7 +1395,12 @@ class TriangulationRecordings(Triangulation):
         """
         normalization_config_path = convert_to_path(normalization_config_path)
         config = read_config(normalization_config_path)
-        best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
+        try:
+            best_frame = _get_best_frame_for_normalisation(config=config, df=self.df)
+        except ValueError:
+            print(f"could not normalize the dataframe {self.csv_output_filepath}!")
+            self.rotated_filepath = None
+            return Path(""), 1000
         x, y, z = get_3D_array(self.df, config['CENTER'], best_frame)
         for key in self.df.keys():
             if key.endswith('_x'):
@@ -1647,6 +1657,7 @@ class CalibrationValidation(Triangulation):
                 predictions=h5_output_filepath,
                 output_directory=self.output_directory,
                 cam_id=cam.cam_id,
+                likelihood_threshold=self.score_threshold,
             )
             predictions.create_plot(plot=False, save=True)
         self.cams_to_exclude = []
