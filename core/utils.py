@@ -217,7 +217,7 @@ processing_filepath: {str: str}
     file to use for marker detection for recordings per cam.
 processing_type: {str: str}
     Dictionary with keys for all valid cam_ids, defining the type of marker 
-    detection to use per cam for recordings. Values: DLC, manual
+    detection to use per cam for recordings. Values: DLC, manual, exclude
 led_extraction_filepath: {str: str}
     Dictionary with keys for all valid cam_ids, defining the filepath to the 
     file to use for marker detection for synchronization per cam.

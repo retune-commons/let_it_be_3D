@@ -37,7 +37,7 @@ processing_type:
   Side2: DLC
   Side3: DLC
   Top: DLC
-  Front: manual
+  Front: exclude
 led_extraction_filepath:
   Bottom: "test_data/MarkerDetection/Bottom/config.yaml"
   Ground1: "test_data/MarkerDetection/Bottom/config.yaml"

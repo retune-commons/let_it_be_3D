@@ -1283,22 +1283,29 @@ class TriangulationRecordings(Triangulation):
             If True (default), then Crossvalidation plot and synchronised number
             of frames for each camera are printed.
         """
+        cams_not_to_analyse = []
         for video_interface in self.video_interfaces.values():
-            if (
-                    video_interface.video_metadata.fps
-                    >= video_interface.video_metadata.target_fps
-            ):
-                synchronizer = RecordingVideoDownSynchronizer
+            if video_interface.video_metadata.processing_type == "exclude":
+                cams_not_to_analyse.append(video_interface.video_metadata.cam_id)
             else:
-                synchronizer = RecordingVideoUpSynchronizer,
-            video_interface.run_synchronizer(
-                synchronizer=synchronizer,
-                output_directory=self.output_directory,
-                synchronize_only=False,
-                overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro,
-                synchro_metadata=self.synchro_metadata,
-                verbose=verbose
-            )
+                if (
+                        video_interface.video_metadata.fps
+                        >= video_interface.video_metadata.target_fps
+                ):
+                    synchronizer = RecordingVideoDownSynchronizer
+                else:
+                    synchronizer = RecordingVideoUpSynchronizer,
+                video_interface.run_synchronizer(
+                    synchronizer=synchronizer,
+                    output_directory=self.output_directory,
+                    synchronize_only=False,
+                    overwrite_DLC_analysis_and_synchro=overwrite_DLC_analysis_and_synchro,
+                    synchro_metadata=self.synchro_metadata,
+                    verbose=verbose
+                )
+        for cam in cams_not_to_analyse:
+            self.video_interfaces.pop(cam)
+            self.metadata_from_videos.pop(cam)
         self._plot_synchro_crossvalidation(verbose=verbose)
         self.triangulation_dlc_cams_filepaths = {
             video_interface: self.video_interfaces[
