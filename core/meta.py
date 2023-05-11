@@ -619,7 +619,7 @@ class MetaInterface(ABC):
         self.meta["meta_step"] = 6
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 
-    def triangulate_recordings(self, triangulate_full_recording: bool = True, verbose: bool = True) -> None:
+    def triangulate_recordings(self, triangulate_full_recording: bool = True, verbose: bool = True, use_preexisting_csvs: bool = False) -> None:
         """
         Run the function run_triangulation for all TriangulationRecording
         objects added to MetaInterface.
@@ -632,6 +632,9 @@ class MetaInterface(ABC):
         verbose: bool, default True
             If True (default), then the recording, that is currently analysed, and the
             duration of an analysis will be printed.
+        use_preexisting_csvs: bool, default False
+            If True (default False), then a already existing file at csv_output_filepath
+            will be read in and no triangulatin will be performed.
         """
         for recording_day in self.meta["recording_days"].values():
             for recording in recording_day["recordings"]:
@@ -642,6 +645,7 @@ class MetaInterface(ABC):
                 self.objects["triangulation_recordings_objects"][recording].run_triangulation(
                     calibration_toml_filepath=toml_filepath,
                     triangulate_full_recording=triangulate_full_recording,
+                    use_preexisting_csvs=use_preexisting_csvs
                 )
                 recording_day["recordings"][recording]["3D_csv"] = str(
                     self.objects["triangulation_recordings_objects"][

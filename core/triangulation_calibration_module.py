@@ -635,7 +635,7 @@ class Calibration:
                     f"Calibration {cal}\n mean percentage error: {mean_dist_err_percentage}\n "
                     f"mean angle error: {mean_angle_err}\n "
                     f"ap_lib reprojection error: {self.reprojerr}\n "
-                    f'Calvin mean reprojection error: {calibration_validation.anipose_io["reproj_nonan"].mean()}')
+                    f'calvin mean reprojection error: {calibration_validation.anipose_io["reproj_nonan"].mean()}')
                 
             report.loc[cal, "key"] = str(calibration_filepath)
             report.loc[cal, "num_cams"] = len(self.camera_objects)
@@ -900,6 +900,7 @@ class Triangulation(ABC):
             self,
             calibration_toml_filepath: Union[Path, str],
             triangulate_full_recording: bool = True,
+            use_preexisting_csvs: bool = False
     ) -> None:
         """
         Load and validate the calibration, triangulate and create 3D df.
@@ -916,56 +917,64 @@ class Triangulation(ABC):
         triangulate_full_recording: bool, default True
             If False (default True), then only the first 2 frames of the
             recording will be triangulated and the 3D dataframe won't be saved.
+        use_preexisting_csvs: bool, default False
+            If True (default False), then a already existing file at csv_output_filepath
+            will be read in and no triangulatin will be performed.
         """
         self.csv_output_filepath = self._create_csv_filepath()
-        calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
-        self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
-
-        filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
-        filepath_keys.sort()
-        self.all_cameras = [camera.name for camera in self.camera_group.cameras]
-        self.all_cameras.sort()
-        missing_cams_in_all_cameras = _find_non_matching_list_elements(filepath_keys,
-                                                                       self.all_cameras)
-        missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
-                                                                         filepath_keys)
-        if missing_cams_in_filepath_keys:
-            min_framenum = min([pd.read_hdf(path).shape[0] for path in
-                                self.triangulation_dlc_cams_filepaths.values()])
-            self._create_empty_files(cams_to_create_empty_files=missing_cams_in_filepath_keys,
-                                     framenum=min_framenum,
-                                     markers=self.markers)
-        for cam in missing_cams_in_all_cameras:
-            self.triangulation_dlc_cams_filepaths.pop(cam)
-            self.cams_to_exclude.append(cam)
-
-        self.anipose_io = self._preprocess_dlc_predictions_for_anipose(triangulate_full_recording=triangulate_full_recording)
-        if self.triangulation_type == "triangulate":
-            p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
-        elif self.triangulation_type == "triangulate_optim_ransac_False":
-            p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"],
-                                                            init_ransac=False,
-                                                            init_progress=True).reshape(
-                self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
-        elif self.triangulation_type == "triangulate_optim_ransac_True":
-            p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"],
-                                                            init_ransac=True,
-                                                            init_progress=True).reshape(
-                self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+        if use_preexisting_csvs and self.csv_output_filepath.exists():
+            self.df = pd.read_csv(self.csv_output_filepath)
+            print(f"Found a file at {self.csv_output_filepath}!\n"
+                  "No triangulation will be performed.")
         else:
-            raise ValueError(
-                "Supported methods for triangulation are triangulate, "
-                "triangulate_optim_ransac_True, triangulate_optim_ransac_False!")
-        self.anipose_io["p3ds"] = p3ds_flat.reshape(self.anipose_io["n_points"],
-                                                    self.anipose_io["n_joints"], 3)
+            calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
+            self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
 
-        self.anipose_io["reprojerr"], self.anipose_io["reproj_nonan"], self.anipose_io[
-            "reprojerr_flat"] = self._get_reprojection_errors(
-            p3ds_flat=p3ds_flat)
+            filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
+            filepath_keys.sort()
+            self.all_cameras = [camera.name for camera in self.camera_group.cameras]
+            self.all_cameras.sort()
+            missing_cams_in_all_cameras = _find_non_matching_list_elements(filepath_keys,
+                                                                           self.all_cameras)
+            missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
+                                                                             filepath_keys)
+            if missing_cams_in_filepath_keys:
+                min_framenum = min([pd.read_hdf(path).shape[0] for path in
+                                    self.triangulation_dlc_cams_filepaths.values()])
+                self._create_empty_files(cams_to_create_empty_files=missing_cams_in_filepath_keys,
+                                         framenum=min_framenum,
+                                         markers=self.markers)
+            for cam in missing_cams_in_all_cameras:
+                self.triangulation_dlc_cams_filepaths.pop(cam)
+                self.cams_to_exclude.append(cam)
 
-        self.df = self._get_dataframe_of_triangulated_points(anipose_io=self.anipose_io)
-        if (triangulate_full_recording) or (not self.csv_output_filepath.exists()):
-            _save_dataframe_as_csv(filepath=self.csv_output_filepath, df=self.df)
+            self.anipose_io = self._preprocess_dlc_predictions_for_anipose(triangulate_full_recording=triangulate_full_recording)
+            if self.triangulation_type == "triangulate":
+                p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
+            elif self.triangulation_type == "triangulate_optim_ransac_False":
+                p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"],
+                                                                init_ransac=False,
+                                                                init_progress=True).reshape(
+                    self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+            elif self.triangulation_type == "triangulate_optim_ransac_True":
+                p3ds_flat = self.camera_group.triangulate_optim(self.anipose_io["points"],
+                                                                init_ransac=True,
+                                                                init_progress=True).reshape(
+                    self.anipose_io["n_points"] * self.anipose_io["n_joints"], 3)
+            else:
+                raise ValueError(
+                    "Supported methods for triangulation are triangulate, "
+                    "triangulate_optim_ransac_True, triangulate_optim_ransac_False!")
+            self.anipose_io["p3ds"] = p3ds_flat.reshape(self.anipose_io["n_points"],
+                                                        self.anipose_io["n_joints"], 3)
+
+            self.anipose_io["reprojerr"], self.anipose_io["reproj_nonan"], self.anipose_io[
+                "reprojerr_flat"] = self._get_reprojection_errors(
+                p3ds_flat=p3ds_flat)
+
+            self.df = self._get_dataframe_of_triangulated_points(anipose_io=self.anipose_io)
+            if (triangulate_full_recording) or (not self.csv_output_filepath.exists()):
+                _save_dataframe_as_csv(filepath=self.csv_output_filepath, df=self.df)
         self._delete_temp_files()
 
     def _delete_temp_files(self) -> None:
@@ -1421,7 +1430,6 @@ class TriangulationRecordings(Triangulation):
         normalised[bp_keys] *= conversionfactor
         if config['FLIP_AXIS_TO_ADJUST_CHIRALITY'] is not None:
             keys_to_flip = [key for key in bp_keys if key.endswith(config['FLIP_AXIS_TO_ADJUST_CHIRALITY'])]
-            print(keys_to_flip)
             normalised[keys_to_flip] *= -1
 
         reference_rotation_markers = []
