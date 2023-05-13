@@ -279,9 +279,9 @@ def _znorm(x, epsilon):
 def _adjust_start_idx_and_offset(
         start_frame_idx: int, offset: int, fps: int
 ) -> Tuple[int, float]:
-    n_frames_to_add = round(offset / fps)
-    adjusted_start_frame_idx = start_frame_idx + n_frames_to_add
     original_ms_per_frame = _get_ms_interval_per_frame(fps=fps)
+    n_frames_to_add = int(offset / original_ms_per_frame)
+    adjusted_start_frame_idx = start_frame_idx + n_frames_to_add
     remaining_offset = offset - n_frames_to_add * original_ms_per_frame
     return adjusted_start_frame_idx, remaining_offset
 
@@ -825,7 +825,7 @@ class Synchronizer(ABC):
             self, start_idx: int, offset: float
     ) -> np.ndarray:
         adjusted_led_timeseries = self.led_timeseries[start_idx:].copy()
-        if self.video_metadata.fps > self.video_metadata.target_fps:
+        if self.video_metadata.fps >= self.video_metadata.target_fps:
             adjusted_led_timeseries = self._downsample_led_timeseries(
                 timeseries=adjusted_led_timeseries, offset=offset
             )
