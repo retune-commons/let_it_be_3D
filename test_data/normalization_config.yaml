@@ -21,6 +21,15 @@ REFERENCE_ROTATION_MARKERS:
 - MazeCornerClosedRight
 - MazeCornerOpenRight
 - MazeCornerOpenLeft
+EQUAL_LENGTHS_GROUND_TRUTH:
+- - - MazeCornerClosedLeft
+    - MazeCornerClosedRight
+  - - MazeCornerOpenRight
+    - MazeCornerOpenLeft
+- - - MazeCornerClosedLeft
+    - MazeCornerOpenLeft
+  - - MazeCornerOpenRight
+    - MazeCornerClosedRight
 INVISIBLE_MARKERS:
  x: [0, 0, 0, 0, 0, 0, 0, 0]
  y: [0, 50, 50, 0, 0, 50, 50, 0]
