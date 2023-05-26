@@ -934,32 +934,32 @@ class Triangulation(ABC):
             will be read in and no triangulatin will be performed.
         """
         self.csv_output_filepath = self._create_csv_filepath()
+        calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
+        self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
+
+        filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
+        filepath_keys.sort()
+        self.all_cameras = [camera.name for camera in self.camera_group.cameras]
+        self.all_cameras.sort()
+        missing_cams_in_all_cameras = _find_non_matching_list_elements(filepath_keys,
+                                                                       self.all_cameras)
+        missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
+                                                                         filepath_keys)
+        if missing_cams_in_filepath_keys:
+            min_framenum = min([pd.read_hdf(path).shape[0] for path in
+                                self.triangulation_dlc_cams_filepaths.values()])
+            self._create_empty_files(cams_to_create_empty_files=missing_cams_in_filepath_keys,
+                                     framenum=min_framenum,
+                                     markers=self.markers)
+        for cam in missing_cams_in_all_cameras:
+            self.triangulation_dlc_cams_filepaths.pop(cam)
+            self.cams_to_exclude.append(cam)
         if use_preexisting_csvs and self.csv_output_filepath.exists():
             self.df = pd.read_csv(self.csv_output_filepath)
+            self.anipose_io = {"reprojerr": np.array([0]), "reproj_nonan": np.array([0]), "reprojerr_flat": np.array([0])}
             print(f"Found a file at {self.csv_output_filepath}!\n"
                   "No triangulation will be performed.")
         else:
-            calibration_toml_filepath = convert_to_path(calibration_toml_filepath)
-            self.camera_group = self._load_calibration(filepath=calibration_toml_filepath)
-
-            filepath_keys = list(self.triangulation_dlc_cams_filepaths.keys())
-            filepath_keys.sort()
-            self.all_cameras = [camera.name for camera in self.camera_group.cameras]
-            self.all_cameras.sort()
-            missing_cams_in_all_cameras = _find_non_matching_list_elements(filepath_keys,
-                                                                           self.all_cameras)
-            missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
-                                                                             filepath_keys)
-            if missing_cams_in_filepath_keys:
-                min_framenum = min([pd.read_hdf(path).shape[0] for path in
-                                    self.triangulation_dlc_cams_filepaths.values()])
-                self._create_empty_files(cams_to_create_empty_files=missing_cams_in_filepath_keys,
-                                         framenum=min_framenum,
-                                         markers=self.markers)
-            for cam in missing_cams_in_all_cameras:
-                self.triangulation_dlc_cams_filepaths.pop(cam)
-                self.cams_to_exclude.append(cam)
-
             self.anipose_io = self._preprocess_dlc_predictions_for_anipose(triangulate_full_recording=triangulate_full_recording)
             if self.triangulation_type == "triangulate":
                 p3ds_flat = self.camera_group.triangulate(self.anipose_io["points_flat"], progress=True)
