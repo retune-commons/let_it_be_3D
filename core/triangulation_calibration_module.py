@@ -235,10 +235,11 @@ def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
         all_normalization_markers.append(marker)
     for marker in config["REFERENCE_ROTATION_MARKERS"]:
         all_normalization_markers.append(marker)
-    for equal_length in config["EQUAL_LENGTHS_GROUND_TRUTH"]:
-        for length in equal_length:
-            for marker in length:
-                all_normalization_markers.append(marker)
+    if "EQUAL_LENGTHS_GROUND_TRUTH" in config:
+        for equal_length in config["EQUAL_LENGTHS_GROUND_TRUTH"]:
+            for length in equal_length:
+                for marker in length:
+                    all_normalization_markers.append(marker)
     all_normalization_markers = set(all_normalization_markers)
     normalization_keys_nested = [get_3D_df_keys(marker) for marker in all_normalization_markers]
     normalization_keys = list(set(it.chain(*normalization_keys_nested)))
@@ -246,15 +247,18 @@ def _get_best_frame_for_normalisation(config: Dict, df: pd.DataFrame) -> int:
     valid_frames_for_normalization = list(df_normalization_keys.dropna(axis=0).index)
 
     if valid_frames_for_normalization:
-        list_of_ground_truths = []
-        for equal_length in config["EQUAL_LENGTHS_GROUND_TRUTH"]:
-            length_a, length_b = equal_length[0], equal_length[1]
-            a = get_xyz_distance_in_triangulation_space((length_a[0], length_a[1]), df)
-            b = get_xyz_distance_in_triangulation_space((length_b[0], length_b[1]), df)
-            list_of_ground_truths.append(abs((a-b))/abs((a+b)))
-        result = sum(list_of_ground_truths)
-        best_frame = np.argmin(result)
-        return best_frame
+        if "EQUAL_LENGTHS_GROUND_TRUTH" in config:
+            list_of_ground_truths = []
+            for equal_length in config["EQUAL_LENGTHS_GROUND_TRUTH"]:
+                length_a, length_b = equal_length[0], equal_length[1]
+                a = get_xyz_distance_in_triangulation_space((length_a[0], length_a[1]), df)
+                b = get_xyz_distance_in_triangulation_space((length_b[0], length_b[1]), df)
+                list_of_ground_truths.append(abs((a-b))/abs((a+b)))
+            result = sum(list_of_ground_truths)
+            best_frame = np.argmin(result)
+            return best_frame
+        else:
+            return valid_frames_for_normalization[0]
     else:
         raise ValueError("Could not normalize the dataframe!")
 
