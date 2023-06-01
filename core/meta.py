@@ -637,16 +637,22 @@ class MetaInterface(ABC):
             will be read in and no triangulatin will be performed.
         """
         for recording_day in self.meta["recording_days"].values():
+            recordings_to_exclude = []
             for recording in recording_day["recordings"]:
                 if verbose:
                     print(f"\nNow analysing {recording}!")
                     start_time_recording = time.time()
                 toml_filepath = recording_day['calibrations']['toml_filepath']
-                self.objects["triangulation_recordings_objects"][recording].run_triangulation(
-                    calibration_toml_filepath=toml_filepath,
-                    triangulate_full_recording=triangulate_full_recording,
-                    use_preexisting_csvs=use_preexisting_csvs
-                )
+                try:
+                    self.objects["triangulation_recordings_objects"][recording].run_triangulation(
+                        calibration_toml_filepath=toml_filepath,
+                        triangulate_full_recording=triangulate_full_recording,
+                        use_preexisting_csvs=use_preexisting_csvs
+                    )
+                except IndexError:
+                    print(f"{recording} was excluded!")
+                    recordings_to_exclude.append(recording)
+                    continue
                 recording_day["recordings"][recording]["3D_csv"] = str(
                     self.objects["triangulation_recordings_objects"][
                         recording
@@ -661,6 +667,9 @@ class MetaInterface(ABC):
                     print(
                         f"The analysis of this recording {recording} took {duration}."
                     )
+            for recording in recordings_to_exclude:
+                recording_day["recordings"].pop(recording)
+                self.objects["triangulation_recordings_objects"].pop(recording)
         self.meta["meta_step"] = 7
         self.export_meta_to_yaml(self.standard_yaml_filepath)
 

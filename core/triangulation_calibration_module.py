@@ -949,6 +949,10 @@ class Triangulation(ABC):
                                                                        self.all_cameras)
         missing_cams_in_filepath_keys = _find_non_matching_list_elements(self.all_cameras, 
                                                                          filepath_keys)
+        if len(self.all_cameras)-len(missing_cams_in_filepath_keys) < 2:
+                print("All videos had to be excluded!")
+                raise IndexError("The exclusion state for all cameras is 'exclude'. "
+                                 "At least two cameras are necessary to perform the triangulation!")
         if missing_cams_in_filepath_keys:
             min_framenum = min([pd.read_hdf(path).shape[0] for path in
                                 self.triangulation_dlc_cams_filepaths.values()])
@@ -1823,7 +1827,8 @@ class CalibrationValidation(Triangulation):
                     marker_detection_directory=config,
                 )
                 h5_output_filepath = dlc_interface.analyze_objects(filepath=h5_output_filepath,
-                                                                   filtering=False)
+                                                                   filtering=False, 
+                                                                   use_gpu = self.synchro_metadata["use_gpu"])
                 # filtering is not supported and not necessary for single frame predictions!
             else:
                 raise ValueError(
