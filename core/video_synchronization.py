@@ -1159,7 +1159,13 @@ class RecordingVideoSynchronizer(Synchronizer):
                 output_directory=self.output_directory,
                 marker_detection_directory=config_filepath,
             )
-            dlc_ending = dlc_interface.analyze_objects(filepath=output_filepath, filtering=True, use_gpu=self.use_gpu)
+            if self.use_gpu=="prevent":
+                use_gpu = "prevent"  
+            elif self.use_gpu == "":
+                use_gpu = ""
+            else:
+                use_gpu = "full"
+            dlc_ending = dlc_interface.analyze_objects(filepath=output_filepath, filtering=True, use_gpu=use_gpu)
 
         return output_filepath
 

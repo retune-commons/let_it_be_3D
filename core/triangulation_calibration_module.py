@@ -1828,7 +1828,7 @@ class CalibrationValidation(Triangulation):
                 )
                 h5_output_filepath = dlc_interface.analyze_objects(filepath=h5_output_filepath,
                                                                    filtering=False, 
-                                                                   use_gpu = self.synchro_metadata["use_gpu"])
+                                                                   use_gpu = "low")
                 # filtering is not supported and not necessary for single frame predictions!
             else:
                 raise ValueError(
