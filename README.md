@@ -1,7 +1,7 @@
 # let_it_be_3D
 
 With let_it_be_3D we want to extend the functions of aniposelib and bring them into a pipeline structure.
-Our goals are having as less manual steps required as possible and standardized quality assurance/collection of metadata.
+Our goals are having as few manual steps required as possible and standardized quality assurance/collection of metadata.
 We provide additional methods for `video synchronisation`, `adjustment for different framerates`, `validation of anipose calibration`, `adjustment of intrinsic calibrations to croppings`, `manual marker detection`, `checking and correcting filenames` and `normalisation of the 3D triangulated dataframe`.
 
 <details>
